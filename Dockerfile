@@ -2,9 +2,12 @@ from alpine:3.2
 
 RUN apk add --update musl python3 && rm /var/cache/apk/*
 RUN apk add --update bash && rm -rf /var/cache/apk/*
-ADD requirements.txt /requirements.txt
+ADD actors/requirements.txt /requirements.txt
 RUN pip3 install -r /requirements.txt
-ADD registration /registration
+ADD abaco.conf /etc/abaco.conf
+
+ADD actors /actors
 
 EXPOSE 5000
-CMD ["python3", "/registration/api.py"]
+
+CMD ["python3", "/actors/reg_api.py"]

@@ -1,0 +1,15 @@
+---
+
+reg:
+    image: ab_reg
+    name: reg
+    ports:
+        - "5000:5000"
+    links:
+        - redis
+
+redis:
+    image: redis
+    name: redis
+    ports:
+        - "6379:6379"
