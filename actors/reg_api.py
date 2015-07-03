@@ -51,8 +51,13 @@ class ActorsResource(Resource):
         state = args.get('state', None)
         actor = Actor(name, image, subscriptions, description, state)
         actors_store[actor.id] = json.dumps(actor.to_json())
+        self.add_actor_message()
         return actor.to_json()
 
+    def add_actor_message(self):
+        """Put a message on the new_actors queue to create a new ActorExecutor for an actor."""
+        # TODO
+        pass
 
 class Actor(object):
 
@@ -90,6 +95,10 @@ class ActorResource(Resource):
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
+
+    def delete(self, actor_id):
+        del actors_store[actor_id]
+        return {'msg': 'Delete successful.'}
 
 api.add_resource(ActorsResource, '/actors')
 api.add_resource(ActorResource, '/actors/<string:actor_id>')
