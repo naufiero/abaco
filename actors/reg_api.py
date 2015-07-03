@@ -51,11 +51,11 @@ class ActorsResource(Resource):
         state = args.get('state', None)
         actor = Actor(name, image, subscriptions, description, state)
         actors_store[actor.id] = json.dumps(actor.to_json())
-        self.add_actor_message()
+        self.new_actor_message()
         return actor.to_json()
 
-    def add_actor_message(self):
-        """Put a message on the new_actors queue to create a new ActorExecutor for an actor."""
+    def new_actor_message(self):
+        """Put a message on the new_actors queue that actor was created to create a new ActorExecutor for an actor."""
         # TODO
         pass
 
@@ -98,8 +98,13 @@ class ActorResource(Resource):
 
     def delete(self, actor_id):
         del actors_store[actor_id]
+        self.delete_actor_message(actor_id)
         return {'msg': 'Delete successful.'}
 
+    def delete_actor_message(self, actor_id):
+        """Put a command message on the actor_messages queue that actor was deleted."""
+        pass
+        
 api.add_resource(ActorsResource, '/actors')
 api.add_resource(ActorResource, '/actors/<string:actor_id>')
 
