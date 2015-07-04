@@ -30,7 +30,7 @@ class RequestParser(reqparse.RequestParser):
 class ActorsResource(Resource):
 
     def get(self):
-        return [actor for actor in actors_store.items()]
+        return [json.loads(actor[1]) for actor in actors_store.items()]
 
     def validate_post(self):
         parser = RequestParser()
@@ -91,7 +91,7 @@ class Actor(object):
 class ActorResource(Resource):
     def get(self, actor_id):
         try:
-            return actors_store[actor_id]
+            return json.loads(actors_store[actor_id])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
@@ -105,9 +105,39 @@ class ActorResource(Resource):
         """Put a command message on the actor_messages queue that actor was deleted."""
         pass
         
+class ActorStateResource(Resource):
+    def get(self, actor_id):
+        try:
+            actor = actors_store[actor_id]
+        except KeyError:
+            raise APIException(
+                "actor not found: {}'".format(actor_id), 404)
+        actor = json.loads(actor)
+        return actor.get('state')
+
+    def post(self, actor_id):
+        args = self.validate_post()
+        state = args['state']
+        try:
+            actor = actors_store[actor_id]
+        except KeyError:
+            raise APIException(
+                "actor not found: {}'".format(actor_id), 404)
+        actor = json.loads(actor)
+        actor['state'] = state
+        actors_store[actor_id] = json.dumps(actor)
+        return actor
+
+    def validate_post(self):
+        parser = RequestParser()
+        parser.add_argument('state', type=str, required=True, help="Set the state for this actor.")
+        args = parser.parse_args()
+        return args
+
+
 api.add_resource(ActorsResource, '/actors')
 api.add_resource(ActorResource, '/actors/<string:actor_id>')
-
+api.add_resource(ActorStateResource, '/actors/<string:actor_id>/state')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=True)
