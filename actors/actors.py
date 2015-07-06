@@ -53,6 +53,30 @@ class Subscription(DbDict):
                 return id
             idx = idx + 1
 
+class Execution(DbDict):
+    """Basic data access object representing an Actor execution."""
+
+    def __init__(self, actor, d):
+        super(Execution, self).__init__(d)
+        if not self.get('id'):
+            self['id'] = Execution.get_id(actor)
+
+    @classmethod
+    def get_id(cls, actor):
+        idx = 0
+        actor_id = actor.id
+        try:
+            excs = actor.executions
+        except KeyError:
+            return actor_id + "_exc_0"
+        if not excs:
+            return actor_id + "_exc_0"
+        while True:
+            id = actor_id + "_exc_" + str(idx)
+            if id not in excs:
+                return id
+            idx = idx + 1
+
 
 class ActorsResource(Resource):
 
@@ -167,7 +191,6 @@ class ActorSubscriptionResource(Resource):
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
-
         return subscriptions
 
     def post(self, actor_id):
@@ -197,3 +220,73 @@ class ActorSubscriptionResource(Resource):
         parser.add_argument('event_pattern', type=str, action='append', help="Regex pattern of event id's for the subscription.")
         args = parser.parse_args()
         return args
+
+
+class ActorExecutionsResource(Resource):
+    def get(self, actor_id):
+        try:
+            actor = Actor.from_db(actors_store[actor_id])
+        except KeyError:
+            raise APIException(
+                "actor not found: {}'".format(actor_id), 404)
+        tot = {'total_executions': 0, 'total_cpu': 0, 'total_io':0, 'total_runtime': 0, 'ids':[]}
+        executions = actor.get('executions') or {}
+        for id, val in executions.items():
+            tot['ids'].append(id)
+            tot['total_executions'] += 1
+            tot['total_cpu'] += int(val['cpu'])
+            tot['total_io'] += int(val['io'])
+            tot['total_runtime'] += int(val['runtime'])
+        return tot
+
+    def post(self, actor_id):
+        try:
+            actor = Actor.from_db(actors_store[actor_id])
+        except KeyError:
+            raise APIException(
+                "actor not found: {}'".format(actor_id), 404)
+        args = self.validate_post()
+        exc = Execution(actor, args)
+        try:
+            excs = actor.executions
+        except KeyError:
+            excs = {}
+        excs[exc.id] = exc
+        actor.executions = excs
+        actors_store[actor_id] = actor.to_db()
+        return actor
+
+    def validate_post(self):
+        parser = RequestParser()
+        parser.add_argument('runtime', type=str, required=True, help="Runtime, in milliseconds, of the execution.")
+        parser.add_argument('cpu', type=str, required=True, help="CPU usage, in user jiffies, of the execution.")
+        parser.add_argument('io', type=str, required=True, help="Block I/O usage, in number of 512-byte sectors read from and written to, by the execution.")
+        # Accounting for memory is quite hard -- probably easier to cap all containers at a fixed amount or perhaps have a graduated
+        # list of cap sized (e.g. small, medium and large).
+        # parser.add_argument('mem', type=str, required=True, help="Memory usage, , of the execution.")
+        args = parser.parse_args()
+        for k,v in args.items():
+            try:
+                int(v)
+            except ValueError:
+                raise APIException(message="Argument " + k + " must be an integer.")
+        return args
+
+
+class ActorExecutionResource(Resource):
+    def get(self, actor_id, execution_id):
+        try:
+            actor = Actor.from_db(actors_store[actor_id])
+        except KeyError:
+            raise APIException(
+                "actor not found: {}'".format(actor_id), 404)
+        try:
+            excs = actor.executions
+        except KeyError:
+            raise APIException("No executions found for actor {}.".format(actor_id))
+        try:
+            exc = excs[execution_id]
+        except KeyError:
+            raise APIException("Execution not found {}.".format(execution_id))
+        return exc
+
