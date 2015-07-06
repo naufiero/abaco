@@ -8,7 +8,7 @@ from stores import actors_store
 
 
 class Actor(DbDict):
-    """Basic data access oject for working with Actors."""
+    """Basic data access object for working with Actors."""
 
     def __init__(self, d):
         super(Actor, self).__init__(d)
@@ -51,7 +51,7 @@ class ActorsResource(Resource):
         actors_store[actor.id] = actor.to_db()
 
         self.new_actor_message()
-        return actor.to_json()
+        return actor
 
     def new_actor_message(self):
         """Put a message on the new_actors queue that actor was created to create a new ActorExecutor for an actor."""
@@ -73,19 +73,49 @@ class ActorResource(Resource):
         self.delete_actor_message(actor_id)
         return {'msg': 'Delete successful.'}
 
-    def delete_actor_message(self, actor_id):
-        """Put a command message on the actor_messages queue that actor was deleted."""
-        # TODO
-        pass
-
-class ActorStateResource(Resource):
-    def get(self, actor_id):
+    def put(self, actor_id):
         try:
             actor = Actor.from_db(actors_store[actor_id])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
-        return {'state': actor.state } or { 'state': None }
+        args = self.validate_put()
+        args['name'] = actor['name']
+        args['id'] = actor['id']
+        actor = Actor(args)
+        actors_store[actor.id] = actor.to_db()
+        self.update_actor_message(actor_id)
+        return actor
+
+    def validate_put(self):
+        parser = RequestParser()
+        parser.add_argument('image', type=str, required=True,
+                            help='Reference to image on docker hub for this actor.')
+        parser.add_argument('subscriptions', type=[str], help='List of event ids to subscribe this actor to.')
+        parser.add_argument('description', type=str)
+        args = parser.parse_args()
+        return args
+
+    def delete_actor_message(self, actor_id):
+        """Put a command message on the actor_messages queue that actor was deleted."""
+        # TODO
+        pass
+
+    def update_actor_message(self, actor_id):
+        """Put a command message on the actor_messages queue that actor was updated."""
+        # TODO
+        pass
+
+
+class ActorStateResource(Resource):
+    def get(self, actor_id):
+        try:
+            actor = Actor.from_db(actors_store[actor_id])
+            state = actor.get('state')
+        except KeyError:
+            raise APIException(
+                "actor not found: {}'".format(actor_id), 404)
+        return {'state': state }
 
     def post(self, actor_id):
         args = self.validate_post()
