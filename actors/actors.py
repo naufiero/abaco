@@ -3,14 +3,14 @@ import json
 from flask_restful import Resource, Api
 
 from models import Actor, Execution, Subscription
-from request_utils import RequestParser, APIException
+from request_utils import RequestParser, APIException, ok
 from stores import actors_store
 
 
 class ActorsResource(Resource):
 
     def get(self):
-        return [json.loads(actor[1]) for actor in actors_store.items()]
+        return ok(result=[json.loads(actor[1]) for actor in actors_store.items()], msg="Actors retrieved successfully.")
 
     def validate_post(self):
         parser = RequestParser()
@@ -27,7 +27,7 @@ class ActorsResource(Resource):
         actors_store[actor.id] = actor.to_db()
 
         self.new_actor_message()
-        return actor
+        return ok(result=actor, msg="Actor created successfully.")
 
     def new_actor_message(self):
         """Put a message on the new_actors queue that actor was created to create a new ActorExecutor for an actor."""
@@ -42,12 +42,12 @@ class ActorResource(Resource):
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
-        return actor
+        return ok(result=actor, msg="Actor retrieved successfully.")
 
     def delete(self, actor_id):
         del actors_store[actor_id]
         self.delete_actor_message(actor_id)
-        return {'msg': 'Delete successful.'}
+        return ok(msg='Actor delete successfully.')
 
     def put(self, actor_id):
         try:
@@ -61,7 +61,7 @@ class ActorResource(Resource):
         actor = Actor(args)
         actors_store[actor.id] = actor.to_db()
         self.update_actor_message(actor_id)
-        return actor
+        return ok(result=actor, msg="Actor updated successfully.")
 
     def validate_put(self):
         parser = RequestParser()
@@ -91,7 +91,7 @@ class ActorStateResource(Resource):
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
-        return {'state': state }
+        return ok(result={'state': state }, msg="Actor state retrieved successfully.")
 
     def post(self, actor_id):
         args = self.validate_post()
@@ -103,7 +103,7 @@ class ActorStateResource(Resource):
                 "actor not found: {}'".format(actor_id), 404)
         actor.state = state
         actors_store[actor_id] = actor.to_db()
-        return actor
+        return ok(result=actor, msg="State updated successfully.")
 
     def validate_post(self):
         parser = RequestParser()
@@ -120,7 +120,7 @@ class ActorSubscriptionResource(Resource):
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
-        return subscriptions
+        return ok(result=subscriptions, msg="Subscriptions retrieved successfully.")
 
     def post(self, actor_id):
         args = self.validate_post()
@@ -141,7 +141,7 @@ class ActorSubscriptionResource(Resource):
             subs[s.id] = s
             actor.subscriptions = subs
         actors_store[actor_id] = actor.to_db()
-        return actor
+        return ok(result=actor, msg="Subscriptions updated successfully.")
 
     def validate_post(self):
         parser = RequestParser()
@@ -166,7 +166,7 @@ class ActorExecutionsResource(Resource):
             tot['total_cpu'] += int(val['cpu'])
             tot['total_io'] += int(val['io'])
             tot['total_runtime'] += int(val['runtime'])
-        return tot
+        return ok(result=tot, msg="Actor executions retrieved successfully.")
 
     def post(self, actor_id):
         try:
@@ -183,7 +183,7 @@ class ActorExecutionsResource(Resource):
         excs[exc.id] = exc
         actor.executions = excs
         actors_store[actor_id] = actor.to_db()
-        return actor
+        return ok(result=actor, msg="Actor execution added successfully.")
 
     def validate_post(self):
         parser = RequestParser()
@@ -217,5 +217,5 @@ class ActorExecutionResource(Resource):
             exc = excs[execution_id]
         except KeyError:
             raise APIException("Execution not found {}.".format(execution_id))
-        return exc
+        return ok(result=exc, msg="Actor execution retrieved successfully.")
 
