@@ -1,4 +1,5 @@
 import json
+from stores import actors_store
 
 class DbDict(dict):
 
