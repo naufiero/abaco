@@ -2,7 +2,7 @@
 from flask_restful import Resource, Api
 
 from models import Actor
-from request_utils import RequestParser, APIException
+from request_utils import RequestParser, APIException, ok
 from stores import actors_store
 
 class MessagesResource(Resource):
@@ -16,7 +16,7 @@ class MessagesResource(Resource):
                 "actor not found: {}'".format(actor_id), 404)
         # TODO
         # retrieve pending messages from the queue
-        return {'messages': []}
+        return ok(result={'messages': []})
 
     def validate_post(self):
         parser = RequestParser()
@@ -27,7 +27,7 @@ class MessagesResource(Resource):
     def post(self, actor_id):
         args = self.validate_post()
         self.new_message(args['message'])
-        return {'msg': 'Success'}
+        return ok(result={'msg': 'Success'})
 
     def new_message(self, message):
         """Put a message on the new_actors queue that actor was created to create a new ActorExecutor for an actor."""
