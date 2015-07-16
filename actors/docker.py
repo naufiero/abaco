@@ -43,8 +43,11 @@ def execute_actor(image, msg):
             result['cpu'] += stats['cpu_stats']['cpu_usage']['total_usage']
             result['io'] += stats['network']['rx_bytes']
         except ReadTimeout:
-            if max_run_time
-            
+            runtime = timeit.default_timer() - start
+            if max_run_time > 0 and max_run_time < runtime:
+                cli.stop(container.get('Id'))
+
+
     stop = timeit.default_timer()
-    result['runtime'] = stop - start
+    result['runtime'] = int(stop - start)
     return result
