@@ -1,10 +1,14 @@
 from channelpy import Channel
 
+from .config import Config
+from .stores import workers_store
 
 class Spawner(object):
 
     def __init__(self):
-        self.ch = Channel(name='command')
+        uri = Config.get('rabbit', 'uri')
+        self.ch = Channel(name='command', uri=uri)
+        self.num_workers = Config.get('workers', 'init_count')
 
     def run(self):
         while True:
@@ -37,16 +41,16 @@ class Spawner(object):
         workers = []
         try:
             for i in range(self.num_workers):
-                ch, worker = self.start_worker(actor_id, image)
+                ch, worker = self.start_worker(image)
                 channels.append(ch)
                 workers.append(worker)
         except Exception:
             for worker in workers:
-                kill(worker)
+                self.kill_worker(worker)
             return
         return channels, workers
 
-    def start_worker(self, actor_id, image):
+    def start_worker(self, image):
         ch = Channel()
         worker = self.schedule_to_run(image, ch._name)
         result = ch.get()
@@ -55,6 +59,11 @@ class Spawner(object):
         else:
             raise Exception()
 
+    def schedule_to_run(self, image, ch_name):
+        pass
+
+    def kill_worker(self, worker):
+        pass
 
 def main():
     pass

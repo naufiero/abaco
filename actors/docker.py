@@ -1,40 +1,50 @@
-import docker
-from models import Actor
-from stores import actors_store
+import timeit
 
-class ActorError(Exception):
+import docker
+from requests.exceptions import ReadTimeout
+
+from .config import Config
+
+max_run_time = Config.get('workers', 'max_run_time')
+
+class DockerError(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
         self.message = message
 
 
 
-def pull_image(actor_id):
+def pull_image(image):
     """
     Update the local registry with an actor's image.
     :param actor_id:
     :return:
     """
-    try:
-        actor = Actor.from_db(actors_store[actor_id])
-    except KeyError:
-        raise ActorError("Unable to pull image -- actor {} not found.".format(actor_id))
-    image = actor.image
     cli = docker.AutoVersionClient(base_url='unix://var/run/docker.sock')
     try:
         rsp = cli.pull(repository=image)
     except Exception as e:
-        raise ActorError("Error pulling image for actor {} - exception: {} ".format(actor_id, str(e)))
+        raise DockerError("Error pulling image {} - exception: {} ".format(image, str(e)))
     return rsp
 
 def execute_actor(image, msg):
+    result = {'cpu': 0,
+              'io': 0,
+              'runtime': 0 }
     cli = docker.AutoVersionClient(base_url='unix://var/run/docker.sock')
     container = cli.create_container(image=image, environment={'message': msg})
     cli.start(container=container.get('Id'))
-    cli.wait(container=container.get('Id'))
-    
-
-if __name__ == "__main__":
-    rsp = pull_image("foo_1")
-    print("Image pulled. Response: {}".format(str(rsp)))
-
+    start = timeit.default_timer()
+    stats_obj = cli.stats(container=container.get('Id'), decode=True)
+    while True:
+        try:
+            cli.wait(container=container.get('Id'), timeout=0.5)
+            stats = next(stats_obj)
+            result['cpu'] += stats['cpu_stats']['cpu_usage']['total_usage']
+            result['io'] += stats['network']['rx_bytes']
+        except ReadTimeout:
+            if max_run_time
+            
+    stop = timeit.default_timer()
+    result['runtime'] = stop - start
+    return result

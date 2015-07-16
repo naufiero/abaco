@@ -8,3 +8,4 @@ config_store = partial(
     Store, Config.get('store', 'host'), Config.getint('store', 'port'))
 
 actors_store = config_store(db=1)
+workers_store = config_store(db=2)
