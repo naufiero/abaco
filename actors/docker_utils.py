@@ -45,7 +45,7 @@ def pull_image(image):
         raise DockerError("Error pulling image {} - exception: {} ".format(image, str(e)))
     return rsp
 
-def run_worker(ch_name, image):
+def run_worker(image, ch_name):
     """
     Run an actor executor worker with a given channel and image
     :return:
