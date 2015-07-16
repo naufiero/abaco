@@ -2,6 +2,8 @@ import json
 
 from flask_restful import Resource, Api
 
+from channels import CommandChannel
+from codes import SUBMITTED
 from models import Actor, Execution, Subscription
 from request_utils import RequestParser, APIException, ok
 from stores import actors_store
@@ -23,10 +25,14 @@ class ActorsResource(Resource):
 
     def post(self):
         args = self.validate_post()
+        args['executions'] = {}
+        args['state'] = ''
+        args['subscriptions'] = []
+        args['status'] = SUBMITTED
         actor = Actor(args)
         actors_store[actor.id] = actor.to_db()
-
-        self.new_actor_message()
+        ch = CommandChannel()
+        ch.put_cmd(actor_id=actor.id, image=actor.image)
         return ok(result=actor, msg="Actor created successfully.")
 
     def new_actor_message(self):
@@ -47,7 +53,7 @@ class ActorResource(Resource):
     def delete(self, actor_id):
         del actors_store[actor_id]
         self.delete_actor_message(actor_id)
-        return ok(msg='Actor delete successfully.')
+        return ok(result=None, msg='Actor delete successfully.')
 
     def put(self, actor_id):
         try:
@@ -56,11 +62,21 @@ class ActorResource(Resource):
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
         args = self.validate_put()
+        update_image = False
         args['name'] = actor['name']
         args['id'] = actor['id']
+        args['executions'] = actor['executions']
+        args['state'] = actor['state']
+        if args['image'] == actor.image:
+            args['status'] = actor.status
+        else:
+            update_image = True
+            args['status'] = SUBMITTED
         actor = Actor(args)
         actors_store[actor.id] = actor.to_db()
-        self.update_actor_message(actor_id)
+        if update_image:
+            ch = CommandChannel()
+            ch.put_cmd(actor_id=actor.id, image=actor.image)
         return ok(result=actor, msg="Actor updated successfully.")
 
     def validate_put(self):
@@ -74,11 +90,6 @@ class ActorResource(Resource):
 
     def delete_actor_message(self, actor_id):
         """Put a command message on the actor_messages queue that actor was deleted."""
-        # TODO
-        pass
-
-    def update_actor_message(self, actor_id):
-        """Put a command message on the actor_messages queue that actor was updated."""
         # TODO
         pass
 
@@ -175,14 +186,7 @@ class ActorExecutionsResource(Resource):
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
         args = self.validate_post()
-        exc = Execution(actor, args)
-        try:
-            excs = actor.executions
-        except KeyError:
-            excs = {}
-        excs[exc.id] = exc
-        actor.executions = excs
-        actors_store[actor_id] = actor.to_db()
+        Execution.add_execution(actor_id, args)
         return ok(result=actor, msg="Actor execution added successfully.")
 
     def validate_post(self):

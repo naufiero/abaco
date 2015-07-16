@@ -9,13 +9,22 @@ reg:
         - redis
         - rabbit
 
-
 mes:
     image: ab_reg
     name: mes
     command: "python3 /actors/message_api.py"
     ports:
         - "5001:5000"
+    links:
+        - redis
+        - rabbit
+
+spawner:
+    image: ab_reg
+    name: spawner
+    command: "python3 /actors/spawner.py"
+    volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
     links:
         - redis
         - rabbit

@@ -34,6 +34,14 @@ class Actor(DbDict):
         a = Actor(json.loads(s))
         return a
 
+    @classmethod
+    def set_status(cls, actor_id, status):
+        """Update the status of an actor"""
+        actor = Actor.from_db(actors_store[actor_id])
+        actor.status = status
+        actors_store[actor.id] = actor.to_db()
+
+
 class Subscription(DbDict):
     """Basic data access object for an Actor's subscription to an event."""
 
@@ -81,3 +89,16 @@ class Execution(DbDict):
             if id not in excs:
                 return id
             idx = idx + 1
+
+    @classmethod
+    def add_execution(cls, actor_id, ex):
+        """
+        Add an execution to an actor.
+        :param actor_id: str
+        :param ex: dict
+        :return:
+        """
+        actor = Actor.from_db(actors_store[actor_id])
+        execution = Execution(actor, ex)
+        actor.executions[execution.id] = execution
+        actors_store[actor_id] = actor.to_db()
