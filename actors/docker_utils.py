@@ -80,8 +80,15 @@ def execute_actor(image, msg):
         # if there was an error starting the container, user will need to debig
         raise DockerStartContainerError("Could not start container {}. Exception {}".format(container.get('Id'), str(e)))
     start = timeit.default_timer()
-    stats_obj = cli.stats(container=container.get('Id'), decode=True)
     running = True
+    try:
+        stats_obj = cli.stats(container=container.get('Id'), decode=True)
+    except ReadTimeout:
+        # if the container execution is so fast that the inital stats object cannot be created,
+        # we skip the running loop and return a minimal stats object
+        result['cpu'] = 1
+        result['runtime'] = 1
+        return result
     while running:
         try:
             stats = next(stats_obj)
