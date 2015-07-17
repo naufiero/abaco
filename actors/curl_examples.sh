@@ -23,6 +23,7 @@ curl -X DELETE localhost:5000/actors/foo_1
 # add, message, and update example
 
 curl -X POST --data "name=foo&image=jstubbs/abaco_test" localhost:5000/actors
+curl -X POST --data "name=foo&image=jstubbs/abaco_test_nosleep" localhost:5000/actors
 curl localhost:5000/actors/foo_0
 curl -X POST --data "message=testing execution" localhost:5001/actors/foo_0/messages
 curl -X PUT --data "name=foo&image=jstubbs/abaco_test2" localhost:5000/actors/foo_0
