@@ -29,4 +29,4 @@ class MessagesResource(Resource):
         args = self.validate_post()
         ch = ActorMsgChannel(actor_id=actor_id)
         ch.put_msg(msg=args['message'])
-        return ok(result={'msg': 'Success'})
+        return ok(result={'msg': args['message']})

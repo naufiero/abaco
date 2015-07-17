@@ -12,7 +12,7 @@ reg:
 mes:
     image: ab_reg
     name: mes
-    command: "python3 /actors/message_api.py"
+    command: "python3 -u /actors/message_api.py"
     ports:
         - "5001:5000"
     links:
@@ -22,7 +22,7 @@ mes:
 spawner:
     image: ab_reg
     name: spawner
-    command: "python3 /actors/spawner.py"
+    command: "python3 -u /actors/spawner.py"
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
     links:

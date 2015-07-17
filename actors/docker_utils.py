@@ -1,6 +1,7 @@
 import timeit
 
 import docker
+from requests.packages.urllib3.exceptions import ReadTimeoutError
 from requests.exceptions import ReadTimeout
 
 from config import Config
@@ -8,7 +9,7 @@ from config import Config
 
 AE_IMAGE = 'ab_reg'
 
-max_run_time = Config.get('workers', 'max_run_time')
+max_run_time = int(Config.get('workers', 'max_run_time'))
 
 dd = Config.get('docker', 'dd')
 
@@ -55,7 +56,7 @@ def run_worker(image, ch_name):
                                      environment={'ch_name': ch_name,
                                                   'image': image},
                                      volumes=['/var/run/docker.sock'],
-                                     command='python3 /actors/worker.py')
+                                     command='python3 -u /actors/worker.py')
     binds = {'/var/run/docker.sock':{
         'bind': '/var/run/docker.sock',
         'ro': False }}
@@ -72,7 +73,7 @@ def execute_actor(image, msg):
               'io': 0,
               'runtime': 0 }
     cli = docker.AutoVersionClient(base_url=dd)
-    container = cli.create_container(image=image, environment={'message': msg})
+    container = cli.create_container(image=image, environment={'MSG': msg})
     try:
         cli.start(container=container.get('Id'))
     except Exception as e:
@@ -86,13 +87,19 @@ def execute_actor(image, msg):
             stats = next(stats_obj)
             result['cpu'] += stats['cpu_stats']['cpu_usage']['total_usage']
             result['io'] += stats['network']['rx_bytes']
-            cli.wait(container=container.get('Id'), timeout=0.1)
+        except ReadTimeoutError:
+            # container stopped before another stats record could be read, just ignore and move on
             running = False
-        except ReadTimeout:
-            runtime = timeit.default_timer() - start
-            if max_run_time > 0 and max_run_time < runtime:
-                cli.stop(container.get('Id'))
+        if running:
+            try:
+                cli.wait(container=container.get('Id'), timeout=1)
                 running = False
+            except ReadTimeout:
+                # the wait timed out so check if we are beyond the max_run_time
+                runtime = timeit.default_timer() - start
+                if max_run_time > 0 and max_run_time < runtime:
+                    cli.stop(container.get('Id'))
+                    running = False
     stop = timeit.default_timer()
     result['runtime'] = int(stop - start)
     return result

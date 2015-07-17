@@ -1,3 +1,4 @@
+import json
 import time
 
 import rabbitpy
@@ -31,46 +32,54 @@ class Spawner(object):
         print("Processing cmd:{}".format(str(cmd)))
         actor_id = cmd['actor_id']
         image = cmd['image']
+        print("Actor id:{}".format(actor_id))
         try:
-            new_channels, new_workers = self.start_workers(actor_id, image)
+            new_channels, anon_channels, new_workers = self.start_workers(actor_id, image)
         except SpawnerException as e:
             # for now, start_workers will do clean up for a SpawnerException, so we just need
             # to return back to the run loop.
             return
+        print("Created new workers: {}".format(str(new_workers)))
 
         # get any existing workers:
         try:
-            workers = workers_store[actor_id]
+            workers = json.loads(workers_store[actor_id])
+            print("Found existing workers: {}".format(str(workers)))
         except KeyError:
+            print("No existing workers.")
             workers = {}
 
         # if there are existing workers, we need to close the actor message channel and
         # gracefully shutdown the existing worker processes.
-        if len(workers.values()) > 0 :
+        if len(workers) > 0 :
             # first, close the actor msg channel to prevent any new messages from being pulled
             # by the old workers.
             actor_ch = ActorMsgChannel(actor_id)
             actor_ch.close()
 
             # now, send messages to workers for a graceful shutdown:
-            for worker in workers.values():
+            for worker in workers:
                 ch = WorkerChannel(name=worker['ch_name'])
                 ch.put('stop')
 
         # finally, tell new workers to subscribe to the actor channel.
-        for channel in new_channels:
+        for channel in anon_channels:
             channel.put({'status': 'ok', 'actor_id': actor_id})
 
-        workers_store[actor_id] = new_workers
+        workers_store[actor_id] = json.dumps(new_workers)
 
     def start_workers(self, actor_id, image):
-        print("starting workers. actor_id: {} image: {}".format(actor_id, image))
+        print("starting {} workers. actor_id: {} image: {}".format(str(self.num_workers), actor_id, image))
         channels = []
+        anon_channels = []
         workers = []
         try:
             for i in range(self.num_workers):
-                ch, worker = self.start_worker(image)
+                print("starting worker {}".format(str(i)))
+                ch, anon_ch, worker = self.start_worker(image)
+                print("channel for worker {} is: {}".format(str(i), ch._name))
                 channels.append(ch)
+                anon_channels.append(anon_ch)
                 workers.append(worker)
         except SpawnerException as e:
             print("Caught SpawnerException:{}".format(str(e)))
@@ -80,19 +89,21 @@ class Spawner(object):
                 try:
                     self.kill_worker(worker)
                 except DockerError as e:
-                    # todo -- should log these but want to continue on.
-                    pass
+                    print("Received DockerError trying to kill worker: {}".format(str(e)))
             raise SpawnerException()
-        return channels, workers
+        return channels, anon_channels, workers
 
     def start_worker(self, image):
         ch = WorkerChannel()
         # start an actor executor container and wait for a confirmation that image was pulled.
         worker = run_worker(image, ch._name)
+        print("worker started successfully, waiting on ack that image was pulled...")
         result = ch.get()
-        if result['status'] == 'ok':
-            return ch, worker
+        if result['value']['status'] == 'ok':
+            print("received ack from worker.")
+            return ch, result['reply_to'], worker
         else:
+            print("Got an error status from worker: {}. Raising an exception.".format(str(result)))
             raise SpawnerException()
 
     def kill_worker(self, worker):

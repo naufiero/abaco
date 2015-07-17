@@ -34,4 +34,4 @@ class ActorMsgChannel(Channel):
         super().__init__(name='actor_msg_{}'.format(actor_id), uri=self.uri)
 
     def put_msg(self, msg):
-        self.put({'msg':msg})
+        self.put({'msg': msg})
