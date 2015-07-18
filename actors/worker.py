@@ -1,13 +1,17 @@
+import json
 import os
-import sys
 import threading
 
+from flask_restful import Resource, Api
 import channelpy
 
-from channels import ActorMsgChannel, WorkerChannel
+from channels import ActorMsgChannel, CommandChannel,WorkerChannel
 from codes import ERROR, READY
 from docker_utils import DockerError, DockerStartContainerError, execute_actor, pull_image
 from models import Actor, Execution
+from request_utils import APIException, ok, error, RequestParser
+from stores import actors_store, workers_store
+
 
 class WorkerException(Exception):
     def __init__(self, message):
@@ -18,7 +22,84 @@ class WorkerException(Exception):
 # required.
 keep_running = True
 
-def process_worker_ch(worker_ch, actor_ch):
+class WorkersResource(Resource):
+    def get(self, actor_id):
+        try:
+            workers = get_workers(actor_id)
+        except WorkerException as e:
+            raise APIException(e.message, 404)
+        return ok(result=workers, msg="Workers retrieved successfully.")
+
+    def validate_post(self):
+        parser = RequestParser()
+        parser.add_argument('num', type=int, help="Number of workers to start (default is 1).")
+        args = parser.parse_args()
+        return args
+
+    def post(self, actor_id):
+        """Start new workers for an actor"""
+        try:
+            actor = Actor.from_db(actors_store[actor_id])
+        except KeyError:
+            raise APIException(
+                "actor not found: {}'".format(actor_id), 404)
+        args = self.validate_post()
+        num = args.get('num')
+        if not num or num == 0:
+            num = 1
+        ch = CommandChannel()
+        ch.put_cmd(actor_id=actor.id, image=actor.image, num=num, stop_existing=False)
+        return ok(result=None, msg="Scheduled {} new worker(s) to start.".format(str(num)))
+
+class WorkerResource(Resource):
+    def get(self, actor_id, ch_name):
+        try:
+            worker = get_worker(actor_id, ch_name)
+        except WorkerException as e:
+            raise APIException(e.message, 404)
+        return ok(result=worker, msg="Worker retrieved successfully.")
+
+    def delete(self, actor_id, ch_name):
+        try:
+            worker = get_worker(actor_id, ch_name)
+        except WorkerException as e:
+            raise APIException(e.message, 404)
+        ch = WorkerChannel(name=ch_name)
+        ch.put("stop")
+        return ok(result=worker, msg="Worker scheduled to be stopped.")
+
+def get_workers(actor_id):
+    """Retrieve all workers for an actor."""
+    try:
+        Actor.from_db(actors_store[actor_id])
+    except KeyError:
+        raise WorkerException("actor not found: {}'".format(actor_id))
+    try:
+        workers = json.loads(workers_store[actor_id])
+    except KeyError:
+        return []
+    return workers
+
+def get_worker(actor_id, ch_name):
+    """Retrieve a worker from the workers store."""
+    workers = get_workers(actor_id)
+    for worker in workers:
+        if worker['ch_name'] == ch_name:
+            return worker
+    raise WorkerException("Worker not found.")
+
+def delete_worker(actor_id, ch_name):
+    workers = get_workers(actor_id)
+    i = -1
+    for idx, worker in enumerate(workers):
+        if worker['ch_name'] == ch_name:
+            i = idx
+        if i > -1:
+            workers.pop(i)
+            workers_store[actor_id] = json.dumps(workers)
+
+
+def process_worker_ch(worker_ch, actor_id, actor_ch):
     """ Target for a thread to listen on the worker channel for a message to stop processing.
     :param worker_ch:
     :return:
@@ -28,6 +109,10 @@ def process_worker_ch(worker_ch, actor_ch):
     msg = worker_ch.get()
     if msg == 'stop':
         print("Received stop message, stopping worker...")
+        try:
+            delete_worker(actor_id, worker_ch._name)
+        except WorkerException:
+            pass
         keep_running = False
         actor_ch.close()
 
@@ -38,7 +123,7 @@ def subscribe(actor_id, worker_ch):
     :return:
     """
     actor_ch = ActorMsgChannel(actor_id)
-    t = threading.Thread(target=process_worker_ch, args=(worker_ch, actor_ch))
+    t = threading.Thread(target=process_worker_ch, args=(worker_ch, actor_id, actor_ch))
     t.start()
     print("Worker subscribing to actor channel...")
     while keep_running:

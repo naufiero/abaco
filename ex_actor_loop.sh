@@ -1,7 +1,7 @@
 #!/bin/bash
 
 for i in `seq 1 100`; do
-  curl -X POST --data "message=testing execution" localhost:5001/actors/foo_1/messages
+  curl -X POST --data "message=testing execution" localhost:5001/actors/foo_0/messages
 done
 
 # nice clean up:

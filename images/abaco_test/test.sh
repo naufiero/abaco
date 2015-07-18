@@ -1,4 +1,4 @@
 #!/bin/bash
 
 echo "Contents of MSG: "$MSG
-sleep 5
+sleep 2

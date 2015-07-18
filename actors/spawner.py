@@ -28,20 +28,9 @@ class Spawner(object):
             cmd = self.cmd_ch.get()
             self.process(cmd)
 
-    def process(self, cmd):
-        print("Processing cmd:{}".format(str(cmd)))
-        actor_id = cmd['actor_id']
-        image = cmd['image']
-        print("Actor id:{}".format(actor_id))
-        try:
-            new_channels, anon_channels, new_workers = self.start_workers(actor_id, image)
-        except SpawnerException as e:
-            # for now, start_workers will do clean up for a SpawnerException, so we just need
-            # to return back to the run loop.
-            return
-        print("Created new workers: {}".format(str(new_workers)))
+    def stop_workers(self, actor_id):
+        """Stop existing workers; used when updating an actor's image."""
 
-        # get any existing workers:
         try:
             workers = json.loads(workers_store[actor_id])
             print("Found existing workers: {}".format(str(workers)))
@@ -62,19 +51,44 @@ class Spawner(object):
                 ch = WorkerChannel(name=worker['ch_name'])
                 ch.put('stop')
 
-        # finally, tell new workers to subscribe to the actor channel.
+
+    def process(self, cmd):
+        print("Processing cmd:{}".format(str(cmd)))
+        actor_id = cmd['actor_id']
+        image = cmd['image']
+        stop_existing = cmd.get('stop_existing', True)
+        num_workers = cmd.get('num', self.num_workers)
+        print("Actor id:{}".format(actor_id))
+        try:
+            new_channels, anon_channels, new_workers = self.start_workers(actor_id, image, num_workers)
+        except SpawnerException as e:
+            # for now, start_workers will do clean up for a SpawnerException, so we just need
+            # to return back to the run loop.
+            return
+        print("Created new workers: {}".format(str(new_workers)))
+
+        # stop any existing workers:
+        if stop_existing:
+            self.stop_workers(actor_id)
+
+        # tell new workers to subscribe to the actor channel.
         for channel in anon_channels:
             channel.put({'status': 'ok', 'actor_id': actor_id})
 
-        workers_store[actor_id] = json.dumps(new_workers)
+        if not stop_existing:
+            workers = json.loads(workers_store[actor_id])
+            workers.extend(new_workers)
+            workers_store[actor_id] = json.dumps(workers)
+        else:
+            workers_store[actor_id] = json.dumps(new_workers)
 
-    def start_workers(self, actor_id, image):
+    def start_workers(self, actor_id, image, num_workers):
         print("starting {} workers. actor_id: {} image: {}".format(str(self.num_workers), actor_id, image))
         channels = []
         anon_channels = []
         workers = []
         try:
-            for i in range(self.num_workers):
+            for i in range(num_workers):
                 print("starting worker {}".format(str(i)))
                 ch, anon_ch, worker = self.start_worker(image)
                 print("channel for worker {} is: {}".format(str(i), ch._name))

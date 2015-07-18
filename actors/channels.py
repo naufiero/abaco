@@ -20,10 +20,12 @@ class CommandChannel(Channel):
         self.uri = Config.get('rabbit', 'uri')
         super().__init__(name='command', uri=self.uri)
 
-    def put_cmd(self, actor_id, image):
+    def put_cmd(self, actor_id, image, num=None, stop_existing=True):
         """Put a new command on the command channel."""
-        self.put({'actor_id': actor_id,
-                  'image': image})
+        msg = {'actor_id': actor_id, 'image': image, 'stop_existing': stop_existing}
+        if num:
+            msg['num'] = num
+        self.put(msg)
 
 
 class ActorMsgChannel(Channel):

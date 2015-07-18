@@ -19,6 +19,16 @@ mes:
         - redis
         - rabbit
 
+admin:
+    image: ab_reg
+    name: admin
+    command: "python3 -u /actors/admin_api.py"
+    ports:
+        - "5003:5000"
+    links:
+        - redis
+        - rabbit
+
 spawner:
     image: ab_reg
     name: spawner
