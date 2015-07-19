@@ -1,5 +1,5 @@
 import json
-from stores import actors_store
+from stores import actors_store, logs_store
 
 class DbDict(dict):
 
@@ -102,3 +102,14 @@ class Execution(DbDict):
         execution = Execution(actor, ex)
         actor.executions[execution.id] = execution
         actors_store[actor_id] = actor.to_db()
+        return execution.id
+
+    @classmethod
+    def set_logs(cls, exc_id, logs):
+        """
+        Set the logs for an execution.
+        :param actor_id: str
+        :param ex: dict
+        :return:
+        """
+        logs_store[exc_id] = logs

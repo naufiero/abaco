@@ -108,5 +108,6 @@ def execute_actor(image, msg):
                     cli.stop(container.get('Id'))
                     running = False
     stop = timeit.default_timer()
+    logs = cli.logs(container.get('Id'))
     result['runtime'] = int(stop - start)
-    return result
+    return result, logs

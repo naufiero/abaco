@@ -9,3 +9,4 @@ config_store = partial(
 
 actors_store = config_store(db=1)
 workers_store = config_store(db=2)
+logs_store = config_store(db=3)

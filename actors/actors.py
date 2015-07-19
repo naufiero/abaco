@@ -6,7 +6,7 @@ from channels import CommandChannel
 from codes import SUBMITTED
 from models import Actor, Execution, Subscription
 from request_utils import RequestParser, APIException, ok
-from stores import actors_store
+from stores import actors_store, logs_store
 
 
 class ActorsResource(Resource):
@@ -223,3 +223,19 @@ class ActorExecutionResource(Resource):
             raise APIException("Execution not found {}.".format(execution_id))
         return ok(result=exc, msg="Actor execution retrieved successfully.")
 
+class ActorExecutionLogsResource(Resource):
+    def get(self, actor_id, execution_id):
+        try:
+            actor = Actor.from_db(actors_store[actor_id])
+        except KeyError:
+            raise APIException(
+                "actor not found: {}'".format(actor_id), 404)
+        try:
+            excs = actor.executions
+        except KeyError:
+            raise APIException("No executions found for actor {}.".format(actor_id))
+        try:
+            logs = logs_store[execution_id]
+        except KeyError:
+            logs = ""
+        return ok(result=logs, msg="Logs retrieved successfully.")

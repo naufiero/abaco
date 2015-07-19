@@ -133,14 +133,15 @@ def subscribe(actor_id, worker_ch):
             continue
         print("Received message {}. Starting actor container...".format(str(msg)))
         try:
-            stats = execute_actor(image, msg['msg'])
+            stats, logs = execute_actor(image, msg['msg'])
         except DockerStartContainerError as e:
             print("Got DockerStartContainerError: {}".format(str(e)))
             Actor.set_status(actor_id, ERROR)
             continue
         # add the execution to the actor store
         print("Actor container finished successfully. Got stats object:{}".format(str(stats)))
-        Execution.add_execution(actor_id, stats)
+        exc_id = Execution.add_execution(actor_id, stats)
+        Execution.set_logs(exc_id, logs)
 
 def main(worker_ch_name, image):
     worker_ch = WorkerChannel(name=worker_ch_name)
