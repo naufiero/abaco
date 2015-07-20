@@ -12,7 +12,7 @@ class APIException(Exception):
         self.message = message
         self.code = code
         self.status = 'error'
-        self.tag = TAG
+        self.version = TAG
 
 class RequestParser(reqparse.RequestParser):
     """Wrap reqparse to raise APIException."""
@@ -40,13 +40,13 @@ class AbacoApi(Api):
 def ok(result, msg="The request was successful"):
     d = {'result': result,
          'status': 'success',
-         'tag': TAG,
+         'version': TAG,
          'msg': msg}
     return d
 
 def error(result=None, msg="Error processing the request."):
     d = {'result': result,
          'status': 'error',
-         'tag': TAG,
+         'version': TAG,
          'msg': msg}
     return d
