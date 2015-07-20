@@ -94,9 +94,10 @@ def delete_worker(actor_id, ch_name):
     for idx, worker in enumerate(workers):
         if worker['ch_name'] == ch_name:
             i = idx
-        if i > -1:
-            workers.pop(i)
-            workers_store[actor_id] = json.dumps(workers)
+            break
+    if i > -1:
+        workers.pop(i)
+        workers_store[actor_id] = json.dumps(workers)
 
 
 def process_worker_ch(worker_ch, actor_id, actor_ch):
@@ -132,8 +133,9 @@ def subscribe(actor_id, worker_ch):
         except channelpy.ChannelTimeoutException:
             continue
         print("Received message {}. Starting actor container...".format(str(msg)))
+        message = msg.pop('msg', '')
         try:
-            stats, logs = execute_actor(image, msg['msg'])
+            stats, logs = execute_actor(image, message, msg)
         except DockerStartContainerError as e:
             print("Got DockerStartContainerError: {}".format(str(e)))
             Actor.set_status(actor_id, ERROR)
