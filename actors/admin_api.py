@@ -1,10 +1,10 @@
 from flask import Flask
-from flask_restful import Api
+from request_utils import AbacoApi
 
 from worker import WorkersResource, WorkerResource
 
 app = Flask(__name__)
-api = Api(app)
+api = AbacoApi(app)
 
 # Resources
 api.add_resource(WorkersResource, '/actors/<string:actor_id>/workers')
