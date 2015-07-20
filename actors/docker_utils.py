@@ -68,12 +68,13 @@ def run_worker(image, ch_name):
              'cid': container.get('Id'),
              'ch_name': ch_name}
 
-def execute_actor(image, msg):
+def execute_actor(image, msg, d={}):
     result = {'cpu': 0,
               'io': 0,
               'runtime': 0 }
     cli = docker.AutoVersionClient(base_url=dd)
-    container = cli.create_container(image=image, environment={'MSG': msg})
+    d['MSG'] = msg
+    container = cli.create_container(image=image, environment=d)
     try:
         cli.start(container=container.get('Id'))
     except Exception as e:
