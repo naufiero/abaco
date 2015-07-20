@@ -1,11 +1,11 @@
 
 from flask import Flask
-from flask_restful import Api
+from request_utils import AbacoApi
 
 from messages import MessagesResource
 
 app = Flask(__name__)
-api = Api(app)
+api = AbacoApi(app)
 
 # Resources
 api.add_resource(MessagesResource, '/actors/<string:actor_id>/messages')

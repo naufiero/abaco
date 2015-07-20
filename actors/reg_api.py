@@ -1,13 +1,13 @@
 
 from flask import Flask
-from flask_restful import Api
+from request_utils import AbacoApi
 
 from actors import ActorResource, ActorStateResource, ActorsResource, \
     ActorSubscriptionResource, ActorExecutionsResource, ActorExecutionResource, \
     ActorExecutionLogsResource
 
 app = Flask(__name__)
-api = Api(app)
+api = AbacoApi(app)
 
 # Resources
 api.add_resource(ActorsResource, '/actors')
