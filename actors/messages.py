@@ -1,6 +1,6 @@
 
 from flask import request
-from flask_restful import Resource, Api
+from flask_restful import Resource
 
 from channels import ActorMsgChannel
 from models import Actor

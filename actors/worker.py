@@ -2,7 +2,7 @@ import json
 import os
 import threading
 
-from flask_restful import Resource, Api
+from flask_restful import Resource
 import channelpy
 
 from channels import ActorMsgChannel, CommandChannel,WorkerChannel
