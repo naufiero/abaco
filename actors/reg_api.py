@@ -5,9 +5,17 @@ from request_utils import AbacoApi
 from actors import ActorResource, ActorStateResource, ActorsResource, \
     ActorSubscriptionResource, ActorExecutionsResource, ActorExecutionResource, \
     ActorExecutionLogsResource
+from auth import authn_and_authz
+
 
 app = Flask(__name__)
 api = AbacoApi(app)
+
+# Authn/z
+@app.before_request
+def auth():
+    authn_and_authz()
+
 
 # Resources
 api.add_resource(ActorsResource, '/actors')

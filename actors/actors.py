@@ -1,7 +1,9 @@
 import json
 
+from flask import g
 from flask_restful import Resource, Api
 
+from auth import add_permission
 from channels import CommandChannel
 from codes import SUBMITTED
 from models import Actor, Execution, Subscription
@@ -33,6 +35,7 @@ class ActorsResource(Resource):
         actors_store[actor.id] = actor.to_db()
         ch = CommandChannel()
         ch.put_cmd(actor_id=actor.id, image=actor.image)
+        add_permission(g.user, actor.id, 'UPDATE')
         return ok(result=actor, msg="Actor created successfully.")
 
     def new_actor_message(self):

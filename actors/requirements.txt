@@ -4,3 +4,5 @@ Flask-RESTful==0.3.3
 redis==2.10.3
 pika==0.9.13
 docker-py
+pycrypto==2.6.1
+PyJWT==0.2.3
