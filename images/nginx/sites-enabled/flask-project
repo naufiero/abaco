@@ -1,0 +1,26 @@
+server {
+
+    listen 80;
+    server_name abaco.org;
+    charset utf-8;
+
+    location /docs {
+        root /;
+    }
+
+    location ~/actors/(.*)/messages {
+        proxy_pass http://172.17.42.1:5001/actors/$1/messages;
+    }
+
+    location ~/actors/(.*)/workers {
+        proxy_pass http://172.17.42.1:5003/actors/$1/workers;
+    }
+
+    location ~/actors/(.*)/permissions {
+        proxy_pass http://172.17.42.1:5003/actors/$1/permissions;
+    }
+
+    location ~/actors(.*) {
+        proxy_pass http://172.17.42.1:5000/actors$1;
+    }
+}
