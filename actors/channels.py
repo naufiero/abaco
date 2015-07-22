@@ -1,4 +1,4 @@
-from channelpy import Channel
+from channelpy import Channel, RabbitConnection
 
 from config import Config
 
@@ -9,7 +9,9 @@ class WorkerChannel(Channel):
     """
     def __init__(self, name=None):
         self.uri = Config.get('rabbit', 'uri')
-        super().__init__(name, uri=self.uri)
+        super().__init__(name=name,
+                         connection_type=RabbitConnection,
+                         uri=self.uri)
 
 
 class CommandChannel(Channel):
@@ -18,7 +20,9 @@ class CommandChannel(Channel):
 
     def __init__(self):
         self.uri = Config.get('rabbit', 'uri')
-        super().__init__(name='command', uri=self.uri)
+        super().__init__(name='command',
+                         connection_type=RabbitConnection,
+                         uri=self.uri)
 
     def put_cmd(self, actor_id, image, num=None, stop_existing=True):
         """Put a new command on the command channel."""
@@ -33,7 +37,9 @@ class ActorMsgChannel(Channel):
     """
     def __init__(self, actor_id):
         self.uri = Config.get('rabbit', 'uri')
-        super().__init__(name='actor_msg_{}'.format(actor_id), uri=self.uri)
+        super().__init__(name='actor_msg_{}'.format(actor_id),
+                         connection_type=RabbitConnection,
+                         uri=self.uri)
 
     def put_msg(self, msg, d={}):
         d['msg'] = msg
