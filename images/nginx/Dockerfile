@@ -27,7 +27,7 @@ RUN apk add --update bash && rm -f /var/cache/apk/*
 # RUN ln -sf /dev/stdout /var/log/nginx/access.log
 # RUN ln -sf /dev/stderr /var/log/nginx/error.log
 
-ADD nginx.conf /etc/nginx/nginx.conf
+ADD nginx.conf /etc/nginx/conf/nginx.conf
 ADD sites-enabled/ /etc/nginx/sites-enabled
 
 VOLUME ["/var/log/nginx"]

@@ -8,12 +8,12 @@ server {
         root /;
     }
 
-    location ~/actors/(.*)/messages {
-        proxy_pass http://172.17.42.1:5001/actors/$1/messages;
+    location ~* ^/actors/(.*)/messages(.*) {
+        proxy_pass http://172.17.42.1:5001/actors/$1/messages$is_args$args;
     }
 
-    location ~/actors/(.*)/workers {
-        proxy_pass http://172.17.42.1:5003/actors/$1/workers;
+    location ~/actors/(.*)/workers(.*) {
+        proxy_pass http://172.17.42.1:5003/actors/$1/workers$2;
     }
 
     location ~/actors/(.*)/permissions {
