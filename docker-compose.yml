@@ -1,7 +1,7 @@
 ---
 
 nginx:
-    image: ab_nginx
+    image: jstubbs/abaco_nginx
     name: nginx
     volumes:
       - docs/swagger2.0.json:/docs/swagger2.0.json
@@ -9,7 +9,7 @@ nginx:
         - "8000:80"
 
 reg:
-    image: ab_reg
+    image: jstubbs/abaco_core
     name: reg
     ports:
         - "5000:5000"
@@ -18,7 +18,7 @@ reg:
         - rabbit
 
 mes:
-    image: ab_reg
+    image: jstubbs/abaco_core
     name: mes
     command: "python3 -u /actors/message_api.py"
     ports:
@@ -28,7 +28,7 @@ mes:
         - rabbit
 
 admin:
-    image: ab_reg
+    image: jstubbs/abaco_core
     name: admin
     command: "python3 -u /actors/admin_api.py"
     ports:
@@ -38,7 +38,7 @@ admin:
         - rabbit
 
 spawner:
-    image: ab_reg
+    image: jstubbs/abaco_core
     name: spawner
     command: "python3 -u /actors/spawner.py"
     volumes:
