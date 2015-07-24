@@ -91,7 +91,7 @@ class Spawner(object):
             for i in range(num_workers):
                 print("starting worker {}".format(str(i)))
                 ch, anon_ch, worker = self.start_worker(image)
-                print("channel for worker {} is: {}".format(str(i), ch._name))
+                print("channel for worker {} is: {}".format(str(i), ch.name))
                 channels.append(ch)
                 anon_channels.append(anon_ch)
                 workers.append(worker)
@@ -110,7 +110,7 @@ class Spawner(object):
     def start_worker(self, image):
         ch = WorkerChannel()
         # start an actor executor container and wait for a confirmation that image was pulled.
-        worker = run_worker(image, ch._name)
+        worker = run_worker(image, ch.name)
         print("worker started successfully, waiting on ack that image was pulled...")
         result = ch.get()
         if result['value']['status'] == 'ok':
