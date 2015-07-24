@@ -1,4 +1,4 @@
--e git://github.com/waltermoreira/channelpy.git#egg=channelpy
+-e git://github.com/TACC/channelpy.git#egg=channelpy
 flask==0.10.1
 Flask-RESTful==0.3.3
 redis==2.10.3
