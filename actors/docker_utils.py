@@ -1,3 +1,4 @@
+import os
 import timeit
 
 import docker
@@ -7,7 +8,7 @@ from requests.exceptions import ReadTimeout
 from config import Config
 
 
-AE_IMAGE = 'ab_reg'
+AE_IMAGE = os.environ.get('AE_IMAGE', 'jstubbs/abaco_core')
 
 max_run_time = int(Config.get('workers', 'max_run_time'))
 
