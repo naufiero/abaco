@@ -13,4 +13,4 @@ ADD actors /actors
 
 EXPOSE 5000
 
-CMD ["python3", "/actors/reg_api.py"]
+CMD ["python3", "-u", "/actors/reg_api.py"]
