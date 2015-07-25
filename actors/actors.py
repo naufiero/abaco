@@ -21,8 +21,15 @@ class ActorsResource(Resource):
         parser.add_argument('name', type=str, required=True, help="User defined name for this actor.")
         parser.add_argument('image', type=str, required=True,
                             help='Reference to image on docker hub for this actor.')
+        parser.add_argument('streaming', type=str)
         parser.add_argument('description', type=str)
         args = parser.parse_args()
+        if not args.get('streaming'):
+            args['streaming'] = 'FALSE'
+        else:
+            args['streaming'] = args['streaming'].upper()
+            if args['streaming'] not in ('TRUE', 'FALSE'):
+                raise APIException("Invalid value for streaming: must be in:{}".format(('TRUE', 'FALSE')))
         return args
 
     def post(self):
@@ -88,7 +95,15 @@ class ActorResource(Resource):
                             help='Reference to image on docker hub for this actor.')
         parser.add_argument('subscriptions', type=[str], help='List of event ids to subscribe this actor to.')
         parser.add_argument('description', type=str)
+        parser.add_argument('streaming', type=str)
         args = parser.parse_args()
+        if not args.get('streaming'):
+            args['streaming'] = 'FALSE'
+        else:
+            args['streaming'] = args['streaming'].upper()
+            print("Got streaming parm of: {}".format(args.get('streaming')))
+            if args['streaming'] not in ('TRUE', 'FALSE'):
+                raise APIException("Invalid value for streaming: must be in:{}".format(('TRUE', 'FALSE')))
         return args
 
     def delete_actor_message(self, actor_id):
