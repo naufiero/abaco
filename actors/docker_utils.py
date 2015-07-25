@@ -6,7 +6,8 @@ from requests.packages.urllib3.exceptions import ReadTimeoutError
 from requests.exceptions import ReadTimeout
 
 from config import Config
-
+from codes import BUSY
+from models import update_worker_status
 
 AE_IMAGE = os.environ.get('AE_IMAGE', 'jstubbs/abaco_core')
 
@@ -67,9 +68,10 @@ def run_worker(image, ch_name):
              # @todo - location will need to change to support swarm or multi-node compute cluster.
              'location': 'unix://var/run/docker.sock',
              'cid': container.get('Id'),
-             'ch_name': ch_name}
+             'ch_name': ch_name,
+             'status': BUSY}
 
-def execute_actor(image, msg, d={}):
+def execute_actor(actor_id, worker_ch, image, msg, d={}):
     result = {'cpu': 0,
               'io': 0,
               'runtime': 0 }
@@ -82,6 +84,7 @@ def execute_actor(image, msg, d={}):
         # if there was an error starting the container, user will need to debig
         raise DockerStartContainerError("Could not start container {}. Exception {}".format(container.get('Id'), str(e)))
     start = timeit.default_timer()
+    update_worker_status(actor_id, worker_ch, BUSY)
     running = True
     try:
         stats_obj = cli.stats(container=container.get('Id'), decode=True)

@@ -1,5 +1,7 @@
 import json
-from stores import actors_store, logs_store
+import time
+
+from stores import actors_store, logs_store, workers_store
 
 class DbDict(dict):
 
@@ -113,3 +115,48 @@ class Execution(DbDict):
         :return:
         """
         logs_store[exc_id] = logs
+
+class WorkerException(Exception):
+    def __init__(self, message):
+        Exception.__init__(self, message)
+        self.message = message
+
+
+def get_workers(actor_id):
+    """Retrieve all workers for an actor."""
+    try:
+        Actor.from_db(actors_store[actor_id])
+    except KeyError:
+        raise WorkerException("actor not found: {}'".format(actor_id))
+    try:
+        workers = json.loads(workers_store[actor_id])
+    except KeyError:
+        return []
+    return workers
+
+def get_worker(actor_id, ch_name):
+    """Retrieve a worker from the workers store."""
+    workers = get_workers(actor_id)
+    for worker in workers:
+        if worker['ch_name'] == ch_name:
+            return worker
+    raise WorkerException("Worker not found.")
+
+def delete_worker(actor_id, ch_name):
+    workers = get_workers(actor_id)
+    i = -1
+    for idx, worker in enumerate(workers):
+        if worker['ch_name'] == ch_name:
+            i = idx
+            break
+    if i > -1:
+        workers.pop(i)
+        workers_store[actor_id] = json.dumps(workers)
+
+def update_worker_status(actor_id, worker_ch, status):
+    workers = get_workers(actor_id)
+    for worker in workers:
+        if worker['ch_name'] == worker_ch:
+            worker['status'] = status
+            worker['last_update'] = time.time()
+    workers_store[actor_id] = json.dumps(workers)

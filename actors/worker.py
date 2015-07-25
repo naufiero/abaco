@@ -1,22 +1,18 @@
 import json
 import os
 import threading
+import time
 
 from flask_restful import Resource
 import channelpy
 
 from channels import ActorMsgChannel, CommandChannel,WorkerChannel
-from codes import ERROR, READY
+from codes import ERROR, READY, BUSY
 from docker_utils import DockerError, DockerStartContainerError, execute_actor, pull_image
-from models import Actor, Execution
+from models import Actor, Execution, get_workers, get_worker, delete_worker, update_worker_status, WorkerException
 from request_utils import APIException, ok, error, RequestParser
 from stores import actors_store, workers_store
 
-
-class WorkerException(Exception):
-    def __init__(self, message):
-        Exception.__init__(self, message)
-        self.message = message
 
 # keep_running will be updated by the thread listening on the worker channel when a graceful shutdown is
 # required.
@@ -68,38 +64,6 @@ class WorkerResource(Resource):
         ch.put("stop")
         return ok(result=worker, msg="Worker scheduled to be stopped.")
 
-def get_workers(actor_id):
-    """Retrieve all workers for an actor."""
-    try:
-        Actor.from_db(actors_store[actor_id])
-    except KeyError:
-        raise WorkerException("actor not found: {}'".format(actor_id))
-    try:
-        workers = json.loads(workers_store[actor_id])
-    except KeyError:
-        return []
-    return workers
-
-def get_worker(actor_id, ch_name):
-    """Retrieve a worker from the workers store."""
-    workers = get_workers(actor_id)
-    for worker in workers:
-        if worker['ch_name'] == ch_name:
-            return worker
-    raise WorkerException("Worker not found.")
-
-def delete_worker(actor_id, ch_name):
-    workers = get_workers(actor_id)
-    i = -1
-    for idx, worker in enumerate(workers):
-        if worker['ch_name'] == ch_name:
-            i = idx
-            break
-    if i > -1:
-        workers.pop(i)
-        workers_store[actor_id] = json.dumps(workers)
-
-
 def process_worker_ch(worker_ch, actor_id, actor_ch):
     """ Target for a thread to listen on the worker channel for a message to stop processing.
     :param worker_ch:
@@ -111,7 +75,7 @@ def process_worker_ch(worker_ch, actor_id, actor_ch):
     if msg == 'stop':
         print("Received stop message, stopping worker...")
         try:
-            delete_worker(actor_id, worker_ch._name)
+            delete_worker(actor_id, worker_ch.name)
         except WorkerException:
             pass
         keep_running = False
@@ -128,6 +92,7 @@ def subscribe(actor_id, worker_ch):
     t.start()
     print("Worker subscribing to actor channel...")
     while keep_running:
+        update_worker_status(actor_id, worker_ch.name, READY)
         try:
             msg = actor_ch.get(timeout=2)
         except channelpy.ChannelTimeoutException:
@@ -135,7 +100,7 @@ def subscribe(actor_id, worker_ch):
         print("Received message {}. Starting actor container...".format(str(msg)))
         message = msg.pop('msg', '')
         try:
-            stats, logs = execute_actor(image, message, msg)
+            stats, logs = execute_actor(actor_id, worker_ch, image, message, msg)
         except DockerStartContainerError as e:
             print("Got DockerStartContainerError: {}".format(str(e)))
             Actor.set_status(actor_id, ERROR)
@@ -157,9 +122,11 @@ def main(worker_ch_name, image):
         raise e
     # inform spawner that image pulled successfully
     print("Image pulled successfully")
-    result = worker_ch.put_sync({'status': 'ok'})
+
     # wait to receive message from spawner that it is time to subscribe to the actor channel
     print("Worker waiting on message from spawner...")
+    result = worker_ch.put_sync({'status': 'ok'})
+
     if result['status'] == 'error':
         print("Worker received error message from spawner: {}. Quiting...".format(str(result)))
         raise WorkerException(str(result))
