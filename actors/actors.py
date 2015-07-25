@@ -9,6 +9,7 @@ from codes import SUBMITTED
 from models import Actor, Execution, Subscription
 from request_utils import RequestParser, APIException, ok
 from stores import actors_store, logs_store
+from worker import shutdown_workers
 
 
 class ActorsResource(Resource):
@@ -61,8 +62,8 @@ class ActorResource(Resource):
         return ok(result=actor, msg="Actor retrieved successfully.")
 
     def delete(self, actor_id):
+        shutdown_workers(actor_id)
         del actors_store[actor_id]
-        self.delete_actor_message(actor_id)
         return ok(result=None, msg='Actor delete successfully.')
 
     def put(self, actor_id):

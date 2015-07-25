@@ -21,6 +21,10 @@ keep_running = True
 class WorkersResource(Resource):
     def get(self, actor_id):
         try:
+            Actor.from_db(actors_store[actor_id])
+        except KeyError:
+            raise APIException("actor not found: {}'".format(actor_id), 400)
+        try:
             workers = get_workers(actor_id)
         except WorkerException as e:
             raise APIException(e.message, 404)
@@ -50,6 +54,10 @@ class WorkersResource(Resource):
 class WorkerResource(Resource):
     def get(self, actor_id, ch_name):
         try:
+            Actor.from_db(actors_store[actor_id])
+        except KeyError:
+            raise WorkerException("actor not found: {}'".format(actor_id))
+        try:
             worker = get_worker(actor_id, ch_name)
         except WorkerException as e:
             raise APIException(e.message, 404)
@@ -63,6 +71,15 @@ class WorkerResource(Resource):
         ch = WorkerChannel(name=ch_name)
         ch.put("stop")
         return ok(result=worker, msg="Worker scheduled to be stopped.")
+
+def shutdown_workers(actor_id):
+    """Graceful shutdown of all workers for an actor"""
+    workers = get_workers(actor_id)
+    for worker in workers:
+        ch = WorkerChannel(name=worker['ch_name'])
+        ch.put('stop')
+
+
 
 def process_worker_ch(worker_ch, actor_id, actor_ch):
     """ Target for a thread to listen on the worker channel for a message to stop processing.
