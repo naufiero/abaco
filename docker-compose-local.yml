@@ -3,8 +3,6 @@
 nginx:
     build: images/nginx
     name: nginx
-    volumes:
-      - docs/swagger2.0.json:/docs/swagger2.0.json
     ports:
         - "8000:80"
 
