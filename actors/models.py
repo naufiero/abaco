@@ -125,10 +125,6 @@ class WorkerException(Exception):
 def get_workers(actor_id):
     """Retrieve all workers for an actor."""
     try:
-        Actor.from_db(actors_store[actor_id])
-    except KeyError:
-        raise WorkerException("actor not found: {}'".format(actor_id))
-    try:
         workers = json.loads(workers_store[actor_id])
     except KeyError:
         return []
