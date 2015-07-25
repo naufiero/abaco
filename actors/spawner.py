@@ -71,16 +71,20 @@ class Spawner(object):
         if stop_existing:
             self.stop_workers(actor_id)
 
-        # tell new workers to subscribe to the actor channel.
-        for channel in anon_channels:
-            channel.put({'status': 'ok', 'actor_id': actor_id})
-
+        # add workers to store first so that the records will be there when the workers go
+        # to update their status
         if not stop_existing:
             workers = json.loads(workers_store[actor_id])
             workers.extend(new_workers)
             workers_store[actor_id] = json.dumps(workers)
         else:
             workers_store[actor_id] = json.dumps(new_workers)
+
+
+        # tell new workers to subscribe to the actor channel.
+        for channel in anon_channels:
+            channel.put({'status': 'ok', 'actor_id': actor_id})
+
 
     def start_workers(self, actor_id, image, num_workers):
         print("starting {} workers. actor_id: {} image: {}".format(str(self.num_workers), actor_id, image))
