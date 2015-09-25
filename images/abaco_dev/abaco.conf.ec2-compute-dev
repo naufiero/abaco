@@ -1,6 +1,6 @@
 [store]
 # url for the redis instance
-host: 52.4.49.147
+host: 52.6.129.245
 
 # port for the redis instance
 port: 6379
@@ -8,7 +8,7 @@ port: 6379
 
 [rabbit]
 # url and port for the rabbitmq instance
-uri: amqp://52.4.49.147:5672
+uri: amqp://52.6.129.245:5672
 
 
 [workers]
@@ -27,7 +27,7 @@ dd: unix://var/run/docker.sock
 
 [web]
 # type of access control for the web front end. supports: 'jwt', and 'none'
-access_control: none
+access_control: jwt
 
 # the name of the tenant when deployed behind apim (jwt access_control)
 tenant_name: dev
