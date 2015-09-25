@@ -11,6 +11,9 @@ ADD abaco.conf /etc/abaco.conf
 
 ADD actors /actors
 
+ADD entry.sh /entry.sh
+RUN chmod +x /entry.sh
+
 EXPOSE 5000
 
-CMD ["python3", "-u", "/actors/reg_api.py"]
+CMD ["./entry.sh"]
