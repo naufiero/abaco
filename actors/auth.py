@@ -80,19 +80,28 @@ def authentication():
         return
     if access_control_type == 'jwt':
         return check_jwt(request)
-    abort(400)
+    abort(400, {'message': 'Invalid access_control'})
 
 
 def check_jwt(req):
     tenant_name = Config.get('web', 'tenant_name')
     try:
-        decoded = jwt.decode(
-            req.headers['X-JWT-Assertion-{0}'.format(tenant_name)],
-            PUB_KEY)
+        jwt_header = req.headers['X-JWT-Assertion-{0}'.format(tenant_name)]
+    except KeyError:
+        try:
+            jwt_header = req.headers['Assertion']
+        except KeyError:
+             msg = ''
+             for k,v in req.headers.items():
+                msg = msg + ' ' + str(k) + ': ' + str(v)
+             abort(400, {'message': 'JWT header missing. Headers: '+msg})
+             # abort(400, {'message': 'JWT header missing.'})
+    try:
+        decoded = jwt.decode(jwt_header, PUB_KEY)
         g.user = decoded['http://wso2.org/claims/enduser']
         g.token = get_token(req.headers)
     except (jwt.DecodeError, KeyError):
-        abort(400)
+        abort(400, {'message': 'Invalid JWT.'})
 
 def get_token(headers):
     """
