@@ -88,7 +88,7 @@ The services are now running behind ``nginx`` which should be listenting on 8000
 
    .. code-block:: bash
 
-      $ curl -X POST --data "message=execute yourself"  localhost:8000/actors/foo_0/message
+      $ curl -X POST --data "message=execute yourself"  localhost:8000/actors/foo_0/messages
 
    abaco executes the image resigtered for foo_0, in this case,
    jstubbs/abaco_test, and passes in the string `execute yourself` as
