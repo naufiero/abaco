@@ -1,0 +1,16 @@
+---
+
+redis:
+    image: redis
+    name: redis
+    ports:
+        - "6379:6379"
+
+rabbit:
+    image: rabbitmq:3.5.3-management
+    name: rabbit
+    ports:
+        - "5672:5672"
+        - "15672:15672"
+    environment:
+       RABBITMQ_NODENAME: abaco-rabbit
