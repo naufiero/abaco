@@ -26,3 +26,9 @@ class Store(collections.MutableMapping):
 
     def __len__(self):
         return self._db.dbsize()
+
+    def transaction(self, callable, *args):
+        """ Convenience wrapper around redis-py transaction. See the Pipelines section of the docs:
+        https://github.com/andymccurdy/redis-py
+        """
+        self._db.transaction(callable, args)
