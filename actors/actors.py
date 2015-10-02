@@ -8,7 +8,7 @@ from channels import CommandChannel
 from codes import SUBMITTED
 from models import Actor, Execution, Subscription
 from request_utils import RequestParser, APIException, ok
-from stores import actors_store, logs_store
+from stores import actors_store, logs_store, permissions_store
 from worker import shutdown_workers
 
 
@@ -46,11 +46,6 @@ class ActorsResource(Resource):
         add_permission(g.user, actor.id, 'UPDATE')
         return ok(result=actor, msg="Actor created successfully.")
 
-    def new_actor_message(self):
-        """Put a message on the new_actors queue that actor was created to create a new ActorExecutor for an actor."""
-        # TODO
-        pass
-
 
 class ActorResource(Resource):
     def get(self, actor_id):
@@ -63,7 +58,15 @@ class ActorResource(Resource):
 
     def delete(self, actor_id):
         shutdown_workers(actor_id)
+        try:
+            actor = Actor.from_db(actors_store[actor_id])
+            executions = actor.get('executions') or {}
+            for id, val in executions.items():
+                del logs_store[id]
+        except KeyError:
+            pass
         del actors_store[actor_id]
+        del permissions_store[actor_id]
         return ok(result=None, msg='Actor delete successfully.')
 
     def put(self, actor_id):
