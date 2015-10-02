@@ -5,6 +5,7 @@ redis:
     name: redis
     ports:
         - "6379:6379"
+    command: redis-server --appendonly yes
 
 rabbit:
     image: rabbitmq:3.5.3-management
