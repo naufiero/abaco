@@ -1,24 +1,30 @@
 ---
 
 nginx:
-    build: images/nginx
+    image: jstubbs/abaco_nginx
     name: nginx
+    volumes:
+        - ./local-dev.conf:/etc/abaco.conf
     ports:
         - "8000:80"
 
 reg:
-    build: .
+    image: jstubbs/abaco_core
     name: reg
     ports:
         - "5000:5000"
+    volumes:
+        - ./local-dev.conf:/etc/abaco.conf
     links:
         - redis
         - rabbit
 
 mes:
-    build: .
+    image: jstubbs/abaco_core
     name: mes
     command: "python3 -u /actors/message_api.py"
+    volumes:
+        - ./local-dev.conf:/etc/abaco.conf
     ports:
         - "5001:5000"
     links:
@@ -26,9 +32,11 @@ mes:
         - rabbit
 
 admin:
-    build: .
+    image: jstubbs/abaco_core
     name: admin
     command: "python3 -u /actors/admin_api.py"
+    volumes:
+        - ./local-dev.conf:/etc/abaco.conf
     ports:
         - "5003:5000"
     links:
@@ -36,7 +44,7 @@ admin:
         - rabbit
 
 spawner:
-    build: .
+    image: jstubbs/abaco_core
     name: spawner
     command: "python3 -u /actors/spawner.py"
     volumes:
