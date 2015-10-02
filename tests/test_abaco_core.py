@@ -156,6 +156,15 @@ def test_list_permissions():
     result = basic_response_checks(rsp)
     assert len(result) == 1
 
+def test_add_permissions():
+    url = '{}/actors/test_0/permissions'.format(base_url)
+    data = {'user': 'tester', 'level': 'UPDATE'}
+    rsp = requests.post(url, data=data)
+    result = basic_response_checks(rsp)
+    rsp = requests.get(url)
+    result = basic_response_checks(rsp)
+    assert len(result) == 2
+
 
 # ##############
 # Clean up
