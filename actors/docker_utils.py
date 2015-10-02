@@ -113,6 +113,12 @@ def execute_actor(actor_id, worker_ch, image, msg, d={}):
                     cli.stop(container.get('Id'))
                     running = False
     stop = timeit.default_timer()
+    # get logs from container
     logs = cli.logs(container.get('Id'))
+    # remove container, ignore errors
+    try:
+        cli.remove_container()
+    except:
+        pass
     result['runtime'] = int(stop - start)
     return result, logs
