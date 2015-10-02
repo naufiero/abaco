@@ -175,6 +175,9 @@ def add_permission(user, actor_id, level):
         permissions = get_permissions(actor_id)
     except PermissionsException:
         permissions = []
+    for pem in permissions:
+        if pem.get('user') == 'user' and pem.get('level') == level:
+            return
     permissions.append({'user': user,
                         'level': level})
     permissions_store[actor_id] = json.dumps(permissions)
