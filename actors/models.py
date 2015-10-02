@@ -139,15 +139,27 @@ def get_worker(actor_id, ch_name):
     raise WorkerException("Worker not found.")
 
 def delete_worker(actor_id, ch_name):
-    workers = get_workers(actor_id)
-    i = -1
-    for idx, worker in enumerate(workers):
-        if worker['ch_name'] == ch_name:
-            i = idx
-            break
-    if i > -1:
-        workers.pop(i)
-        workers_store[actor_id] = json.dumps(workers)
+    """Deletes a worker from the worker store. Uses Redis optimistic locking to provide thread-safety since multiple
+    clients could be attempting to delete workers at the same time.
+    """
+    def safe_delete(pipe):
+        """Removes a worker from the worker store in a thread-safe way; this is the callable function to be used
+        with the redis-py transaction method. See the Pipelines section of the docs:
+        https://github.com/andymccurdy/redis-py
+        """
+        workers = pipe.get(actor_id)
+        i = -1
+        for idx, worker in enumerate(workers):
+            if worker['ch_name'] == ch_name:
+                i = idx
+                break
+        if i > -1:
+            workers.pop(i)
+        pipe.multi()
+        pipe.set(actor_id, workers)
+
+    workers_store.transaction(safe_delete, actor_id)
+
 
 def update_worker_status(actor_id, worker_ch, status):
     workers = get_workers(actor_id)
