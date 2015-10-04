@@ -71,13 +71,14 @@ def run_worker(image, ch_name):
              'ch_name': ch_name,
              'status': BUSY}
 
-def execute_actor(actor_id, worker_ch, image, msg, d={}):
+def execute_actor(actor_id, worker_ch, image, msg, d={}, privileged=False):
     result = {'cpu': 0,
               'io': 0,
               'runtime': 0 }
     cli = docker.AutoVersionClient(base_url=dd)
     d['MSG'] = msg
-    container = cli.create_container(image=image, environment=d)
+    host_config = {'privileged': privileged}
+    container = cli.create_container(image=image, environment=d, host_config=host_config)
     try:
         cli.start(container=container.get('Id'))
     except Exception as e:
