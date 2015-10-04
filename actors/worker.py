@@ -116,8 +116,10 @@ def subscribe(actor_id, worker_ch):
             continue
         print("Received message {}. Starting actor container...".format(str(msg)))
         message = msg.pop('msg', '')
+        actor = Actor.from_db(actors_store[actor_id])
+        privileged = actor['privileged']
         try:
-            stats, logs = execute_actor(actor_id, worker_ch, image, message, msg)
+            stats, logs = execute_actor(actor_id, worker_ch, image, message, msg, privileged)
         except DockerStartContainerError as e:
             print("Got DockerStartContainerError: {}".format(str(e)))
             Actor.set_status(actor_id, ERROR)
