@@ -16,7 +16,8 @@ curl -X POST --data "cpu=9&io=5&runtime=1000" localhost:5000/actors/foo_0/execut
 curl localhost:5000/actors/foo_0/executions
 curl -X DELETE localhost:5000/actors/foo_1
 
-
+# pass json in
+curl -X POST -H "Content-Type: application/json" -d '{"image": "jstubbs/abaco_test", "name": "foo", "default_environment":{"key1": "value1"} }' localhost:8000/actors
 
 
 
