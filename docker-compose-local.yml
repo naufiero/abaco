@@ -52,8 +52,6 @@ spawner:
     links:
         - redis
         - rabbit
-    environment:
-          AE_IMAGE: abaco_spawner
 
 redis:
     image: redis
