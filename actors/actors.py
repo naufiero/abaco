@@ -25,7 +25,10 @@ class ActorsResource(Resource):
         parser.add_argument('streaming', type=str)
         parser.add_argument('description', type=str)
         parser.add_argument('privileged', type=str)
+        parser.add_argument('default_environment', type=dict)
         args = parser.parse_args()
+        if not args.get('default_environment'):
+            args['default_environment'] = {}
         if not args.get('streaming'):
             args['streaming'] = 'FALSE'
         else:
@@ -108,7 +111,10 @@ class ActorResource(Resource):
         parser.add_argument('description', type=str)
         parser.add_argument('streaming', type=str)
         parser.add_argument('privileged', type=str)
+        parser.add_argument('default_environment', type=dict)
         args = parser.parse_args()
+        if not args.get('default_environment'):
+            args['default_environment'] = {}
         if not args.get('streaming'):
             args['streaming'] = 'FALSE'
         else:
