@@ -148,15 +148,16 @@ def delete_worker(actor_id, ch_name):
         https://github.com/andymccurdy/redis-py
         """
         workers = pipe.get(actor_id)
+        workers = json.loads(workers)
         i = -1
         for idx, worker in enumerate(workers):
-            if worker['ch_name'] == ch_name:
+            if worker.get('ch_name') == ch_name:
                 i = idx
                 break
         if i > -1:
             workers.pop(i)
         pipe.multi()
-        pipe.set(actor_id, workers)
+        pipe.set(actor_id, json.dumps(workers))
 
     workers_store.transaction(safe_delete, actor_id)
 
