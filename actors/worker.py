@@ -115,11 +115,23 @@ def subscribe(actor_id, worker_ch):
         except channelpy.ChannelTimeoutException:
             continue
         print("Received message {}. Starting actor container...".format(str(msg)))
-        message = msg.pop('msg', '')
+        # the msg object is a dictionary with an entry called message and an arbitrary
+        # set of k:v pairs coming in from the query parameters.
+        message = msg.pop('message', '')
         actor = Actor.from_db(actors_store[actor_id])
-        privileged = actor['privileged']
+        privileged = False
+        if actor['privileged'] == 'TRUE':
+            privileged = True
+        environment = actor['default_environment']
+        print("Actor default environment: {}".format(environment))
+        print("Actor privileged: {}".format(privileged))
+        # overlay the default_environment registered for the actor with the msg
+        # dictionary
+        environment.update(msg)
+        print("Passing update environment: {}".format(environment))
         try:
-            stats, logs = execute_actor(actor_id, worker_ch, image, message, msg, privileged)
+            stats, logs = execute_actor(actor_id, worker_ch, image, message,
+                                        environment, privileged)
         except DockerStartContainerError as e:
             print("Got DockerStartContainerError: {}".format(str(e)))
             Actor.set_status(actor_id, ERROR)
