@@ -29,10 +29,13 @@ class MessagesResource(Resource):
     def post(self, actor_id):
         args = self.validate_post()
         d = {}
+        # build a dictionary of k:v pairs from the query parameters, and pass a single
+        # additional object 'message' from within the post payload. Note that 'message'
+        # need not be JSON data.
         for k, v in request.args.items():
             if k == 'message':
                 continue
             d[k] = v
         ch = ActorMsgChannel(actor_id=actor_id)
-        ch.put_msg(msg=args['message'], d=d)
+        ch.put_msg(message=args['message'], d=d)
         return ok(result={'msg': args['message']})
