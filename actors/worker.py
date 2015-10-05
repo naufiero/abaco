@@ -88,15 +88,24 @@ def process_worker_ch(worker_ch, actor_id, actor_ch):
     """
     global keep_running
     print("Worker subscribing to worker channel...")
-    msg = worker_ch.get()
-    if msg == 'stop':
-        print("Received stop message, stopping worker...")
-        try:
-            delete_worker(actor_id, worker_ch.name)
-        except WorkerException:
-            pass
-        keep_running = False
-        actor_ch.close()
+    while True:
+        msg = worker_ch.get()
+        print("Received message in worker channel: {}".format(msg))
+        print("Type(msg)={}".format(type(msg)))
+        if type(msg) == dict:
+            value = msg.get('value', '')
+            if value == 'status':
+                # this is a health check, return 'ok' to the reply_to channel.
+                ch = msg['reply_to']
+                ch.put('ok')
+        elif msg == 'stop':
+            print("Received stop message, stopping worker...")
+            try:
+                delete_worker(actor_id, worker_ch.name)
+            except WorkerException:
+                pass
+            keep_running = False
+            actor_ch.close()
 
 def subscribe(actor_id, worker_ch):
     """

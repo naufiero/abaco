@@ -155,7 +155,10 @@ def delete_worker(actor_id, ch_name):
                 i = idx
                 break
         if i > -1:
+            print("safe_delete found worker, removing.")
             workers.pop(i)
+        else:
+            print("safe_delete did not find worker: {}. workers:{}".format(ch_name, workers))
         pipe.multi()
         pipe.set(actor_id, json.dumps(workers))
 
