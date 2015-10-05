@@ -41,6 +41,6 @@ class ActorMsgChannel(Channel):
                          connection_type=RabbitConnection,
                          uri=self.uri)
 
-    def put_msg(self, msg, d={}):
-        d['msg'] = msg
+    def put_msg(self, message, d={}):
+        d['message'] = message
         self.put(d)
