@@ -80,8 +80,8 @@ def test_execute_actor():
     assert result.get('msg')  == 'testing execution'
     # check for the execution to complete
     count = 0
-    while count < 3:
-        time.sleep(2)
+    while count < 4:
+        time.sleep(3)
         url = '{}/actors/test_0/executions'.format(base_url)
         rsp = requests.get(url)
         result = basic_response_checks(rsp)
@@ -142,7 +142,7 @@ def test_delete_worker():
     url = '{}/actors/test_0/workers/{}'.format(base_url, id)
     rsp = requests.delete(url)
     result = basic_response_checks(rsp)
-    time.sleep(2)
+    time.sleep(4)
 
     # get the update list of workers
     url = '{}/actors/test_0/workers'.format(base_url)
