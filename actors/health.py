@@ -3,11 +3,12 @@
 # 2. all actors have at least one responsive worker
 # 3. all actors with autoscale=true have a number of workers proportional to the messages in the queue.
 
-import time
+# Execute from a container on a schedule as follows:
+# docker run -it -v /var/run/docker.sock:/var/run/docker.sock jstubbs/abaco_core python3 -u /actors/health.py
 
 import channelpy
 
-from docker_utils import rm_container
+from docker_utils import rm_container, DockerError
 from models import Actor, delete_worker, get_workers
 from channels import CommandChannel, WorkerChannel
 from stores import actors_store
@@ -29,11 +30,15 @@ def check_workers(actor_id):
             result = ch.put_sync('status', timeout=5)
         except channelpy.exceptions.ChannelTimeoutException:
             print("Worker did not respond, removing container and deleting worker.")
-            rm_container(worker['cid'])
+            try:
+                rm_container(worker['cid'])
+            except DockerError:
+                pass
             delete_worker(actor_id, worker['ch_name'])
             return
         if not result == 'ok':
             print("Worker responded unexpectedly: {}, deleting worker.".format(result))
+            rm_container(worker['cid'])
             delete_worker(actor_id, worker['ch_name'])
         else:
             print("Worker ok.")
