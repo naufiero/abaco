@@ -35,7 +35,7 @@ def check_workers(actor_id):
             except DockerError:
                 pass
             delete_worker(actor_id, worker['ch_name'])
-            return
+            continue
         if not result == 'ok':
             print("Worker responded unexpectedly: {}, deleting worker.".format(result))
             rm_container(worker['cid'])
