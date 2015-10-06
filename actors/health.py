@@ -4,7 +4,7 @@
 # 3. all actors with autoscale=true have a number of workers proportional to the messages in the queue.
 
 # Execute from a container on a schedule as follows:
-# docker run -it -v /var/run/docker.sock:/var/run/docker.sock jstubbs/abaco_core python3 -u /actors/health.py
+# docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock jstubbs/abaco_core python3 -u /actors/health.py
 
 import channelpy
 
