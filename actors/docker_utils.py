@@ -78,9 +78,21 @@ def execute_actor(actor_id, worker_ch, image, msg, d={}, privileged=False):
     cli = docker.AutoVersionClient(base_url=dd)
     d['MSG'] = msg
     host_config = {'privileged': privileged}
-    container = cli.create_container(image=image, environment=d, host_config=host_config)
+    binds = {}
+    volumes = []
+    # if container is privileged, mount the docker daemon so that additional
+    # containers can be started.
+    if privileged:
+        binds = {'/var/run/docker.sock':{
+                    'bind': '/var/run/docker.sock',
+                    'ro': False }}
+        volumes = ['/var/run/docker.sock']
+    container = cli.create_container(image=image,
+                                     environment=d,
+                                     host_config=host_config,
+                                     volumes=volumes)
     try:
-        cli.start(container=container.get('Id'))
+        cli.start(container=container.get('Id'), binds=binds)
     except Exception as e:
         # if there was an error starting the container, user will need to debig
         raise DockerStartContainerError("Could not start container {}. Exception {}".format(container.get('Id'), str(e)))
