@@ -1,3 +1,4 @@
+import json
 import os
 import timeit
 
@@ -110,11 +111,20 @@ def execute_actor(actor_id, worker_ch, image, msg, d={}, privileged=False):
     while running:
         try:
             stats = next(stats_obj)
-            result['cpu'] += stats['cpu_stats']['cpu_usage']['total_usage']
-            result['io'] += stats['network']['rx_bytes']
         except ReadTimeoutError:
             # container stopped before another stats record could be read, just ignore and move on
             running = False
+        try:
+            result['cpu'] += stats['cpu_stats']['cpu_usage']['total_usage']
+            result['io'] += stats['network']['rx_bytes']
+        except KeyError:
+            # as of docker 1.9, the stats object returns bytes that must be decoded
+            # and the network key is now 'networks' with multiple subkeys.
+            if type(stats) == bytes:
+                stats = json.loads(stats.decode("utf-8"))
+            result['cpu'] += stats['cpu_stats']['cpu_usage']['total_usage']
+            result['io'] += stats['networks']['eth0']['rx_bytes']
+
         if running:
             try:
                 cli.wait(container=container.get('Id'), timeout=1)
@@ -130,8 +140,9 @@ def execute_actor(actor_id, worker_ch, image, msg, d={}, privileged=False):
     logs = cli.logs(container.get('Id'))
     # remove container, ignore errors
     try:
-        cli.remove_container()
-    except:
-        pass
+        cli.remove_container(container=container)
+        print("Container removed.")
+    except Exception as e:
+        print("Exception trying to remove actor: {}".format(e))
     result['runtime'] = int(stop - start)
     return result, logs
