@@ -80,7 +80,7 @@ def test_execute_actor():
     assert result.get('msg')  == 'testing execution'
     # check for the execution to complete
     count = 0
-    while count < 4:
+    while count < 10:
         time.sleep(3)
         url = '{}/actors/test_0/executions'.format(base_url)
         rsp = requests.get(url)
