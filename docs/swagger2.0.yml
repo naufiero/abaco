@@ -1,0 +1,293 @@
+---
+  swagger: "2.0"
+  info:
+    version: "0.1"
+    title: "Abaco API"
+    description: "Actor based co(ntainers)mputing, an Actors-as-a-Service API."
+    contact:
+      email: "jstubbs@tacc.utexas.edu"
+    termsOfService: "http://agaveapi.co/terms"
+  tags:
+    -
+      name: "actors"
+      description: ""
+    -
+      name: "messages"
+      description: ""
+    -
+      name: "executions"
+      description: ""
+    -
+      name: "logs"
+      description: ""
+  paths:
+    /actors:
+      get:
+        tags:
+          - "actors"
+        responses:
+          200:
+            description: "list of actors"
+          500:
+            description: "internal error"
+        description: ""
+        summary: "Get list of all actors"
+        operationId: "getActors"
+        produces:
+          - "application/json"
+      post:
+        tags:
+          - "actors"
+        responses:
+          200:
+            description: "No response was specified"
+        description: ""
+        summary: "Create a new actor"
+        operationId: "createActor"
+        produces:
+          - "application/json"
+        parameters:
+          -
+            in: "formData"
+            description: "name of the actor"
+            name: "name"
+            required: true
+            type: "string"
+          -
+            in: "formData"
+            description: "Image on the public docker hub for the actor"
+            name: "image"
+            required: false
+            type: "string"
+          -
+            in: "formData"
+            description: "description of this actor"
+            name: "description"
+            required: false
+            type: "string"
+    /actors/{actor_id}:
+      delete:
+        tags:
+          - "actors"
+        parameters:
+          -
+            in: "path"
+            description: "id of the actor"
+            name: "actor_id"
+            required: true
+            type: "string"
+        responses:
+          200:
+            description: "Delete an actor"
+        description: ""
+        summary: "Delete an actor"
+        operationId: "deleteActor"
+        produces:
+          - "application/json"
+      get:
+        tags:
+          - "actors"
+        parameters:
+          -
+            in: "path"
+            description: "id of the actor"
+            name: "actor_id"
+            required: true
+            type: "string"
+        responses:
+          200:
+            description: "Get details about an actor."
+        description: ""
+        summary: "Get details about a actor"
+        operationId: "getActor"
+        produces:
+          - "application/json"
+      put:
+        tags:
+          - "actors"
+        responses:
+          200:
+            description: "No response was specified"
+        description: ""
+        summary: "Update an existing actor"
+        operationId: "updateActor"
+        produces:
+          - "application/json"
+        parameters:
+          -
+            in: "path"
+            description: "id of the actor"
+            name: "actor_id"
+            required: true
+            type: "string"
+          -
+            in: "formData"
+            description: "Image on the public docker hub for the actor"
+            name: "image"
+            required: false
+            type: "string"
+          -
+            in: "formData"
+            description: "description of this actor"
+            name: "description"
+            required: false
+            type: "string"
+    /actors/{actor_id}/messages:
+      get:
+        tags:
+          - "actors"
+          - "messages"
+        parameters:
+          -
+            in: "path"
+            description: "id of the actor"
+            name: "actor_id"
+            required: true
+            type: "string"
+        responses:
+          200:
+            description: "Get queued messages for an actor."
+        description: ""
+        summary: "Get queued messages for an actor."
+        operationId: "getActorMessages"
+        produces:
+          - "application/json"
+      post:
+        tags:
+          - "actors"
+          - "messages"
+        responses:
+          200:
+            description: "Post a new message to an actor to invoke it."
+        description: ""
+        summary: "Post a new message to an actor to invoke it."
+        operationId: "postActorMessage"
+        produces:
+          - "application/json"
+        parameters:
+          -
+            in: "path"
+            description: "id of the actor"
+            name: "actor_id"
+            required: true
+            type: "string"
+          -
+            in: "formData"
+            description: "message to pass to the actor"
+            name: "message"
+            required: true
+            type: "string"
+    /actors/{actor_id}/executions:
+      get:
+        tags:
+          - "actors"
+          - "executions"
+        parameters:
+          -
+            in: "path"
+            description: "id of the actor"
+            name: "actor_id"
+            required: true
+            type: "string"
+        responses:
+          200:
+            description: "Get executions for an actor."
+        description: ""
+        summary: "Get executions for an actor."
+        operationId: "getActorExecutions"
+        produces:
+          - "application/json"
+      post:
+        tags:
+          - "actors"
+          - "executions"
+        responses:
+          200:
+            description: "Post a new message to an actor to invoke it."
+        description: ""
+        summary: "Post a new message to an actor to invoke it."
+        operationId: "postActorExecution"
+        produces:
+          - "application/json"
+        parameters:
+          -
+            in: "path"
+            description: "id of the actor"
+            name: "actor_id"
+            required: true
+            type: "string"
+          -
+            in: "formData"
+            description: "Block I/O usage, in number of 512-byte sectors read from and written to, by the execution"
+            name: "io"
+            required: true
+            type: "string"
+          -
+            in: "formData"
+            description: "runtime in milliseconds of the execution"
+            name: "runtime"
+            required: true
+            type: "string"
+          -
+            in: "formData"
+            description: "cpu usage (in jiffies) of the execution"
+            name: "cpu"
+            required: true
+            type: "string"
+    /actors/{actor_id}/executions/{execution_id}:
+      get:
+        tags:
+          - "actors"
+          - "executions"
+        parameters:
+          -
+            in: "path"
+            description: "id of the actor"
+            name: "actor_id"
+            required: true
+            type: "string"
+          -
+            in: "path"
+            description: "id of the actor execution"
+            name: "execution_id"
+            required: true
+            type: "string"
+        responses:
+          200:
+            description: "Get details about an execution"
+        description: ""
+        summary: "Get details about an execution"
+        operationId: "getActorExecution"
+        produces:
+          - "application/json"
+    /actors/{actor_id}/executions/{execution_id}/logs:
+      get:
+        tags:
+          - "actors"
+          - "executions"
+          - "logs"
+        parameters:
+          -
+            in: "path"
+            description: "id of the actor"
+            name: "actor_id"
+            required: true
+            type: "string"
+          -
+            in: "path"
+            description: "id of the actor execution"
+            name: "execution_id"
+            required: true
+            type: "string"
+        responses:
+          200:
+            description: "Get container logs from an execution"
+        description: ""
+        summary: "Get container logs from an execution"
+        operationId: "getActorExecutionLogs"
+        produces:
+          - "application/json"
+  host: "localhost"
+  basePath: "/"
+  schemes:
+    - "http"

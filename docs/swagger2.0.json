@@ -1,304 +1,395 @@
 {
-  "swagger": "2.0",
-  "info": {
-    "version": "0.1",
-    "title": "Abaco API",
-    "description": "Actor based co(ntainers)mputing, an Actors-as-a-Service API.",
-    "contact": {
-      "email": "jstubbs@tacc.utexas.edu"
-    },
-    "termsOfService": "http://agaveapi.co/terms"
-  },
-  "tags": [
-    {
-      "name": "actors",
-      "description": ""
-    },
-    {
-      "name": "messages",
-      "description": ""
-    },
-    {
-      "name": "executions",
-      "description": ""
-    },
-    {
-      "name": "logs",
-      "description": ""
-    },
-    {
-      "name": "workers",
-      "description": ""
-    },
-    {
-      "name": "permissions",
-      "description": ""
-    }
-  ],
-  "paths": {
-    "/actors": {
-      "get": {
-        "tags": ["actors"],
-        "responses": {
-          "200": {
-            "description": "list of actors"
-          },
-          "500": {
-            "description": "internal error"
-          }
+    "basePath": "/",
+    "host": "localhost",
+    "info": {
+        "contact": {
+            "email": "jstubbs@tacc.utexas.edu"
         },
-        "description": "",
-        "summary": "Get list of all actors",
-        "operationId": "getActors",
-        "produces": [
-          "application/json"
-        ]
-      },
-      "post": {
-        "tags": ["actors"],
-        "responses": {
-          "200": {
-            "description": "No response was specified"
-          }
-        },
-        "description": "",
-        "summary": "Create a new actor",
-        "operationId": "createActor",
-        "produces": [
-          "application/json"
-        ],
-        "parameters": [
-          {
-            "in": "formData",
-            "description": "name of the actor",
-            "name": "name",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "in": "formData",
-            "description": "Image on the public docker hub for the actor",
-            "name": "image",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "in": "formData",
-            "description": "description of this actor",
-            "name": "description",
-            "required": false,
-            "type": "string"
-          }
-        ]
-      }
+        "description": "Actor based co(ntainers)mputing, an Actors-as-a-Service API.",
+        "termsOfService": "http://agaveapi.co/terms",
+        "title": "Abaco API",
+        "version": "0.1"
     },
-    "/actors/{actor_id}": {
-      "delete": {
-        "tags": ["actors"],
-        "responses": {
-          "200": {
-            "description": "Delete an actor"
-          }
+    "paths": {
+        "/actors": {
+            "get": {
+                "description": "",
+                "operationId": "getActors",
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "list of actors"
+                    },
+                    "500": {
+                        "description": "internal error"
+                    }
+                },
+                "summary": "Get list of all actors",
+                "tags": [
+                    "actors"
+                ]
+            },
+            "post": {
+                "description": "",
+                "operationId": "createActor",
+                "parameters": [
+                    {
+                        "description": "name of the actor",
+                        "in": "formData",
+                        "name": "name",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "description": "Image on the public docker hub for the actor",
+                        "in": "formData",
+                        "name": "image",
+                        "required": false,
+                        "type": "string"
+                    },
+                    {
+                        "description": "description of this actor",
+                        "in": "formData",
+                        "name": "description",
+                        "required": false,
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response was specified"
+                    }
+                },
+                "summary": "Create a new actor",
+                "tags": [
+                    "actors"
+                ]
+            }
         },
-        "description": "",
-        "summary": "Delete an actor",
-        "operationId": "deleteActor",
-        "produces": [
-          "application/json"
-        ]
-      },
-      "get": {
-        "tags": ["actors"],
-        "responses": {
-          "200": {
-            "description": "Get details about an actor."
-          }
+        "/actors/{actor_id}": {
+            "delete": {
+                "description": "",
+                "operationId": "deleteActor",
+                "parameters": [
+                    {
+                        "description": "id of the actor",
+                        "in": "path",
+                        "name": "actor_id",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Delete an actor"
+                    }
+                },
+                "summary": "Delete an actor",
+                "tags": [
+                    "actors"
+                ]
+            },
+            "get": {
+                "description": "",
+                "operationId": "getActor",
+                "parameters": [
+                    {
+                        "description": "id of the actor",
+                        "in": "path",
+                        "name": "actor_id",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get details about an actor."
+                    }
+                },
+                "summary": "Get details about a actor",
+                "tags": [
+                    "actors"
+                ]
+            },
+            "put": {
+                "description": "",
+                "operationId": "updateActor",
+                "parameters": [
+                    {
+                        "description": "id of the actor",
+                        "in": "path",
+                        "name": "actor_id",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "description": "Image on the public docker hub for the actor",
+                        "in": "formData",
+                        "name": "image",
+                        "required": false,
+                        "type": "string"
+                    },
+                    {
+                        "description": "description of this actor",
+                        "in": "formData",
+                        "name": "description",
+                        "required": false,
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response was specified"
+                    }
+                },
+                "summary": "Update an existing actor",
+                "tags": [
+                    "actors"
+                ]
+            }
         },
-        "description": "",
-        "summary": "Get details about a actor",
-        "operationId": "getActor",
-        "produces": [
-          "application/json"
-        ]
-      },
-      "put": {
-        "tags": ["actors"],
-        "responses": {
-          "200": {
-            "description": "No response was specified"
-          }
+        "/actors/{actor_id}/executions": {
+            "get": {
+                "description": "",
+                "operationId": "getActorExecutions",
+                "parameters": [
+                    {
+                        "description": "id of the actor",
+                        "in": "path",
+                        "name": "actor_id",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get executions for an actor."
+                    }
+                },
+                "summary": "Get executions for an actor.",
+                "tags": [
+                    "actors",
+                    "executions"
+                ]
+            },
+            "post": {
+                "description": "",
+                "operationId": "postActorExecution",
+                "parameters": [
+                    {
+                        "description": "id of the actor",
+                        "in": "path",
+                        "name": "actor_id",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "description": "Block I/O usage, in number of 512-byte sectors read from and written to, by the execution",
+                        "in": "formData",
+                        "name": "io",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "description": "runtime in milliseconds of the execution",
+                        "in": "formData",
+                        "name": "runtime",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "description": "cpu usage (in jiffies) of the execution",
+                        "in": "formData",
+                        "name": "cpu",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Post a new message to an actor to invoke it."
+                    }
+                },
+                "summary": "Post a new message to an actor to invoke it.",
+                "tags": [
+                    "actors",
+                    "executions"
+                ]
+            }
         },
-        "description": "",
-        "summary": "Update an existing actor",
-        "operationId": "updateActor",
-        "produces": [
-          "application/json"
-        ],
-        "parameters": [
-          {
-            "in": "formData",
-            "description": "Image on the public docker hub for the actor",
-            "name": "image",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "in": "formData",
-            "description": "description of this actor",
-            "name": "description",
-            "required": false,
-            "type": "string"
-          }
-        ]
-      }
+        "/actors/{actor_id}/executions/{execution_id}": {
+            "get": {
+                "description": "",
+                "operationId": "getActorExecution",
+                "parameters": [
+                    {
+                        "description": "id of the actor",
+                        "in": "path",
+                        "name": "actor_id",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "description": "id of the actor execution",
+                        "in": "path",
+                        "name": "execution_id",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get details about an execution"
+                    }
+                },
+                "summary": "Get details about an execution",
+                "tags": [
+                    "actors",
+                    "executions"
+                ]
+            }
+        },
+        "/actors/{actor_id}/executions/{execution_id}/logs": {
+            "get": {
+                "description": "",
+                "operationId": "getActorExecutionLogs",
+                "parameters": [
+                    {
+                        "description": "id of the actor",
+                        "in": "path",
+                        "name": "actor_id",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "description": "id of the actor execution",
+                        "in": "path",
+                        "name": "execution_id",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get container logs from an execution"
+                    }
+                },
+                "summary": "Get container logs from an execution",
+                "tags": [
+                    "actors",
+                    "executions",
+                    "logs"
+                ]
+            }
+        },
+        "/actors/{actor_id}/messages": {
+            "get": {
+                "description": "",
+                "operationId": "getActorMessages",
+                "parameters": [
+                    {
+                        "description": "id of the actor",
+                        "in": "path",
+                        "name": "actor_id",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get queued messages for an actor."
+                    }
+                },
+                "summary": "Get queued messages for an actor.",
+                "tags": [
+                    "actors",
+                    "messages"
+                ]
+            },
+            "post": {
+                "description": "",
+                "operationId": "postActorMessage",
+                "parameters": [
+                    {
+                        "description": "id of the actor",
+                        "in": "path",
+                        "name": "actor_id",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "description": "message to pass to the actor",
+                        "in": "formData",
+                        "name": "message",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Post a new message to an actor to invoke it."
+                    }
+                },
+                "summary": "Post a new message to an actor to invoke it.",
+                "tags": [
+                    "actors",
+                    "messages"
+                ]
+            }
+        }
     },
-    "/actors/{actor_id}/messages": {
-      "get": {
-        "tags": [
-          "actors",
-          "messages"
-        ],
-        "responses": {
-          "200": {
-            "description": "Get queued messages for an actor."
-          }
+    "schemes": [
+        "http"
+    ],
+    "swagger": "2.0",
+    "tags": [
+        {
+            "description": "",
+            "name": "actors"
         },
-        "description": "",
-        "summary": "Get queued messages for an actor.",
-        "operationId": "getActorMessages",
-        "produces": [
-          "application/json"
-        ]
-      },
-      "post": {
-        "tags": [
-          "actors",
-          "messages"
-        ],
-        "responses": {
-          "200": {
-            "description": "Post a new message to an actor to invoke it."
-          }
+        {
+            "description": "",
+            "name": "messages"
         },
-        "description": "",
-        "summary": "Post a new message to an actor to invoke it.",
-        "operationId": "postActorMessage",
-        "produces": [
-          "application/json"
-        ],
-        "parameters": [
-          {
-            "in": "formData",
-            "description": "message to pass to the actor",
-            "name": "message",
-            "required": true,
-            "type": "string"
-          }
-        ]
-      }
-    },
-    "/actors/{actor_id}/executions": {
-      "get": {
-        "tags": [
-          "actors",
-          "executions"
-        ],
-        "responses": {
-          "200": {
-            "description": "Get executions for an actor."
-          }
+        {
+            "description": "",
+            "name": "executions"
         },
-        "description": "",
-        "summary": "Get executions for an actor.",
-        "operationId": "getActorExecutions",
-        "produces": [
-          "application/json"
-        ]
-      },
-      "post": {
-        "tags": [
-          "actors",
-          "executions"
-        ],
-        "responses": {
-          "200": {
-            "description": "Post a new message to an actor to invoke it."
-          }
-        },
-        "description": "",
-        "summary": "Post a new message to an actor to invoke it.",
-        "operationId": "postActorMessage",
-        "produces": [
-          "application/json"
-        ],
-        "parameters": [
-          {
-            "in": "formData",
-            "description": "Block I/O usage, in number of 512-byte sectors read from and written to, by the execution",
-            "name": "io",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "in": "formData",
-            "description": "runtime in milliseconds of the execution",
-            "name": "runtime",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "in": "formData",
-            "description": "cpu usage (in jiffies) of the execution",
-            "name": "cpu",
-            "required": true,
-            "type": "string"
-          }
-        ]
-      }
-    },
-     "/actors/{actor_id}/executions/{execution_id}": {
-       "get": {
-         "tags": [
-           "actors",
-           "executions"
-         ],
-         "responses": {
-           "200": {
-             "description": "Get details about an execution"
-           }
-         },
-         "description": "",
-         "summary": "Get details about an execution",
-         "operationId": "getActorExecution",
-         "produces": [
-           "application/json"
-         ]
-       }
-     },
-     "/actors/{actor_id}/executions/{execution_id}/logs": {
-       "get": {
-         "tags": [
-           "actors",
-           "executions",
-           "logs"
-         ],
-         "responses": {
-           "200": {
-             "description": "Get container logs from an execution"
-           }
-         },
-         "description": "",
-         "summary": "Get container logs from an execution",
-         "operationId": "getActorExecutionLogs",
-         "produces": [
-           "application/json"
-         ]
-       }
-     }
-  },
-  "host": "localhost",
-  "basePath": "/",
-  "schemes": [
-    "http"
-  ]
+        {
+            "description": "",
+            "name": "logs"
+        }
+    ]
 }
