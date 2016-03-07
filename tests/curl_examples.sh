@@ -1,3 +1,4 @@
+#!/bin/sh
 
 # Some simple examples exercising the APIs with curl
 curl localhost:8000/actors
@@ -5,8 +6,8 @@ curl -X POST --data "name=foo&image=jstubbs/abaco_test" localhost:8000/actors
 curl -X POST --data "name=bar&image=bar_image&description=The bar actor" localhost:8000/actors
 curl -X POST --data "name=foo&image=busybox&description=A second foo actor" localhost:8000/actors
 curl localhost:8000/actors/foo_0
-curl localhost:5001/actors/foo_0/messages
-curl -X POST --data "message=testing execution" localhost:5001/actors/foo_0/messages
+curl localhost:8000/actors/foo_0/messages
+curl -X POST --data "message=testing execution" localhost:8000/actors/foo_0/messages
 curl localhost:8000/actors/foo_0/state
 curl -X POST --data "state=some state" localhost:8000/actors/foo_0/state
 curl localhost:8000/actors/foo_0/state
