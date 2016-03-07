@@ -22,9 +22,9 @@ Quickstart
 
    .. code-block:: bash
    
-      $ docker-compose up -d
+      $ docker-compose -f docker-compose-local.yml up -d
 
-The services are now running behind ``nginx`` which should be listenting on 8000.
+The services are now running behind ``nginx`` which should be listening on 8000.
 
 2. Register an actor -- To define an actor, pass a name and an image available
    on the public docker hub.
@@ -53,8 +53,8 @@ The services are now running behind ``nginx`` which should be listenting on 8000
       }
 
 3. Notice that abaco returned a status of ``SUBMITTED``; behind the
-   scenes, abaco is starting two worker containers to handle messages
-   passed to this actor. The workers must initialize themselves
+   scenes, abaco is starting a worker container to handle messages
+   passed to this actor. The worker must initialize itself
    (download the image, etc) before the actor is ready. You can
    retrieve the details about an actor (including the status) by
    making a ``GET`` request to a specific actor like:
@@ -63,7 +63,7 @@ The services are now running behind ``nginx`` which should be listenting on 8000
 
        $ curl localhost:8000/actors/foo_0
 
-   When the actor's workers are initialized, you will see a response like this:
+   When the actor's worker is initialized, you will see a response like this:
 
    .. code-block:: JSON
 
