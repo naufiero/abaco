@@ -27,6 +27,10 @@ class Store(collections.MutableMapping):
     def __len__(self):
         return self._db.dbsize()
 
+    def set_with_expiry(self, key, obj, ex):
+        """Set `key` to `obj` with automatic expiration of `ex` seconds."""
+        self._db.set(key, obj, ex=ex)
+
     def transaction(self, callable, *args):
         """ Convenience wrapper around redis-py transaction. See the Pipelines section of the docs:
         https://github.com/andymccurdy/redis-py
