@@ -9,7 +9,8 @@ import channelpy
 from channels import ActorMsgChannel, CommandChannel,WorkerChannel
 from codes import ERROR, READY, BUSY
 from docker_utils import DockerError, DockerStartContainerError, execute_actor, pull_image
-from models import Actor, Execution, get_workers, get_worker, delete_worker, update_worker_status, WorkerException
+from models import Actor, Execution, get_workers, get_worker, delete_worker, \
+  update_worker_status, update_worker_execution_time, WorkerException
 from request_utils import APIException, ok, error, RequestParser
 from stores import actors_store, workers_store
 
@@ -68,16 +69,19 @@ class WorkerResource(Resource):
             worker = get_worker(actor_id, ch_name)
         except WorkerException as e:
             raise APIException(e.message, 404)
-        ch = WorkerChannel(name=ch_name)
-        ch.put("stop")
+        shutdown_worker(ch_name)
         return ok(result=worker, msg="Worker scheduled to be stopped.")
+
+def shutdown_worker(ch_name):
+    """Gracefully shutdown a single worker."""
+    ch = WorkerChannel(name=ch_name)
+    ch.put("stop")
 
 def shutdown_workers(actor_id):
     """Graceful shutdown of all workers for an actor"""
     workers = get_workers(actor_id)
     for worker in workers:
-        ch = WorkerChannel(name=worker['ch_name'])
-        ch.put('stop')
+        shutdown_worker(worker['ch_name'])
 
 
 
@@ -149,6 +153,7 @@ def subscribe(actor_id, worker_ch):
         print("Actor container finished successfully. Got stats object:{}".format(str(stats)))
         exc_id = Execution.add_execution(actor_id, stats)
         Execution.set_logs(exc_id, logs)
+        update_worker_execution_time(actor_id, worker_ch.name)
 
 def main(worker_ch_name, image):
     worker_ch = WorkerChannel(name=worker_ch_name)
