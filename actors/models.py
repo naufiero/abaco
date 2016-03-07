@@ -1,6 +1,7 @@
 import json
 import time
 
+from config import Config
 from stores import actors_store, logs_store, workers_store
 
 class DbDict(dict):
@@ -114,6 +115,13 @@ class Execution(DbDict):
         :param ex: dict
         :return:
         """
+        log_ex = Config.get('web', 'log_ex')
+        try:
+            log_ex = int(log_ex)
+        except Exception:
+            log_ex = -1
+        if log_ex > 0:
+            logs_store.set_with_expiry(exc_id, logs, log_ex)
         logs_store[exc_id] = logs
 
 class WorkerException(Exception):
@@ -164,6 +172,14 @@ def delete_worker(actor_id, ch_name):
 
     workers_store.transaction(safe_delete, actor_id)
 
+def update_worker_execution_time(actor_id, worker_ch):
+    workers = get_workers(actor_id)
+    now = time.time()
+    for worker in workers:
+        if worker['ch_name'] == worker_ch:
+            worker['last_execution'] = now
+            worker['last_update'] = now
+    workers_store[actor_id] = json.dumps(workers)
 
 def update_worker_status(actor_id, worker_ch, status):
     workers = get_workers(actor_id)
