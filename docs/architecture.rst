@@ -21,7 +21,8 @@ In addition to the above components, abaco makes use of Redis and RabbitMQ for p
 processes is achieved through message
 passing via RabbitMQ. abaco makes heavy use of channels (inspired from Go channels, see
 https://github.com/TACC/channelpy) to facilitate both direct communication as well as pub/sub. Four types of
-channels are used - the command channel, worker channels, actor message channels and anonymous channels. See the channels.py module for more details.
+channels are used - the command channel, worker channels, actor message channels and anonymous channels. See the
+channels.py module for more details.
 
 
 frontend components
