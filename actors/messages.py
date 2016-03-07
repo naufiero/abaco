@@ -1,9 +1,9 @@
 
-from flask import request
+from flask import request, g
 from flask_restful import Resource
 
-from channels import ActorMsgChannel
-from models import Actor
+from channels import ActorMsgChannel, CommandChannel
+from models import Actor, get_workers
 from request_utils import RequestParser, APIException, ok
 from stores import actors_store
 
@@ -36,6 +36,17 @@ class MessagesResource(Resource):
             if k == 'message':
                 continue
             d[k] = v
+        if hasattr(g, 'user'):
+            d['_abaco_username'] = g.user
+        if hasattr(g, 'jwt'):
+            d['_abaco_jwt'] = g.jwt
         ch = ActorMsgChannel(actor_id=actor_id)
         ch.put_msg(message=args['message'], d=d)
+        # make sure at least one worker is available
+        workers = get_workers(actor_id)
+        if len(workers) < 1:
+            ch = CommandChannel()
+            actor = Actor.from_db(actors_store[actor_id])
+            ch.put_cmd(actor_id=actor.id, image=actor.image, num=1, stop_existing=False)
+
         return ok(result={'msg': args['message']})
