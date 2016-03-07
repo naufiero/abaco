@@ -52,6 +52,12 @@ spawner:
     links:
         - redis
         - rabbit
+health:
+    image: jstubbs/abaco_core
+    command: /actors/health_check.sh
+    volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - ./local-dev.conf:/etc/abaco.conf
 
 redis:
     image: redis
