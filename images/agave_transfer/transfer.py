@@ -8,7 +8,7 @@ username = os.environ.get('username', 'jdoe')
 password = os.environ.get('password', 'abcde')
 client_key = os.environ.get('client_key', 'iVlh5I4_I6I0b3_NJE2xTUfWAdYa')
 client_secret = os.environ.get('client_secret', 'h4qMtPMGZH7DqsbFD2mA4Ssx9B0a')
-base_url = os.environ.get('base_url', 'https://dev.tenants.staging.agaveapi.co')
+base_url = os.environ.get('base_url', 'https://public.tenants.prod.agaveapi.co')
 
 
 def get_token():
