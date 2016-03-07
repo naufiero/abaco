@@ -1,7 +1,7 @@
 import json
 
 from flask import g
-from flask_restful import Resource, Api
+from flask_restful import Resource, Api, inputs
 
 from auth import add_permission
 from channels import CommandChannel
@@ -22,25 +22,22 @@ class ActorsResource(Resource):
         parser.add_argument('name', type=str, required=True, help="User defined name for this actor.")
         parser.add_argument('image', type=str, required=True,
                             help='Reference to image on docker hub for this actor.')
-        parser.add_argument('streaming', type=str)
+        parser.add_argument('stateless', type=bool,
+                            help="Whether the actor stores private state.", default=False)
         parser.add_argument('description', type=str)
-        parser.add_argument('privileged', type=str)
+        parser.add_argument('privileged', type=bool)
         parser.add_argument('default_environment', type=dict)
         args = parser.parse_args()
         if not args.get('default_environment'):
             args['default_environment'] = {}
-        if not args.get('streaming'):
-            args['streaming'] = 'FALSE'
+        if not args.get('stateless'):
+            args['stateless'] = False
         else:
-            args['streaming'] = args['streaming'].upper()
-            if args['streaming'] not in ('TRUE', 'FALSE'):
-                raise APIException("Invalid value for streaming: must be in:{}".format(('TRUE', 'FALSE')))
+            args['stateless'] = inputs.boolean(args['stateless'])
         if not args.get('privileged'):
-            args['privileged'] = 'FALSE'
+            args['privileged'] = False
         else:
-            args['privileged'] = args['privileged'].upper()
-            if args['privileged'] not in ('TRUE', 'FALSE'):
-                raise APIException("Invalid value for privileged: must be in:{}".format(('TRUE', 'FALSE')))
+            args['privileged'] = inputs.boolean(args['privileged'])
         return args
 
     def post(self):
