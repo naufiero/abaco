@@ -41,6 +41,12 @@ class ActorMsgChannel(Channel):
                          connection_type=RabbitConnection,
                          uri=self.uri)
 
-    def put_msg(self, message, d={}):
+    def put_msg(self, message, d={}, **kwargs):
+        """Pass a message to an actor's inbox, thereby invoking it. `message` is the request
+        body msg parameter; `d` is a dictionary built from the request query parameters;
+        additional metadata (e.g. jwt, username) can be passed through kwargs.
+        """
         d['message'] = message
+        for k, v in kwargs:
+            d[k] = v
         self.put(d)
