@@ -98,6 +98,7 @@ def check_jwt(req):
              # abort(400, {'message': 'JWT header missing.'})
     try:
         decoded = jwt.decode(jwt_header, PUB_KEY)
+        g.jwt = jwt_header
         g.user = decoded['http://wso2.org/claims/enduser']
         g.token = get_token(req.headers)
     except (jwt.DecodeError, KeyError):
