@@ -3,6 +3,7 @@ import os
 import threading
 import time
 
+from flask import g
 from flask_restful import Resource
 import channelpy
 
@@ -21,12 +22,13 @@ keep_running = True
 
 class WorkersResource(Resource):
     def get(self, actor_id):
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            Actor.from_db(actors_store[actor_id])
+            Actor.from_db(actors_store[id])
         except KeyError:
             raise APIException("actor not found: {}'".format(actor_id), 400)
         try:
-            workers = get_workers(actor_id)
+            workers = get_workers(id)
         except WorkerException as e:
             raise APIException(e.message, 404)
         return ok(result=workers, msg="Workers retrieved successfully.")
@@ -39,8 +41,9 @@ class WorkersResource(Resource):
 
     def post(self, actor_id):
         """Start new workers for an actor"""
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            actor = Actor.from_db(actors_store[actor_id])
+            actor = Actor.from_db(actors_store[id])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
@@ -49,24 +52,27 @@ class WorkersResource(Resource):
         if not num or num == 0:
             num = 1
         ch = CommandChannel()
-        ch.put_cmd(actor_id=actor.id, image=actor.image, num=num, stop_existing=False)
+        ch.put_cmd(actor_id=actor.db_id, image=actor.image, num=num, stop_existing=False)
         return ok(result=None, msg="Scheduled {} new worker(s) to start.".format(str(num)))
+
 
 class WorkerResource(Resource):
     def get(self, actor_id, ch_name):
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            Actor.from_db(actors_store[actor_id])
+            Actor.from_db(actors_store[id])
         except KeyError:
             raise WorkerException("actor not found: {}'".format(actor_id))
         try:
-            worker = get_worker(actor_id, ch_name)
+            worker = get_worker(id, ch_name)
         except WorkerException as e:
             raise APIException(e.message, 404)
         return ok(result=worker, msg="Worker retrieved successfully.")
 
     def delete(self, actor_id, ch_name):
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            worker = get_worker(actor_id, ch_name)
+            worker = get_worker(id, ch_name)
         except WorkerException as e:
             raise APIException(e.message, 404)
         shutdown_worker(ch_name)
@@ -78,12 +84,10 @@ def shutdown_worker(ch_name):
     ch.put("stop")
 
 def shutdown_workers(actor_id):
-    """Graceful shutdown of all workers for an actor"""
+    """Graceful shutdown of all workers for an actor. Pass db_id as the `actor_id` argument."""
     workers = get_workers(actor_id)
     for worker in workers:
         shutdown_worker(worker['ch_name'])
-
-
 
 def process_worker_ch(worker_ch, actor_id, actor_ch):
     """ Target for a thread to listen on the worker channel for a message to stop processing.
@@ -152,6 +156,7 @@ def subscribe(actor_id, worker_ch):
         # add the execution to the actor store
         print("Actor container finished successfully. Got stats object:{}".format(str(stats)))
         exc_id = Execution.add_execution(actor_id, stats)
+        print("Added execution: {}".format(exc_id))
         Execution.set_logs(exc_id, logs)
         update_worker_execution_time(actor_id, worker_ch.name)
 

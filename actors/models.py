@@ -21,16 +21,38 @@ class Actor(DbDict):
     def __init__(self, d):
         super(Actor, self).__init__(d)
         if not self.get('id'):
-            self['id'] = Actor.get_id(self.name)
+            self['id'], self['db_id'] = Actor.generate_id(self.name, self.tenant)
+
+    def display(self):
+        """Return a representation fit for display."""
+        self.pop('db_id')
+        if not self.executions:
+            return self
+        # strip tenant from execution id's
+        for k,v in self.executions.items():
+            ex_display_id = k.split('{}_'.format(self.tenant))[1]
+            # change the id in the value as well
+            v['id'] = ex_display_id
+            v.pop('tenant', None)
+            self.executions[ex_display_id] = self.executions.pop(k)
+
+        return self
 
     @classmethod
-    def get_id(cls, name):
+    def generate_id(cls, name, tenant):
+        """Generate an id for a new actor."""
         idx = 0
         while True:
-            id = name + "_" + str(idx)
-            if id not in actors_store:
-                return id
+            db_id = '{}_{}_{}'.format(tenant, name, idx)
+            id = '{}_{}'.format(name, idx)
+            if db_id not in actors_store:
+                return id, db_id
             idx = idx + 1
+
+    @classmethod
+    def get_dbid(cls, tenant, id):
+        """Return the key used in redis from the "display_id" and tenant. """
+        return '{}_{}'.format(tenant, id)
 
     @classmethod
     def from_db(cls, s):
@@ -42,7 +64,7 @@ class Actor(DbDict):
         """Update the status of an actor"""
         actor = Actor.from_db(actors_store[actor_id])
         actor.status = status
-        actors_store[actor.id] = actor.to_db()
+        actors_store[actor_id] = actor.to_db()
 
 
 class Subscription(DbDict):
@@ -74,13 +96,14 @@ class Execution(DbDict):
 
     def __init__(self, actor, d):
         super(Execution, self).__init__(d)
+        self.tenant = actor.tenant
         if not self.get('id'):
             self['id'] = Execution.get_id(actor)
 
     @classmethod
     def get_id(cls, actor):
         idx = 0
-        actor_id = actor.id
+        actor_id = actor.db_id
         try:
             excs = actor.executions
         except KeyError:
@@ -92,6 +115,11 @@ class Execution(DbDict):
             if id not in excs:
                 return id
             idx = idx + 1
+
+    @classmethod
+    def get_dbid(cls, tenant, id):
+        """Return the key used in redis from the "display_id" and tenant. """
+        return '{}_{}'.format(tenant, id)
 
     @classmethod
     def add_execution(cls, actor_id, ex):
@@ -122,7 +150,9 @@ class Execution(DbDict):
             log_ex = -1
         if log_ex > 0:
             logs_store.set_with_expiry(exc_id, logs, log_ex)
-        logs_store[exc_id] = logs
+        else:
+            logs_store[id] = logs
+
 
 class WorkerException(Exception):
     def __init__(self, message):
@@ -131,7 +161,7 @@ class WorkerException(Exception):
 
 
 def get_workers(actor_id):
-    """Retrieve all workers for an actor."""
+    """Retrieve all workers for an actor. Pass db_id as `actor_id` parameter."""
     try:
         workers = json.loads(workers_store[actor_id])
     except KeyError:
@@ -139,7 +169,7 @@ def get_workers(actor_id):
     return workers
 
 def get_worker(actor_id, ch_name):
-    """Retrieve a worker from the workers store."""
+    """Retrieve a worker from the workers store. Pass db_id as `actor_id` parameter."""
     workers = get_workers(actor_id)
     for worker in workers:
         if worker['ch_name'] == ch_name:
@@ -148,7 +178,8 @@ def get_worker(actor_id, ch_name):
 
 def delete_worker(actor_id, ch_name):
     """Deletes a worker from the worker store. Uses Redis optimistic locking to provide thread-safety since multiple
-    clients could be attempting to delete workers at the same time.
+    clients could be attempting to delete workers at the same time. Pass db_id as `actor_id`
+    parameter.
     """
     def safe_delete(pipe):
         """Removes a worker from the worker store in a thread-safe way; this is the callable function to be used
@@ -173,6 +204,7 @@ def delete_worker(actor_id, ch_name):
     workers_store.transaction(safe_delete, actor_id)
 
 def update_worker_execution_time(actor_id, worker_ch):
+    """Pass db_id as `actor_id` parameter."""
     workers = get_workers(actor_id)
     now = time.time()
     for worker in workers:
@@ -182,6 +214,7 @@ def update_worker_execution_time(actor_id, worker_ch):
     workers_store[actor_id] = json.dumps(workers)
 
 def update_worker_status(actor_id, worker_ch, status):
+    """Pass db_id as `actor_id` parameter."""
     workers = get_workers(actor_id)
     for worker in workers:
         if worker['ch_name'] == worker_ch:
