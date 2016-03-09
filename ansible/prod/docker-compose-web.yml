@@ -1,0 +1,37 @@
+---
+
+nginx:
+    image: jstubbs/abaco_nginx
+    name: nginx
+    volumes:
+        - docs/swagger2.0.json:/docs/swagger2.0.json
+        - ./abaco.conf: /etc/abaco.conf
+    ports:
+        - "8000:80"
+
+reg:
+    image: jstubbs/abaco_core
+    name: reg
+    ports:
+        - "5000:5000"
+    volumes:
+        - ./abaco.conf: /etc/abaco.conf
+
+mes:
+    image: jstubbs/abaco_core
+    name: mes
+    command: "python3 -u /actors/message_api.py"
+    ports:
+        - "5001:5000"
+    volumes:
+        - ./abaco.conf: /etc/abaco.conf
+
+admin:
+    image: jstubbs/abaco_core
+    name: admin
+    command: "python3 -u /actors/admin_api.py"
+    ports:
+        - "5003:5000"
+    volumes:
+        - ./abaco.conf: /etc/abaco.conf
+
