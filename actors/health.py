@@ -23,7 +23,7 @@ from worker import shutdown_worker
 
 def get_actor_ids():
     """Returns the list of actor ids currently registered."""
-    return [id for id, _ in actors_store.items()]
+    return [db_id for db_id, _ in actors_store.items()]
 
 def check_workers(actor_id, ttl):
     """Check health of all workers for an actor."""

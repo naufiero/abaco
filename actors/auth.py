@@ -77,6 +77,7 @@ def authentication():
     if access_control_type == 'none':
         g.user = 'anonymous'
         g.token = 'N/A'
+        g.tenant = Config.get('web', 'tenant_name')
         return
     if access_control_type == 'jwt':
         return check_jwt(request)
@@ -213,13 +214,14 @@ def add_permission(user, actor_id, level):
 
 class PermissionsResource(Resource):
     def get(self, actor_id):
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            Actor.from_db(actors_store[actor_id])
+            Actor.from_db(actors_store[id])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
         try:
-            permissions = get_permissions(actor_id)
+            permissions = get_permissions(id)
         except PermissionsException as e:
             raise APIException(e.message, 404)
         return ok(result=permissions, msg="Permissions retrieved successfully.")
@@ -237,12 +239,13 @@ class PermissionsResource(Resource):
 
     def post(self, actor_id):
         """Add new permissions for an actor"""
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            Actor.from_db(actors_store[actor_id])
+            Actor.from_db(actors_store[id])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
         args = self.validate_post()
-        add_permission(args['user'], actor_id, args['level'])
-        permissions = get_permissions(actor_id)
+        add_permission(args['user'], id, args['level'])
+        permissions = get_permissions(id)
         return ok(result=permissions, msg="Permission added successfully.")
