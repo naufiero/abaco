@@ -186,6 +186,6 @@ def test_remove_final_actors():
     rsp = requests.get(url)
     result = basic_response_checks(rsp)
     for act in result:
-        url = '{}/{}/{}'.format(base_url, '/actors', act.get('id'))
+        url = '{}/actors/{}'.format(base_url, act.get('id'))
         rsp = requests.delete(url)
         result = basic_response_checks(rsp)
