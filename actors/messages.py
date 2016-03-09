@@ -41,6 +41,8 @@ class MessagesResource(Resource):
             d['_abaco_username'] = g.user
         if hasattr(g, 'jwt'):
             d['_abaco_jwt'] = g.jwt
+        if hasattr(g, 'api_server'):
+            d['_abaco_api_server'] = g.api_server
         id = Actor.get_dbid(g.tenant, actor_id)
         ch = ActorMsgChannel(actor_id=id)
         ch.put_msg(message=args['message'], d=d)
