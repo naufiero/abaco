@@ -85,10 +85,16 @@ def authentication():
 
 
 def check_jwt(req):
+    tenant_name = None
+    jwt_header = None
     tenant_name = Config.get('web', 'tenant_name')
-    try:
-        jwt_header = req.headers['X-JWT-Assertion-{0}'.format(tenant_name)]
-    except KeyError:
+    for k, v in req.headers.items():
+        if k.startswith('X-JWT-Assertion-{0}'):
+            tenant_name = k.split('X-JWT-Assertion-{0}')
+            jwt_header = req.headers['X-JWT-Assertion-{0}'.format(tenant_name)]
+            break
+    else:
+        # never found a jwt; look for 'Assertion'
         try:
             jwt_header = req.headers['Assertion']
         except KeyError:
@@ -96,14 +102,35 @@ def check_jwt(req):
              for k,v in req.headers.items():
                 msg = msg + ' ' + str(k) + ': ' + str(v)
              abort(400, {'message': 'JWT header missing. Headers: '+msg})
-             # abort(400, {'message': 'JWT header missing.'})
     try:
         decoded = jwt.decode(jwt_header, PUB_KEY)
         g.jwt = jwt_header
+        g.tenant_name = tenant_name
+        g.api_server = get_api_server(tenant_name)
         g.user = decoded['http://wso2.org/claims/enduser']
         g.token = get_token(req.headers)
     except (jwt.DecodeError, KeyError):
         abort(400, {'message': 'Invalid JWT.'})
+
+def get_api_server(tenant_name):
+    # todo - lookup tenant in tenants table
+    if tenant_name == 'AGAVE_PROD':
+        return 'https://public.tenants.prod.agaveapi.co'
+    if tenant_name == 'ARAPORT_ORG':
+        return 'https://api.araport.org'
+    if tenant_name == 'DESIGNSAFE':
+        return 'https://agave.designsafe-ci.org'
+    if tenant_name == 'DEV_STAGING':
+        return 'https://dev.tenants.staging.agaveapi.co'
+    if tenant_name == 'IPLANTC_ORG':
+        return 'https://agave.iplantc.org'
+    if tenant_name == 'IREC':
+        return 'https://irec.tenants.prod.agaveapi.co'
+    if tenant_name == 'TACC_PROD':
+        return 'https://api.tacc.utexas.edu'
+    if tenant_name == 'VDJSERVER_ORG':
+        return 'https://vdj-agave-api.tacc.utexas.edu'
+
 
 def get_token(headers):
     """
