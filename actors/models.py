@@ -25,11 +25,19 @@ class Actor(DbDict):
 
     def display(self):
         """Return a representation fit for display."""
-        self.pop('db_id')
+        db_id = self.pop('db_id')
+        # TODO -
+        # there appears to be some issue with this method. we observed a problem with the reg container not
+        # being able to return all actors in the db because the k.split('{}_'.format(self.tenant))[1] line kept
+        # failing with an IndexError: list index out of range exception. Surprisingly, stopping and starting the
+        # container made things work again. Perhaps there is a non-destructive way to filter the fields from the
+        # model.
         if not self.executions:
             return self
         # strip tenant from execution id's
         for k,v in self.executions.items():
+            if len(k.split('{}_'.format(self.tenant))) < 2:
+                print("Data issue in subscription key: {}, value: {}, for actor with db_id: {} and tenant: {}".format(k, v, db_id, self.tenant))
             ex_display_id = k.split('{}_'.format(self.tenant))[1]
             # change the id in the value as well
             v['id'] = ex_display_id
