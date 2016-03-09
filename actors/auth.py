@@ -77,7 +77,8 @@ def authentication():
     if access_control_type == 'none':
         g.user = 'anonymous'
         g.token = 'N/A'
-        g.tenant = Config.get('web', 'tenant_name')
+        g.tenant = request.headers.get('tenant') or Config.get('web', 'tenant_name')
+        g.api_server = get_api_server(g.tenant)
         return
     if access_control_type == 'jwt':
         return check_jwt(request)
@@ -130,7 +131,7 @@ def get_api_server(tenant_name):
         return 'https://api.tacc.utexas.edu'
     if tenant_name == 'VDJSERVER_ORG':
         return 'https://vdj-agave-api.tacc.utexas.edu'
-
+    return 'https://dev.tenants.staging.agaveapi.co'
 
 def get_token(headers):
     """
