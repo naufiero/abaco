@@ -1,6 +1,6 @@
 import json
 
-from flask import g
+from flask import g, request
 from flask_restful import Resource, Api, inputs
 
 from auth import add_permission
@@ -15,9 +15,11 @@ from worker import shutdown_workers
 class ActorsResource(Resource):
 
     def get(self):
-        return ok(result=[Actor.from_db(actor[1]).display() \
-                          for actor in actors_store.items()],
-                  msg="Actors retrieved successfully.")
+        actors = []
+        for k, v in actors_store.items():
+            if k.startswith(g.tenant):
+                actors.append(Actor.from_db(v).display())
+        return ok(result=actors, msg="Actors retrieved successfully.")
 
     def validate_post(self):
         parser = RequestParser()
@@ -73,13 +75,13 @@ class ActorResource(Resource):
         try:
             actor = Actor.from_db(actors_store[id])
             executions = actor.get('executions') or {}
-            for id, val in executions.items():
-                del logs_store[id]
+            for ex_id, val in executions.items():
+                del logs_store[ex_id]
         except KeyError:
-            pass
+            print("Did not find actor with id: {}".format(id))
         del actors_store[id]
         del permissions_store[id]
-        return ok(result=None, msg='Actor delete successfully.')
+        return ok(result=None, msg='Actor deleted successfully.')
 
     def put(self, actor_id):
         id = Actor.get_dbid(g.tenant, actor_id)
@@ -90,16 +92,14 @@ class ActorResource(Resource):
                 "actor not found: {}'".format(actor_id), 404)
         args = self.validate_put()
         update_image = False
-        args['name'] = actor['name']
-        args['id'] = actor['id']
-        args['db_id'] = actor['db_id']
-        args['executions'] = actor['executions']
-        args['state'] = actor['state']
         if args['image'] == actor.image:
             args['status'] = actor.status
         else:
             update_image = True
             args['status'] = SUBMITTED
+        for k, v in actor.items():
+            if not args.get(k):
+                args[k] = v
         actor = Actor(args)
         actors_store[actor.db_id] = actor.to_db()
         if update_image:
