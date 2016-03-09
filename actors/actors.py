@@ -15,7 +15,9 @@ from worker import shutdown_workers
 class ActorsResource(Resource):
 
     def get(self):
-        return ok(result=[json.loads(actor[1]) for actor in actors_store.items()], msg="Actors retrieved successfully.")
+        return ok(result=[Actor.from_db(actor[1]).display() \
+                          for actor in actors_store.items()],
+                  msg="Actors retrieved successfully.")
 
     def validate_post(self):
         parser = RequestParser()
@@ -46,39 +48,43 @@ class ActorsResource(Resource):
         args['state'] = ''
         args['subscriptions'] = []
         args['status'] = SUBMITTED
+        args['tenant'] = g.tenant
         actor = Actor(args)
-        actors_store[actor.id] = actor.to_db()
+        actors_store[actor.db_id] = actor.to_db()
         ch = CommandChannel()
-        ch.put_cmd(actor_id=actor.id, image=actor.image)
-        add_permission(g.user, actor.id, 'UPDATE')
-        return ok(result=actor, msg="Actor created successfully.")
+        ch.put_cmd(actor_id=actor.db_id, image=actor.image)
+        add_permission(g.user, actor.db_id, 'UPDATE')
+        return ok(result=actor.display(), msg="Actor created successfully.")
 
 
 class ActorResource(Resource):
     def get(self, actor_id):
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            actor = Actor.from_db(actors_store[actor_id])
+            actor = Actor.from_db(actors_store[id])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
-        return ok(result=actor, msg="Actor retrieved successfully.")
+        return ok(result=actor.display(), msg="Actor retrieved successfully.")
 
     def delete(self, actor_id):
-        shutdown_workers(actor_id)
+        id = Actor.get_dbid(g.tenant, actor_id)
+        shutdown_workers(id)
         try:
-            actor = Actor.from_db(actors_store[actor_id])
+            actor = Actor.from_db(actors_store[id])
             executions = actor.get('executions') or {}
             for id, val in executions.items():
                 del logs_store[id]
         except KeyError:
             pass
-        del actors_store[actor_id]
-        del permissions_store[actor_id]
+        del actors_store[id]
+        del permissions_store[id]
         return ok(result=None, msg='Actor delete successfully.')
 
     def put(self, actor_id):
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            actor = Actor.from_db(actors_store[actor_id])
+            actor = Actor.from_db(actors_store[id])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
@@ -86,6 +92,7 @@ class ActorResource(Resource):
         update_image = False
         args['name'] = actor['name']
         args['id'] = actor['id']
+        args['db_id'] = actor['db_id']
         args['executions'] = actor['executions']
         args['state'] = actor['state']
         if args['image'] == actor.image:
@@ -94,11 +101,11 @@ class ActorResource(Resource):
             update_image = True
             args['status'] = SUBMITTED
         actor = Actor(args)
-        actors_store[actor.id] = actor.to_db()
+        actors_store[actor.db_id] = actor.to_db()
         if update_image:
             ch = CommandChannel()
-            ch.put_cmd(actor_id=actor.id, image=actor.image)
-        return ok(result=actor, msg="Actor updated successfully.")
+            ch.put_cmd(actor_id=actor.db_id, image=actor.image)
+        return ok(result=actor.display(), msg="Actor updated successfully.")
 
     def validate_put(self):
         parser = RequestParser()
@@ -135,8 +142,9 @@ class ActorResource(Resource):
 
 class ActorStateResource(Resource):
     def get(self, actor_id):
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            actor = Actor.from_db(actors_store[actor_id])
+            actor = Actor.from_db(actors_store[id])
             state = actor.get('state')
         except KeyError:
             raise APIException(
@@ -144,16 +152,17 @@ class ActorStateResource(Resource):
         return ok(result={'state': state }, msg="Actor state retrieved successfully.")
 
     def post(self, actor_id):
+        id = Actor.get_dbid(g.tenant, actor_id)
         args = self.validate_post()
         state = args['state']
         try:
-            actor = Actor.from_db(actors_store[actor_id])
+            actor = Actor.from_db(actors_store[id])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
         actor.state = state
-        actors_store[actor_id] = actor.to_db()
-        return ok(result=actor, msg="State updated successfully.")
+        actors_store[id] = actor.to_db()
+        return ok(result=actor.display(), msg="State updated successfully.")
 
     def validate_post(self):
         parser = RequestParser()
@@ -162,53 +171,16 @@ class ActorStateResource(Resource):
         return args
 
 
-class ActorSubscriptionResource(Resource):
-    def get(self, actor_id):
-        try:
-            actor = Actor.from_db(actors_store[actor_id])
-            subscriptions = actor.get('subscriptions') or {'subscriptions': None}
-        except KeyError:
-            raise APIException(
-                "actor not found: {}'".format(actor_id), 404)
-        return ok(result=subscriptions, msg="Subscriptions retrieved successfully.")
-
-    def post(self, actor_id):
-        args = self.validate_post()
-        try:
-            actor = Actor.from_db(actors_store[actor_id])
-        except KeyError:
-            raise APIException(
-                "actor not found: {}'".format(actor_id), 404)
-        event_ids = args['event_id']
-        event_patterns = args['event_pattern']
-        subs = {}
-        for id in event_ids:
-            s = Subscription(actor, {'event_id': id})
-            subs[s.id] = s
-            actor.subscriptions = subs
-        for pat in event_patterns:
-            s = Subscription(actor, {'event_pattern': pat})
-            subs[s.id] = s
-            actor.subscriptions = subs
-        actors_store[actor_id] = actor.to_db()
-        return ok(result=actor, msg="Subscriptions updated successfully.")
-
-    def validate_post(self):
-        parser = RequestParser()
-        parser.add_argument('event_id', type=str, action='append', help="Event id for the subscription.")
-        parser.add_argument('event_pattern', type=str, action='append', help="Regex pattern of event id's for the subscription.")
-        args = parser.parse_args()
-        return args
-
-
 class ActorExecutionsResource(Resource):
     def get(self, actor_id):
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            actor = Actor.from_db(actors_store[actor_id])
+            actor = Actor.from_db(actors_store[id])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
         tot = {'total_executions': 0, 'total_cpu': 0, 'total_io':0, 'total_runtime': 0, 'ids':[]}
+        actor.display()
         executions = actor.get('executions') or {}
         for id, val in executions.items():
             tot['ids'].append(id)
@@ -219,14 +191,15 @@ class ActorExecutionsResource(Resource):
         return ok(result=tot, msg="Actor executions retrieved successfully.")
 
     def post(self, actor_id):
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            actor = Actor.from_db(actors_store[actor_id])
+            actor = Actor.from_db(actors_store[id])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
         args = self.validate_post()
-        Execution.add_execution(actor_id, args)
-        return ok(result=actor, msg="Actor execution added successfully.")
+        Execution.add_execution(id, args)
+        return ok(result=actor.display(), msg="Actor execution added successfully.")
 
     def validate_post(self):
         parser = RequestParser()
@@ -247,25 +220,30 @@ class ActorExecutionsResource(Resource):
 
 class ActorExecutionResource(Resource):
     def get(self, actor_id, execution_id):
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            actor = Actor.from_db(actors_store[actor_id])
+            actor = Actor.from_db(actors_store[id])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
+        actor.display()
         try:
             excs = actor.executions
         except KeyError:
             raise APIException("No executions found for actor {}.".format(actor_id))
+        # ex_id = Execution.get_dbid(g.tenant, execution_id)
         try:
             exc = excs[execution_id]
         except KeyError:
             raise APIException("Execution not found {}.".format(execution_id))
         return ok(result=exc, msg="Actor execution retrieved successfully.")
 
+
 class ActorExecutionLogsResource(Resource):
     def get(self, actor_id, execution_id):
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            actor = Actor.from_db(actors_store[actor_id])
+            actor = Actor.from_db(actors_store[id])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
@@ -273,8 +251,9 @@ class ActorExecutionLogsResource(Resource):
             excs = actor.executions
         except KeyError:
             raise APIException("No executions found for actor {}.".format(actor_id))
+        ex_id = Execution.get_dbid(g.tenant, execution_id)
         try:
-            logs = logs_store[execution_id]
+            logs = logs_store[ex_id]
         except KeyError:
             logs = ""
         return ok(result=logs, msg="Logs retrieved successfully.")

@@ -11,8 +11,9 @@ class MessagesResource(Resource):
 
     def get(self, actor_id):
         # check that actor exists
+        id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            actor = Actor.from_db(actors_store[actor_id])
+            actor = Actor.from_db(actors_store[id])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
@@ -40,13 +41,14 @@ class MessagesResource(Resource):
             d['_abaco_username'] = g.user
         if hasattr(g, 'jwt'):
             d['_abaco_jwt'] = g.jwt
-        ch = ActorMsgChannel(actor_id=actor_id)
+        id = Actor.get_dbid(g.tenant, actor_id)
+        ch = ActorMsgChannel(actor_id=id)
         ch.put_msg(message=args['message'], d=d)
         # make sure at least one worker is available
-        workers = get_workers(actor_id)
+        workers = get_workers(id)
         if len(workers) < 1:
             ch = CommandChannel()
-            actor = Actor.from_db(actors_store[actor_id])
-            ch.put_cmd(actor_id=actor.id, image=actor.image, num=1, stop_existing=False)
+            actor = Actor.from_db(actors_store[id])
+            ch.put_cmd(actor_id=id, image=actor.image, num=1, stop_existing=False)
 
         return ok(result={'msg': args['message']})
