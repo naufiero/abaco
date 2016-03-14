@@ -88,11 +88,10 @@ def authentication():
 def check_jwt(req):
     tenant_name = None
     jwt_header = None
-    tenant_name = Config.get('web', 'tenant_name')
     for k, v in req.headers.items():
-        if k.startswith('X-JWT-Assertion-{0}'):
-            tenant_name = k.split('X-JWT-Assertion-{0}')
-            jwt_header = req.headers['X-JWT-Assertion-{0}'.format(tenant_name)]
+        if k.startswith('X-JWT-Assertion-'):
+            tenant_name = k.split('X-JWT-Assertion-')[1]
+            jwt_header = v
             break
     else:
         # never found a jwt; look for 'Assertion'
