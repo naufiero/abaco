@@ -1,0 +1,21 @@
+# Initial deployment of the entire abaco stack. Assumes agave_host and docker_host have been run on the target systems.
+#
+# Example invocation:
+# $ ansible-playbook -i prod/hosts deploy_abaco.plbk
+#
+
+# first, deploy persistence
+- hosts: db
+  roles:
+      - abaco_db
+
+# deploy spawner and health check containers
+- hosts: compute
+  roles:
+      - abaco_compute
+
+# deploy apis
+- hosts: web
+  roles:
+      - abaco_web
+
