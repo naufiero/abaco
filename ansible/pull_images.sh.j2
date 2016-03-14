@@ -1,0 +1,10 @@
+#!/bin/bash
+
+ARG=$1
+
+if [ "$ARG" = "" ]; then
+  ARG=latest
+fi
+
+docker pull jstubbs/abaco_core:$ARG
+docker pull jstubbs/abaco_nginx:$ARG

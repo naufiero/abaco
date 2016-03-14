@@ -1,23 +1,7 @@
 ---
 
-spawner:
-    image: jstubbs/abaco_core
-    name: spawner
-    command: "python3 -u /actors/spawner.py"
-    volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
-        - ./abaco.conf: /etc/abaco.conf
-
-health:
-    image: jstubbs/abaco_core
-    command: /actors/health_check.sh
-    volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
-        - ./abaco.conf: /etc/abaco.conf
-
 redis:
     image: redis
-    name: redis
     ports:
         - "6979:6379"
     command: redis-server --appendonly yes
@@ -26,7 +10,6 @@ redis:
 
 rabbit:
     image: rabbitmq:3.5.3-management
-    name: rabbit
     ports:
         - "5972:5672"
         - "15972:15672"

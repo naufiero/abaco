@@ -6,7 +6,7 @@
   sudo_user: "{{ linux_user }}"
 
 - name: Compile docker_compose template
-  template: src={{ abaco_env }}/docker-compose-db.yml.j2 dest={{ base_dir }}/docker-compose-db.yml
+  template: src={{ abaco_env }}/docker-compose-compute.yml.j2 dest={{ base_dir }}/docker-compose-compute.yml
   sudo: yes
   sudo_user: "{{ linux_user }}"
 
@@ -19,7 +19,19 @@
   acl: permissions="rwx" name={{ base_dir }}/pull_images.sh state=present etype=user entity=apim
   sudo: yes
 
+- name: Pull latest docker images
+  shell: sh pull_images.sh chdir=/home/apim
+  sudo: yes
+  sudo_user: "{{ linux_user }}"
+
+# ignore errors here since this call will fail if there are no containers running
+- name: remove existing compute containers
+  shell: docker rm -f `docker-compose -f  docker-compose-compute.yml ps -q`
+  sudo: yes
+  sudo_user: "{{ linux_user }}"
+  ignore_errors: yes
+
 - name: start the containers with docker compose
-  shell: docker-compose -f docker-compose-db.yml up -d & chdir={{ base_dir }}
+  shell: docker-compose -f docker-compose-compute.yml up -d & chdir={{ base_dir }}
   sudo: yes
   sudo_user: "{{ linux_user }}"
