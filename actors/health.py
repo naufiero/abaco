@@ -15,7 +15,7 @@ import channelpy
 
 import codes
 from config import Config
-from docker_utils import rm_container, DockerError
+from docker_utils import rm_container, DockerError, container_running, run_container_with_docker
 from models import Actor, delete_worker, get_workers
 from channels import CommandChannel, WorkerChannel
 from stores import actors_store
@@ -81,6 +81,10 @@ def manage_workers(actor_id):
 def main():
     print("Running abaco health checks. Now: {}".format(time.time()))
     ttl = Config.get('workers', 'worker_ttl')
+    if not container_running(image='jstubbs/abaco_core', name='abaco_spawner*'):
+        print("No spawners running! Launching new spawner..")
+        command = 'python3 -u /actors/spawner.py'
+        run_container_with_docker('jstubbs/abaco_core', command, name='abaco_spawner_0')
     try:
         ttl = int(ttl)
     except Exception:
