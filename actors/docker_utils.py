@@ -53,24 +53,48 @@ def pull_image(image):
         raise DockerError("Error pulling image {} - exception: {} ".format(image, str(e)))
     return rsp
 
+def container_running(image=None, name=None):
+    """Check if there is a running container for an image.
+    image should be fully qualified; e.g. image='jstubbs/abaco_core'
+    Can pass wildcards in name using * character; e.g. name='abaco_spawner*'
+    """
+    filters = {}
+    if name:
+        filters['name'] = name
+    if image:
+        filters['image'] = image
+    cli = docker.AutoVersionClient(base_url=dd)
+    containers = cli.containers(filters=filters)
+    return len(containers) > 0
+
+def run_container_with_docker(image, command, name=None, environment={}):
+    """Run a container with docker mounted in it."""
+    cli = docker.AutoVersionClient(base_url=dd)
+    environment.update({'image': image})
+    container = cli.create_container(image=image,
+                                     environment=environment,
+                                     volumes=['/var/run/docker.sock'],
+                                     command=command)
+    binds = {'/var/run/docker.sock':{
+        'bind': '/var/run/docker.sock',
+        'ro': False }}
+    cli.start(container=container.get('Id'), binds=binds)
+    return container
+
 def run_worker(image, ch_name):
     """
     Run an actor executor worker with a given channel and image
     :return:
     """
-    cli = docker.AutoVersionClient(base_url=dd)
-    container = cli.create_container(image=AE_IMAGE,
-                                     environment={'ch_name': ch_name,
-                                                  'image': image},
-                                     volumes=['/var/run/docker.sock'],
-                                     command='python3 -u /actors/worker.py')
-    binds = {'/var/run/docker.sock':{
-        'bind': '/var/run/docker.sock',
-        'ro': False }}
-
-    cli.start(container=container.get('Id'), binds=binds)
+    command = 'python3 -u /actors/worker.py'
+    print("docker_utils running worker. image:{}, command:{}, chan:{}".format(
+        image, command, ch_name
+    ))
+    container = run_container_with_docker(image=AE_IMAGE,
+                                          command=command,
+                                          environment={'ch_name': ch_name})
     return { 'image': image,
-             # @todo - location will need to change to support swarm or multi-node compute cluster.
+             # @todo - location will need to change to support swarm or cluster
              'location': dd,
              'cid': container.get('Id'),
              'ch_name': ch_name,
