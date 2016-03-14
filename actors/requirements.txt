@@ -6,3 +6,4 @@ pika==0.9.13
 docker-py
 pycrypto==2.6.1
 PyJWT==0.2.3
+gunicorn==19.3.0
