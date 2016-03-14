@@ -15,7 +15,7 @@ reg:
         - "5000:5000"
     environment:
         server: gunicorn
-        api: mes
+        api: reg
     links:
         - redis
         - rabbit
@@ -41,7 +41,7 @@ admin:
         - "5003:5000"
     environment:
         server: gunicorn
-        api: mes
+        api: admin
     links:
         - redis
         - rabbit
