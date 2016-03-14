@@ -15,6 +15,9 @@ reg:
         - "5000:5000"
     volumes:
         - ./local-dev.conf:/etc/abaco.conf
+    environment:
+        server: dev
+        api: reg
     links:
         - redis
         - rabbit
@@ -27,6 +30,9 @@ mes:
         - ./local-dev.conf:/etc/abaco.conf
     ports:
         - "5001:5000"
+    environment:
+        server: dev
+        api: mes
     links:
         - redis
         - rabbit
@@ -39,6 +45,9 @@ admin:
         - ./local-dev.conf:/etc/abaco.conf
     ports:
         - "5003:5000"
+    environment:
+        server: dev
+        api: admin
     links:
         - redis
         - rabbit

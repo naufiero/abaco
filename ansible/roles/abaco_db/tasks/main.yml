@@ -1,9 +1,12 @@
 ---
 
 - name: copy abaco.conf file
+  copy: src={{ abaco_env }}/abaco.conf dest=/home/apim/abaco.conf
+  sudo: yes
+  sudo_user: {{ linux_user }}
 
 - name: Compile docker_compose template
-  template: src=docker-compose-compute.yml.j2 dest={{ base_dir }}/docker-compose-compute.yml
+  template: src={{ abaco_env }}/docker-compose-core.yml.j2 dest={{ base_dir }}/docker-compose-core.yml
   sudo: yes
   sudo_user: {{ linux_user }}
 
@@ -23,12 +26,12 @@
 
 # ignore errors here since this call will fail if there are no containers running
 - name: remove existing compute containers
-  shell: docker rm -f `docker-compose -f  docker-compose-compute.yml ps -q`
+  shell: docker rm -f `docker-compose -f  docker-compose-core.yml ps -q`
   sudo: yes
   sudo_user: {{ linux_user }}
   ignore_errors: yes
 
 - name: start the containers with docker compose
-  shell: docker-compose -f docker-compose-compute.yml up -d & chdir={{ base_dir }}
+  shell: docker-compose -f docker-compose-core.yml up -d & chdir={{ base_dir }}
   sudo: yes
   sudo_user: {{ linux_user }}
