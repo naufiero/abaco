@@ -13,6 +13,9 @@ reg:
     name: reg
     ports:
         - "5000:5000"
+    environment:
+        server: gunicorn
+        api: mes
     links:
         - redis
         - rabbit
@@ -23,6 +26,9 @@ mes:
     command: "python3 -u /actors/message_api.py"
     ports:
         - "5001:5000"
+    environment:
+        server: gunicorn
+        api: mes
     links:
         - redis
         - rabbit
@@ -33,6 +39,9 @@ admin:
     command: "python3 -u /actors/admin_api.py"
     ports:
         - "5003:5000"
+    environment:
+        server: gunicorn
+        api: mes
     links:
         - redis
         - rabbit
