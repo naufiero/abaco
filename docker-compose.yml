@@ -13,6 +13,8 @@ reg:
     name: reg
     ports:
         - "5000:5000"
+    volumes:
+        - ./abaco.conf:/etc/abaco.conf
     environment:
         server: gunicorn
         api: reg
@@ -23,9 +25,10 @@ reg:
 mes:
     image: jstubbs/abaco_core
     name: mes
-    command: "python3 -u /actors/message_api.py"
     ports:
         - "5001:5000"
+    volumes:
+        - ./abaco.conf:/etc/abaco.conf
     environment:
         server: gunicorn
         api: mes
@@ -36,9 +39,10 @@ mes:
 admin:
     image: jstubbs/abaco_core
     name: admin
-    command: "python3 -u /actors/admin_api.py"
     ports:
         - "5003:5000"
+    volumes:
+        - ./abaco.conf:/etc/abaco.conf
     environment:
         server: gunicorn
         api: admin
@@ -52,6 +56,7 @@ spawner:
     command: "python3 -u /actors/spawner.py"
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
+        - ./abaco.conf:/etc/abaco.conf
     links:
         - redis
         - rabbit
@@ -61,6 +66,7 @@ health:
     command: /actors/health_check.sh
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
+        - ./abaco.conf:/etc/abaco.conf
 
 redis:
     image: redis
