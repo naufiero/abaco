@@ -25,7 +25,6 @@ reg:
 mes:
     image: jstubbs/abaco_core
     name: mes
-    command: "python3 -u /actors/message_api.py"
     volumes:
         - ./local-dev.conf:/etc/abaco.conf
     ports:
@@ -40,7 +39,6 @@ mes:
 admin:
     image: jstubbs/abaco_core
     name: admin
-    command: "python3 -u /actors/admin_api.py"
     volumes:
         - ./local-dev.conf:/etc/abaco.conf
     ports:
@@ -58,6 +56,7 @@ spawner:
     command: "python3 -u /actors/spawner.py"
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
+        - ./local-dev.conf:/etc/abaco.conf
     links:
         - redis
         - rabbit
