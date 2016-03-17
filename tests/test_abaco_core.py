@@ -14,13 +14,24 @@ base_url = os.environ.get('base_url', 'http://localhost:8000')
 # registration API
 # #################
 
-def test_remove_initial_actors():
+@pytest.fixture(scope='session')
+def headers():
+    jwt = os.environ.get('jwt', open('jwt').read())
+    if jwt:
+        jwt_header = os.environ.get('jwt_header', 'X-Jwt-Assertion-AGAVE-PROD')
+        headers = {jwt_header: jwt}
+    else:
+        token = os.environ.get('token', '')
+        headers = {'Authorization': 'Bearer {}'.format(token)}
+    return headers
+
+def test_remove_initial_actors(headers):
     url = '{}/{}'.format(base_url, '/actors')
-    rsp = requests.get(url)
+    rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     for act in result:
         url = '{}/{}/{}'.format(base_url, '/actors', act.get('id'))
-        rsp = requests.delete(url)
+        rsp = requests.delete(url, headers=headers)
         result = basic_response_checks(rsp)
 
 def basic_response_checks(rsp):
@@ -33,16 +44,16 @@ def basic_response_checks(rsp):
     assert 'version' in data.keys()
     return data['result']
 
-def test_list_actors():
+def test_list_actors(headers):
     url = '{}/{}'.format(base_url, '/actors')
-    rsp = requests.get(url)
+    rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert len(result) == 0
 
-def test_register_actor():
+def test_register_actor(headers):
     url = '{}/{}'.format(base_url, '/actors')
     data = {'image': 'jstubbs/abaco_test', 'name': 'test'}
-    rsp = requests.post(url, data=data)
+    rsp = requests.post(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
     assert 'description' in result
     assert 'executions' in result
@@ -50,9 +61,9 @@ def test_register_actor():
     assert result['name'] == 'test'
     assert result['id'] == 'test_0'
 
-def test_list_actor():
+def test_list_actor(headers):
     url = '{}/actors/test_0'.format(base_url)
-    rsp = requests.get(url)
+    rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert 'description' in result
     assert 'executions' in result
@@ -60,11 +71,11 @@ def test_list_actor():
     assert result['name'] == 'test'
     assert result['id'] == 'test_0'
 
-def test_actor_is_ready():
+def test_actor_is_ready(headers):
     count = 0
     while count < 10:
         url = '{}/actors/test_0'.format(base_url)
-        rsp = requests.get(url)
+        rsp = requests.get(url, headers=headers)
         result = basic_response_checks(rsp)
         if result['status'] == 'READY':
             return
@@ -72,10 +83,10 @@ def test_actor_is_ready():
         count += 1
     assert False
 
-def test_execute_actor():
+def test_execute_actor(headers):
     url = '{}/actors/test_0/messages'.format(base_url)
     data = {'message': 'testing execution'}
-    rsp = requests.post(url, data=data)
+    rsp = requests.post(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
     assert result.get('msg')  == 'testing execution'
     # check for the execution to complete
@@ -83,7 +94,7 @@ def test_execute_actor():
     while count < 10:
         time.sleep(3)
         url = '{}/actors/test_0/executions'.format(base_url)
-        rsp = requests.get(url)
+        rsp = requests.get(url, headers=headers)
         result = basic_response_checks(rsp)
         ids = result.get('ids')
         if ids:
@@ -97,9 +108,9 @@ def test_execute_actor():
         count += 1
     assert False
 
-def test_list_execution_logs():
+def test_list_execution_logs(headers):
     url = '{}/actors/test_0/executions/test_0_exc_0/logs'.format(base_url)
-    rsp = requests.get(url)
+    rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert 'Contents of MSG: testing execution' in result
     assert 'PATH' in result
@@ -109,9 +120,9 @@ def test_list_execution_logs():
 # admin API
 # ################
 
-def test_list_workers():
+def test_list_workers(headers):
     url = '{}/actors/test_0/workers'.format(base_url)
-    rsp = requests.get(url)
+    rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert len(result) > 0
     worker = result[0]
@@ -122,46 +133,46 @@ def test_list_workers():
     assert worker.get('last_update')
     assert worker.get('ch_name')
 
-def test_add_worker():
+def test_add_worker(headers):
     url = '{}/actors/test_0/workers'.format(base_url)
-    rsp = requests.post(url)
+    rsp = requests.post(url, headers=headers)
     result = basic_response_checks(rsp)
     time.sleep(8)
-    rsp = requests.get(url)
+    rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert len(result) == 2
 
-def test_delete_worker():
+def test_delete_worker(headers):
     # get the list of workers
     url = '{}/actors/test_0/workers'.format(base_url)
-    rsp = requests.get(url)
+    rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
 
     # delete the last one
     id = result[1].get('ch_name')
     url = '{}/actors/test_0/workers/{}'.format(base_url, id)
-    rsp = requests.delete(url)
+    rsp = requests.delete(url, headers=headers)
     result = basic_response_checks(rsp)
     time.sleep(4)
 
     # get the update list of workers
     url = '{}/actors/test_0/workers'.format(base_url)
-    rsp = requests.get(url)
+    rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert len(result) == 1
 
-def test_list_permissions():
+def test_list_permissions(headers):
     url = '{}/actors/test_0/permissions'.format(base_url)
-    rsp = requests.get(url)
+    rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert len(result) == 1
 
-def test_add_permissions():
+def test_add_permissions(headers):
     url = '{}/actors/test_0/permissions'.format(base_url)
     data = {'user': 'tester', 'level': 'UPDATE'}
-    rsp = requests.post(url, data=data)
+    rsp = requests.post(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
-    rsp = requests.get(url)
+    rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert len(result) == 2
 
@@ -170,10 +181,10 @@ def test_add_permissions():
 # Clean up
 # ##############
 
-def test_update_actor():
+def test_update_actor(headers):
     url = '{}/actors/test_0'.format(base_url)
     data = {'image': 'jstubbs/abaco_test2'}
-    rsp = requests.put(url, data=data)
+    rsp = requests.put(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
     assert 'description' in result
     assert 'executions' in result
@@ -181,11 +192,11 @@ def test_update_actor():
     assert result['name'] == 'test'
     assert result['id'] == 'test_0'
 
-def test_remove_final_actors():
+def test_remove_final_actors(headers):
     url = '{}/{}'.format(base_url, '/actors')
-    rsp = requests.get(url)
+    rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     for act in result:
         url = '{}/actors/{}'.format(base_url, act.get('id'))
-        rsp = requests.delete(url)
+        rsp = requests.delete(url, headers=headers)
         result = basic_response_checks(rsp)
