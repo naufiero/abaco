@@ -2,8 +2,6 @@
 
 nginx:
     image: jstubbs/abaco_nginx
-    volumes:
-        - ./abaco.conf:/etc/abaco.conf
     ports:
         - "80:80"
         - "443:443"
@@ -20,7 +18,6 @@ reg:
 
 mes:
     image: jstubbs/abaco_core
-    command: "python3 -u /actors/message_api.py"
     ports:
         - "5001:5000"
     environment:
@@ -31,7 +28,6 @@ mes:
 
 admin:
     image: jstubbs/abaco_core
-    command: "python3 -u /actors/admin_api.py"
     ports:
         - "5003:5000"
     environment:
