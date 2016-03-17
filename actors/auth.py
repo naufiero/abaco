@@ -89,14 +89,15 @@ def check_jwt(req):
     tenant_name = None
     jwt_header = None
     for k, v in req.headers.items():
-        if k.startswith('X-JWT-Assertion-'):
-            tenant_name = k.split('X-JWT-Assertion-')[1]
+        if k.startswith('X-Jwt-Assertion-'):
+            tenant_name = k.split('X-Jwt-Assertion-')[1]
             jwt_header = v
             break
     else:
         # never found a jwt; look for 'Assertion'
         try:
             jwt_header = req.headers['Assertion']
+            tenant_name = 'dev_staging'
         except KeyError:
              msg = ''
              for k,v in req.headers.items():
@@ -105,7 +106,7 @@ def check_jwt(req):
     try:
         decoded = jwt.decode(jwt_header, PUB_KEY)
         g.jwt = jwt_header
-        g.tenant_name = tenant_name
+        g.tenant = tenant_name.upper()
         g.api_server = get_api_server(tenant_name)
         g.user = decoded['http://wso2.org/claims/enduser']
         g.token = get_token(req.headers)
@@ -114,21 +115,21 @@ def check_jwt(req):
 
 def get_api_server(tenant_name):
     # todo - lookup tenant in tenants table
-    if tenant_name == 'AGAVE_PROD':
+    if tenant_name.upper() == 'AGAVE-PROD':
         return 'https://public.tenants.prod.agaveapi.co'
-    if tenant_name == 'ARAPORT_ORG':
+    if tenant_name.upper() == 'ARAPORT-ORG':
         return 'https://api.araport.org'
-    if tenant_name == 'DESIGNSAFE':
+    if tenant_name.upper() == 'DESIGNSAFE':
         return 'https://agave.designsafe-ci.org'
-    if tenant_name == 'DEV_STAGING':
+    if tenant_name.upper() == 'DEV-STAGING':
         return 'https://dev.tenants.staging.agaveapi.co'
-    if tenant_name == 'IPLANTC_ORG':
+    if tenant_name.upper() == 'IPLANTC-ORG':
         return 'https://agave.iplantc.org'
-    if tenant_name == 'IREC':
+    if tenant_name.upper() == 'IREC':
         return 'https://irec.tenants.prod.agaveapi.co'
-    if tenant_name == 'TACC_PROD':
+    if tenant_name.upper() == 'TACC-PROD':
         return 'https://api.tacc.utexas.edu'
-    if tenant_name == 'VDJSERVER_ORG':
+    if tenant_name.upper() == 'VDJSERVER-ORG':
         return 'https://vdj-agave-api.tacc.utexas.edu'
     return 'https://dev.tenants.staging.agaveapi.co'
 
