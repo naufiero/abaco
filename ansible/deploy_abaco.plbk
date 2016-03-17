@@ -7,15 +7,17 @@
 # first, deploy persistence
 - hosts: db
   roles:
+      - common
       - abaco_db
 
 # deploy spawner and health check containers
 - hosts: compute
   roles:
+      - common
       - abaco_compute
 
 # deploy apis
 - hosts: web
   roles:
+      - common
       - abaco_web
-
