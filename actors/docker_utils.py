@@ -1,3 +1,4 @@
+import configparser
 import json
 import os
 import time
@@ -70,15 +71,22 @@ def container_running(image=None, name=None):
 def run_container_with_docker(image, command, name=None, environment={}):
     """Run a container with docker mounted in it."""
     cli = docker.AutoVersionClient(base_url=dd)
-    environment.update({'image': image})
+    volumes = ['/var/run/docker.sock']
+    binds = {'/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'ro': False}}
+    try:
+        abaco_conf_host_path = Config.get('spawner', 'abaco_conf_host_path')
+        # if an abaco_conf_host_path was configured, mount that into the running container
+        volumes.append('/abaco.conf')
+        binds[abaco_conf_host_path] = {'bind': '/abaco.conf', 'ro': True}
+    except configparser.NoOptionError:
+        pass
+    host_config=cli.create_host_config(binds=binds)
     container = cli.create_container(image=image,
                                      environment=environment,
-                                     volumes=['/var/run/docker.sock'],
+                                     volumes=volumes,
+                                     host_config=host_config,
                                      command=command)
-    binds = {'/var/run/docker.sock':{
-        'bind': '/var/run/docker.sock',
-        'ro': False }}
-    cli.start(container=container.get('Id'), binds=binds)
+    cli.start(container=container.get('Id'))
     return container
 
 def run_worker(image, ch_name):
@@ -92,7 +100,7 @@ def run_worker(image, ch_name):
     ))
     container = run_container_with_docker(image=AE_IMAGE,
                                           command=command,
-                                          environment={'ch_name': ch_name})
+                                          environment={'ch_name': ch_name, 'image': image})
     return { 'image': image,
              # @todo - location will need to change to support swarm or cluster
              'location': dd,
