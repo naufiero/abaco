@@ -133,7 +133,7 @@ def main():
     while idx < 3:
         try:
             sp = Spawner()
-            print("Made connection to rabbit, entering main loop")
+            print("spawner made connection to rabbit, entering main loop")
             sp.run()
         except rabbitpy.exceptions.ConnectionException:
             # rabbit seems to take a few seconds to come up
