@@ -48,7 +48,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'endofday'
+project = u'abaco'
 copyright = u'2014, Joe Stubbs, Walter Moreira'
 
 # The version info for the project you're documenting, acts as replacement for
