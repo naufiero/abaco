@@ -1,3 +1,4 @@
+from copy import deepcopy
 import json
 import time
 
@@ -7,7 +8,12 @@ from stores import actors_store, logs_store, workers_store
 class DbDict(dict):
 
     def __getattr__(self, key):
-        return self[key]
+        # returning an AttributeError is important for making deepcopy work. cf.,
+        # http://stackoverflow.com/questions/25977996/supporting-the-deep-copy-operation-on-a-custom-class
+        try:
+            return self[key]
+        except KeyError as e:
+            raise AttributeError(e)
 
     def __setattr__(self, key, value):
         self[key] = value
@@ -25,26 +31,24 @@ class Actor(DbDict):
 
     def display(self):
         """Return a representation fit for display."""
-        db_id = self.pop('db_id')
-        # TODO -
-        # there appears to be some issue with this method. we observed a problem with the reg container not
-        # being able to return all actors in the db because the k.split('{}_'.format(self.tenant))[1] line kept
-        # failing with an IndexError: list index out of range exception. Surprisingly, stopping and starting the
-        # container made things work again. Perhaps there is a non-destructive way to filter the fields from the
-        # model.
-        if not self.executions:
-            return self
+        # make a deep copy to prevent destructive behavior in the db.
+        result = deepcopy(self)
+        db_id = result.pop('db_id')
+        if not result.executions:
+            return result
         # strip tenant from execution id's
-        for k,v in self.executions.items():
-            if len(k.split('{}_'.format(self.tenant))) < 2:
+        for k,v in result.executions.items():
+            if len(k.split('{}_'.format(result.tenant))) < 2:
                 print("Data issue in subscription key: {}, value: {}, for actor with db_id: {} and tenant: {}".format(k, v, db_id, self.tenant))
-            ex_display_id = k.split('{}_'.format(self.tenant))[1]
-            # change the id in the value as well
-            v['id'] = ex_display_id
-            v.pop('tenant', None)
-            self.executions[ex_display_id] = self.executions.pop(k)
+                ex_display_id = k
+            else:
+                ex_display_id = k.split('{}_'.format(result.tenant))[1]
+                # change the id in the value as well
+                v['id'] = ex_display_id
+                v.pop('tenant', None)
+            result.executions[ex_display_id] = result.executions.pop(k)
 
-        return self
+        return result
 
     @classmethod
     def generate_id(cls, name, tenant):
