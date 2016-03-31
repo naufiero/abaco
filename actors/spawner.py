@@ -40,7 +40,7 @@ class Spawner(object):
 
         # if there are existing workers, we need to close the actor message channel and
         # gracefully shutdown the existing worker processes.
-        if len(workers) > 0 :
+        if len(workers) > 0:
             # first, close the actor msg channel to prevent any new messages from being pulled
             # by the old workers.
             actor_ch = ActorMsgChannel(actor_id)
