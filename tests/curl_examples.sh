@@ -29,3 +29,13 @@ curl -X POST --data "name=foo&image=jstubbs/abaco_test_nosleep" localhost:8000/a
 curl localhost:8000/actors/foo_0
 curl -X POST --data "message=testing execution" localhost:5001/actors/foo_0/messages
 curl -X PUT --data "name=foo&image=jstubbs/abaco_test2" localhost:8000/actors/foo_0
+
+# register a bunch of actors
+for i in {1..20}; do curl -H "X-Jwt-Assertion-AGAVE-PROD: $jwt" -X POST --data "name=test&image=jstubbs/abaco_test" localhost:8000/actors; done
+
+# send off a bunch of messages:
+for i in {1..10}; do for j in {1..20}; do curl -H "X-Jwt-Assertion-AGAVE-PROD: $jwt" -X POST --data "message=test_$i_$j" localhost:8000/actors/test_$i/messages; done; done
+
+for i in {1..10}; do for j in {1..20}; do curl -H "X-Jwt-Assertion-AGAVE-PROD: $jwt" -X POST --data "message=test_$i_$j" "$base/actors/test_$i/messages"; done; done
+
+for i in {1..40}; do curl -H "X-Jwt-Assertion-AGAVE-PROD: $jwt" -X POST --data "message=test number $i" localhost:8000/actors/test_0/messages; done
