@@ -81,7 +81,8 @@ def manage_workers(actor_id):
 def main():
     print("Running abaco health checks. Now: {}".format(time.time()))
     ttl = Config.get('workers', 'worker_ttl')
-    if not container_running(image='jstubbs/abaco_core', name='abaco_spawner*'):
+    if not container_running(image='jstubbs/abaco_core', name='abaco_spawner*')\
+    and not container_running(image='jstubbs/abaco_core', name='apim_spawner*'):
         print("No spawners running! Launching new spawner..")
         command = 'python3 -u /actors/spawner.py'
         run_container_with_docker('jstubbs/abaco_core', command, name='abaco_spawner_0')
