@@ -19,7 +19,7 @@ class MessagesResource(Resource):
                 "actor not found: {}'".format(actor_id), 404)
         # TODO
         # retrieve pending messages from the queue
-        return ok(result={'messages': []})
+        return ok(result={'messages': len(ActorMsgChannel(actor_id=id)._queue._queue)})
 
     def validate_post(self):
         parser = RequestParser()
