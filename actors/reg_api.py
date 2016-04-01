@@ -16,6 +16,9 @@ api = AbacoApi(app)
 def auth():
     authn_and_authz()
 
+import logs
+app.logger.addHandler(logs.get_file_handler('reg_api_logs'))
+
 
 # Resources
 api.add_resource(ActorsResource, '/actors')

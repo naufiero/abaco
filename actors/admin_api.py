@@ -7,6 +7,9 @@ from worker import WorkersResource, WorkerResource
 app = Flask(__name__)
 api = AbacoApi(app)
 
+import logs
+app.logger.addHandler(logs.get_file_handler('admin_api_logs'))
+
 # Authn/z
 @app.before_request
 def auth():
