@@ -6,7 +6,7 @@ from flask_restful import Resource, Api, inputs
 from auth import add_permission
 from channels import CommandChannel
 from codes import SUBMITTED
-from models import Actor, Execution, Subscription
+from models import Actor, Execution
 from request_utils import RequestParser, APIException, ok
 from stores import actors_store, logs_store, permissions_store
 from worker import shutdown_workers
@@ -22,36 +22,13 @@ class ActorsResource(Resource):
         return ok(result=actors, msg="Actors retrieved successfully.")
 
     def validate_post(self):
-        parser = RequestParser()
-        parser.add_argument('name', type=str, required=True, help="User defined name for this actor.")
-        parser.add_argument('image', type=str, required=True,
-                            help='Reference to image on docker hub for this actor.')
-        parser.add_argument('stateless', type=bool,
-                            help="Whether the actor stores private state.", default=False)
-        parser.add_argument('description', type=str)
-        parser.add_argument('privileged', type=bool)
-        parser.add_argument('default_environment', type=dict)
-        args = parser.parse_args()
-        if not args.get('default_environment'):
-            args['default_environment'] = {}
-        if not args.get('stateless'):
-            args['stateless'] = False
-        else:
-            args['stateless'] = inputs.boolean(args['stateless'])
-        if not args.get('privileged'):
-            args['privileged'] = False
-        else:
-            args['privileged'] = inputs.boolean(args['privileged'])
-        return args
+        parser = Actor.request_parser()
+        return parser.parse_args()
 
     def post(self):
         args = self.validate_post()
-        args['executions'] = {}
-        args['state'] = ''
-        args['subscriptions'] = []
-        args['status'] = SUBMITTED
         args['tenant'] = g.tenant
-        actor = Actor(args)
+        actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
         ch = CommandChannel()
         ch.put_cmd(actor_id=actor.db_id, image=actor.image)
@@ -90,48 +67,31 @@ class ActorResource(Resource):
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
-        args = self.validate_put()
+        args = self.validate_put(actor)
         update_image = False
         if args['image'] == actor.image:
             args['status'] = actor.status
         else:
             update_image = True
             args['status'] = SUBMITTED
-        for k, v in actor.items():
-            if not args.get(k):
-                args[k] = v
-        actor = Actor(args)
+        # for k, v in actor.items():
+        #     if not args.get(k):
+        #         args[k] = v
+        actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
         if update_image:
             ch = CommandChannel()
             ch.put_cmd(actor_id=actor.db_id, image=actor.image)
         return ok(result=actor.display(), msg="Actor updated successfully.")
 
-    def validate_put(self):
-        parser = RequestParser()
-        parser.add_argument('image', type=str, required=True,
-                            help='Reference to image on docker hub for this actor.')
-        parser.add_argument('subscriptions', type=[str], help='List of event ids to subscribe this actor to.')
-        parser.add_argument('description', type=str)
-        parser.add_argument('streaming', type=str)
-        parser.add_argument('privileged', type=str)
-        parser.add_argument('default_environment', type=dict)
-        args = parser.parse_args()
-        if not args.get('default_environment'):
-            args['default_environment'] = {}
-        if not args.get('streaming'):
-            args['streaming'] = 'FALSE'
-        else:
-            args['streaming'] = args['streaming'].upper()
-            print("Got streaming parm of: {}".format(args.get('streaming')))
-            if args['streaming'] not in ('TRUE', 'FALSE'):
-                raise APIException("Invalid value for streaming: must be in:{}".format(('TRUE', 'FALSE')))
-        if not args.get('privileged'):
-            args['privileged'] = 'FALSE'
-        else:
-            args['privileged'] = args['privileged'].upper()
-            if args['privileged'] not in ('TRUE', 'FALSE'):
-                raise APIException("Invalid value for privileged: must be in:{}".format(('TRUE', 'FALSE')))
+    def validate_put(self, actor):
+        # inherit derived attributes from the original actor, including id and db_id:
+        args = actor
+        args['tenant'] = actor.tenant
+        parser = Actor.request_parser()
+        parser.remove_argument('name')
+        # this update overrides all required and optional attributes
+        args.update(parser.parse_args())
         return args
 
     def delete_actor_message(self, actor_id):

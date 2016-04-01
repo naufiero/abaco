@@ -2,10 +2,14 @@ from copy import deepcopy
 import json
 import time
 
+from codes import SUBMITTED
 from config import Config
+import errors
+from request_utils import RequestParser
 from stores import actors_store, logs_store, workers_store
 
 class DbDict(dict):
+    """Class for persisting a Python dictonary."""
 
     def __getattr__(self, key):
         # returning an AttributeError is important for making deepcopy work. cf.,
@@ -21,13 +25,97 @@ class DbDict(dict):
     def to_db(self):
         return json.dumps(self)
 
-class Actor(DbDict):
+
+class AbacoDAO(DbDict):
+    """Base Data Access Object class for Abaco models."""
+
+    # the parameters for the DAO
+    # tuples of the form (param name, required/optional/provided/derived, attr_name, type, help, default)
+    # should be defined in the subclass.
+    #
+    #
+    # required: these fields are required in the post/put methods of the web app.
+    # optional: these fields are optional in the post/put methods of the web app and have a default value.
+    # provided: these fields are required to construct the DAO but are provided by the abaco client code, not the user
+    #           and not the DAO class code.
+    # derived: these fields are derived by the DAO class code and do not need to be passed.
+    PARAMS = []
+
+    def __init__(self, **kwargs):
+        """Construct a DAO from **kwargs. Client can also create from a dictionary, d, using AbacoDAO(**d)"""
+        for name, source, attr, typ, help, default in self.PARAMS:
+            if source == 'required':
+                try:
+                    value = kwargs[name]
+                except KeyError:
+                    raise errors.DAOError("Required field {} missing".format(name))
+            elif source == 'optional':
+                value = kwargs.get(name, default)
+            elif source == 'provided':
+                try:
+                    value = kwargs[name]
+                except KeyError:
+                    raise errors.DAOError("Required field {} missing.".format(name))
+            else:
+                value = self.get_derived_value(name, kwargs)
+            setattr(self, attr, value)
+
+    @classmethod
+    def request_parser(cls):
+        """Return a flask RequestParser object that can be used in post/put processing."""
+        parser = RequestParser()
+        for name, source, attr, typ, help, default in cls.PARAMS:
+            required = source == 'required'
+            parser.add_argument(name, type=typ, required=required, help=help, default=default)
+        return parser
+
+    @classmethod
+    def from_db(cls, db_json):
+        """Construct a DAO from a db serialization."""
+        return cls(**json.loads(db_json))
+
+    def get_derived_value(self, name, d):
+        """Compute a derived value for the attribute `name` from the dictionary d of attributes provided."""
+        raise NotImplementedError
+
+
+class Actor(AbacoDAO):
     """Basic data access object for working with Actors."""
 
-    def __init__(self, d):
-        super(Actor, self).__init__(d)
-        if not self.get('id'):
-            self['id'], self['db_id'] = Actor.generate_id(self.name, self.tenant)
+    PARAMS = [
+        # param_name, required/optional/provided/derived, attr_name, type, help, default
+        ('name', 'required', 'name', str, 'User defined name for this actor.', None),
+        ('image', 'required', 'image', str, 'Reference to image on docker hub for this actor.', None),
+
+        ('stateless', 'optional', 'stateless', bool, 'Whether the actor stores private state.', False),
+        ('description', 'optional', 'description', str,  'Description of this actor', ''),
+        ('privileged', 'optional', 'privileged', bool, 'Whether this actor runs in privileged mode.', False),
+        ('default_environment', 'optional', 'default_environment', dict, 'Default environmental variables and values.', {}),
+        ('status', 'optional', 'status', str, 'Current status of the actor.', SUBMITTED),
+        ('executions', 'optional', 'executions', dict, 'Executions for this actor.', {}),
+
+        ('tenant', 'provided', 'tenant', str, 'The tenant that this actor belongs to.', None),
+
+        ('db_id', 'derived', 'db_id', str, 'Primary key in the database for this actor.', None),
+        ('id', 'derived', 'id', str, 'Human readable id for this actor.', None),
+        ]
+
+    def get_derived_value(self, name, d):
+        # first, see if the actor already has an id:
+        try:
+            if d[name]:
+                return d[name]
+        except KeyError:
+            pass
+        # if not, generate an id
+        try:
+            actor_id, db_id = Actor.generate_id(d['name'], d['tenant'])
+        except KeyError:
+            raise errors.DAOError("Required field name or tenant missing")
+        if name == 'id':
+            return actor_id
+        elif name == 'db_id':
+            return db_id
 
     def display(self):
         """Return a representation fit for display."""
@@ -66,10 +154,10 @@ class Actor(DbDict):
         """Return the key used in redis from the "display_id" and tenant. """
         return '{}_{}'.format(tenant, id)
 
-    @classmethod
-    def from_db(cls, s):
-        a = Actor(json.loads(s))
-        return a
+    # @classmethod
+    # def from_db(cls, s):
+    #     a = Actor(**json.loads(s))
+    #     return a
 
     @classmethod
     def set_status(cls, actor_id, status):
@@ -78,30 +166,6 @@ class Actor(DbDict):
         actor.status = status
         actors_store[actor_id] = actor.to_db()
 
-
-class Subscription(DbDict):
-    """Basic data access object for an Actor's subscription to an event."""
-
-    def __init__(self, actor, d):
-        super(Subscription, self).__init__(d)
-        if not self.get('id'):
-            self['id'] = Subscription.get_id(actor)
-
-    @classmethod
-    def get_id(cls, actor):
-        idx = 0
-        actor_id = actor.id
-        try:
-            subs = actor.subscriptions
-        except AttributeError:
-            return actor_id + "_sub_0"
-        if not subs:
-            return actor_id + "_sub_0"
-        while True:
-            id = actor_id + "_sub_" + str(idx)
-            if id not in subs:
-                return id
-            idx = idx + 1
 
 class Execution(DbDict):
     """Basic data access object representing an Actor execution."""
