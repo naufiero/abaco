@@ -65,6 +65,8 @@ class AbacoDAO(DbDict):
         """Return a flask RequestParser object that can be used in post/put processing."""
         parser = RequestParser()
         for name, source, attr, typ, help, default in cls.PARAMS:
+            if source == 'derived':
+                continue
             required = source == 'required'
             parser.add_argument(name, type=typ, required=required, help=help, default=default)
         return parser
@@ -101,7 +103,8 @@ class Actor(AbacoDAO):
         ]
 
     def get_derived_value(self, name, d):
-        # first, see if the actor already has an id:
+        """Compute a derived value for the attribute `name` from the dictionary d of attributes provided."""
+        # first, see if the attribute is already in the object:
         try:
             if d[name]:
                 return d[name]
@@ -126,14 +129,15 @@ class Actor(AbacoDAO):
             return result
         # strip tenant from execution id's
         for k,v in result.executions.items():
-            if len(k.split('{}_'.format(result.tenant))) < 2:
+            if not '{}_'.format(result.tenant) in k:
+            # if len(k.split('{}_'.format(result.tenant))) < 2:
                 print("Data issue in subscription key: {}, value: {}, for actor with db_id: {} and tenant: {}".format(k, v, db_id, self.tenant))
                 ex_display_id = k
             else:
                 ex_display_id = k.split('{}_'.format(result.tenant))[1]
                 # change the id in the value as well
                 v['id'] = ex_display_id
-                v.pop('tenant', None)
+            v.pop('tenant', None)
             result.executions[ex_display_id] = result.executions.pop(k)
 
         return result
