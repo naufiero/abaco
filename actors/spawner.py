@@ -84,6 +84,7 @@ class Spawner(object):
         # tell new workers to subscribe to the actor channel.
         for channel in anon_channels:
             channel.put({'status': 'ok', 'actor_id': actor_id})
+        print("Done processing command.")
 
 
     def start_workers(self, actor_id, image, num_workers):
