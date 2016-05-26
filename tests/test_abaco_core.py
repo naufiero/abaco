@@ -1,6 +1,12 @@
 # Functional test suite for abaco.
 # Start the local development abaco stack and run these tests with py.test from the cwd.
 
+# Notes:
+# 1. Running the tests against the docker-compose-local.yml instance (using local-dev.conf) will use an access_control
+#    of none and the tenant configured in local-dev.conf (dev_staging) for all requests (essentially ignore headers).
+#
+# 2.
+
 import os
 import time
 
