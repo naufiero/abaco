@@ -61,38 +61,39 @@ class ActorResource(Resource):
         return ok(result=None, msg='Actor deleted successfully.')
 
     def put(self, actor_id):
-        id = Actor.get_dbid(g.tenant, actor_id)
+        dbid = Actor.get_dbid(g.tenant, actor_id)
         try:
-            actor = Actor.from_db(actors_store[id])
+            actor = Actor.from_db(actors_store[dbid])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
+        previous_image = actor.image
         args = self.validate_put(actor)
+        args['tenant'] = g.tenant
         update_image = False
-        if args['image'] == actor.image:
+        if args['image'] == previous_image:
             args['status'] = actor.status
         else:
             update_image = True
             args['status'] = SUBMITTED
-        # for k, v in actor.items():
-        #     if not args.get(k):
-        #         args[k] = v
         actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
         if update_image:
             ch = CommandChannel()
             ch.put_cmd(actor_id=actor.db_id, image=actor.image)
-        return ok(result=actor.display(), msg="Actor updated successfully.")
+        # return ok(result={'update_image': str(update_image)},
+        #           msg="Actor updated successfully.")
+        return ok(result=actor.display(),
+                  msg="Actor updated successfully.")
 
     def validate_put(self, actor):
         # inherit derived attributes from the original actor, including id and db_id:
-        args = actor
-        args['tenant'] = actor.tenant
         parser = Actor.request_parser()
+        # remove since name is only required for POST, not PUT
         parser.remove_argument('name')
         # this update overrides all required and optional attributes
-        args.update(parser.parse_args())
-        return args
+        actor.update(parser.parse_args())
+        return actor
 
     def delete_actor_message(self, actor_id):
         """Put a command message on the actor_messages queue that actor was deleted."""
@@ -140,7 +141,7 @@ class ActorExecutionsResource(Resource):
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
         tot = {'total_executions': 0, 'total_cpu': 0, 'total_io':0, 'total_runtime': 0, 'ids':[]}
-        actor.display()
+        actor = actor.display()
         executions = actor.get('executions') or {}
         for id, val in executions.items():
             tot['ids'].append(id)
