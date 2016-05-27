@@ -74,6 +74,7 @@ class Spawner(object):
         # add workers to store first so that the records will be there when the workers go
         # to update their status
         if not stop_existing:
+            # @todo - NOT thread safe
             workers = json.loads(workers_store[actor_id])
             workers.extend(new_workers)
             workers_store[actor_id] = json.dumps(workers)
