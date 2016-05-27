@@ -101,6 +101,7 @@ def run_worker(image, ch_name):
     container = run_container_with_docker(image=AE_IMAGE,
                                           command=command,
                                           environment={'ch_name': ch_name, 'image': image})
+    # TODO - determines worker structure; should be placed in a proper DAO class.
     return { 'image': image,
              # @todo - location will need to change to support swarm or cluster
              'location': dd,

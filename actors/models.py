@@ -8,6 +8,7 @@ import errors
 from request_utils import RequestParser
 from stores import actors_store, logs_store, workers_store
 
+
 class DbDict(dict):
     """Class for persisting a Python dictonary."""
 
@@ -146,6 +147,7 @@ class Actor(AbacoDAO):
     def generate_id(cls, name, tenant):
         """Generate an id for a new actor."""
         idx = 0
+        # @todo - NOT thread safe
         while True:
             db_id = '{}_{}_{}'.format(tenant, name, idx)
             id = '{}_{}'.format(name, idx)
@@ -166,9 +168,64 @@ class Actor(AbacoDAO):
     @classmethod
     def set_status(cls, actor_id, status):
         """Update the status of an actor"""
+        # @todo - NOT thread safe -- use the new store update method
         actor = Actor.from_db(actors_store[actor_id])
         actor.status = status
         actors_store[actor_id] = actor.to_db()
+
+
+class Worker(AbacoDAO):
+    """Basic data access object for working with Workers."""
+
+    PARAMS = [
+        # param_name, required/optional/provided/derived, attr_name, type, help, default
+        ('tenant', 'required', 'tenant', str, 'The tenant that this worker belongs to.', None),
+        ('image', 'required', 'image', list, 'The list of images associated with this worker', None),
+        ('location', 'required', 'location', str, 'The location of the docker daemon used by this worker.', None),
+        ('cid', 'required', 'cid', str, 'The container ID of this worker.', None),
+        ('ch_name', 'required', 'ch_name', str, 'The name of the associate worker chanel.', None),
+        ('status', 'required', 'status', str, 'Status of the worker.', None),
+        ('host_id', 'required', 'host_id', str, 'id of the host where worker is running.', None),
+        ('host_ip', 'required', 'host_ip', str, 'ip of the host where worker is running.', None),
+        ('last_execution', 'required', 'last_execution', str, 'Last time the worker executed an actor container.', None),
+        ]
+
+
+class Execution(AbacoDAO):
+    """Basic data access object for working with actor executions."""
+
+    PARAMS = [
+        # param_name, required/optional/provided/derived, attr_name, type, help, default
+        ('tenant', 'required', 'tenant', str, 'The tenant that this execution belongs to.', None),
+        ('actor_id', 'required', 'actor_id', str, 'The human readable id for the actor associated with this execution.', None),
+        ('runtime', 'required', 'runtime', str, 'Runtime, in milliseconds, of the execution.', None),
+        ('cpu', 'required', 'cpu', str, 'CPU usage, in user jiffies, of the execution.', None),
+        ('io', 'required', 'io', str,
+         'Block I/O usage, in number of 512-byte sectors read from and written to, by the execution.', None),
+        ('id', 'derived', 'id', str, 'Human readable id for this execution.', None),
+    ]
+
+    def get_derived_value(self, name, d):
+        """Compute a derived value for the attribute `name` from the dictionary d of attributes provided."""
+        # first, see if the attribute is already in the object:
+        try:
+            actor_id = d['actor_id']
+        except KeyError:
+            raise errors.DAOError("Required field actor_id missing.")
+        try:
+            if d[name]:
+                return d[name]
+        except KeyError:
+            pass
+        # if not, generate an id
+        try:
+            actor_id, db_id = Actor.generate_id(d['name'], d['tenant'])
+        except KeyError:
+            raise errors.DAOError("Required field name or tenant missing")
+        if name == 'id':
+            return actor_id
+        elif name == 'db_id':
+            return db_id
 
 
 class Execution(DbDict):
