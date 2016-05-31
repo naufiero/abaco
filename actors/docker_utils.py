@@ -110,7 +110,7 @@ def run_worker(image, ch_name):
              'status': BUSY,
              'host_id': host_id,
              'host_ip': host_ip,
-             'last_execution': time.time()}
+             'last_execution': 0}
 
 def execute_actor(actor_id, worker_ch, image, msg, d={}, privileged=False):
     result = {'cpu': 0,
@@ -138,7 +138,7 @@ def execute_actor(actor_id, worker_ch, image, msg, d={}, privileged=False):
         # if there was an error starting the container, user will need to debig
         raise DockerStartContainerError("Could not start container {}. Exception {}".format(container.get('Id'), str(e)))
     start = timeit.default_timer()
-    update_worker_status(actor_id, worker_ch, BUSY)
+    update_worker_status(actor_id, worker_ch.name, BUSY)
     running = True
     # create a separate cli for checkin stats objects since these should be fast and we don't want to wait
     stats_cli = docker.AutoVersionClient(base_url=dd, timeout=1)
@@ -169,7 +169,12 @@ def execute_actor(actor_id, worker_ch, image, msg, d={}, privileged=False):
             if type(stats) == bytes:
                 stats = json.loads(stats.decode("utf-8"))
             result['cpu'] += stats['cpu_stats']['cpu_usage']['total_usage']
-            result['io'] += stats['networks']['eth0']['rx_bytes']
+            # even running docker 1.9, there seems to be a race condition where the 'networks' key doesn't
+            # always get populated.
+            try:
+                result['io'] += stats['networks']['eth0']['rx_bytes']
+            except KeyError:
+                pass
             print("Recorded a stats obj:".format(timeit.default_timer()))
         if running:
             try:

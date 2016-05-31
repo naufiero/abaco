@@ -31,7 +31,7 @@ class ActorsResource(Resource):
         actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
         ch = CommandChannel()
-        ch.put_cmd(actor_id=actor.db_id, image=actor.image)
+        ch.put_cmd(actor_id=actor.db_id, image=actor.image, tenant=args['tenant'])
         add_permission(g.user, actor.db_id, 'UPDATE')
         return ok(result=actor.display(), msg="Actor created successfully.")
 
@@ -80,7 +80,7 @@ class ActorResource(Resource):
         actors_store[actor.db_id] = actor.to_db()
         if update_image:
             ch = CommandChannel()
-            ch.put_cmd(actor_id=actor.db_id, image=actor.image)
+            ch.put_cmd(actor_id=actor.db_id, image=actor.image, tenant=args['tenant'])
         # return ok(result={'update_image': str(update_image)},
         #           msg="Actor updated successfully.")
         return ok(result=actor.display(),
@@ -140,7 +140,7 @@ class ActorExecutionsResource(Resource):
                 "actor not found: {}'".format(actor_id), 404)
         tot = {'total_executions': 0, 'total_cpu': 0, 'total_io':0, 'total_runtime': 0, 'ids':[]}
         try:
-            executions = executions_store[actor_id]
+            executions = executions_store[dbid]
         except KeyError:
             executions = {}
         for id, val in executions.items():
@@ -257,11 +257,11 @@ class MessagesResource(Resource):
         ch = ActorMsgChannel(actor_id=dbid)
         ch.put_msg(message=args['message'], d=d)
         # make sure at least one worker is available
-        workers = get_workers(id)
+        workers = get_workers(dbid)
         if len(workers.items()) < 1:
             ch = CommandChannel()
             actor = Actor.from_db(actors_store[dbid])
-            ch.put_cmd(actor_id=id, image=actor.image, num=1, stop_existing=False)
+            ch.put_cmd(actor_id=dbid, image=actor.image, tenant=g.tenant, num=1, stop_existing=False)
 
         return ok(result={'msg': args['message']})
 
@@ -298,7 +298,7 @@ class WorkersResource(Resource):
         if not num or num == 0:
             num = 1
         ch = CommandChannel()
-        ch.put_cmd(actor_id=actor.db_id, image=actor.image, num=num, stop_existing=False)
+        ch.put_cmd(actor_id=actor.db_id, image=actor.image, tenant=g.tenant, num=num, stop_existing=False)
         return ok(result=None, msg="Scheduled {} new worker(s) to start.".format(str(num)))
 
 
