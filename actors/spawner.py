@@ -6,7 +6,7 @@ import rabbitpy
 from codes import ERROR
 from config import Config
 from docker_utils import DockerError, run_worker
-from models import Actor
+from models import Actor, Worker, add_worker
 from stores import workers_store
 from channels import ActorMsgChannel, CommandChannel, WorkerChannel
 
@@ -34,7 +34,7 @@ class Spawner(object):
         try:
             workers_dict = json.loads(workers_store[actor_id])
         except KeyError:
-            workers = {}
+            workers_dict = {}
 
         # if there are existing workers, we need to close the actor message channel and
         # gracefully shutdown the existing worker processes.
@@ -53,11 +53,12 @@ class Spawner(object):
         print("Processing cmd:{}".format(str(cmd)))
         actor_id = cmd['actor_id']
         image = cmd['image']
+        tenant = cmd['tenant']
         stop_existing = cmd.get('stop_existing', True)
         num_workers = cmd.get('num', self.num_workers)
         print("Actor id:{}".format(actor_id))
         try:
-            new_channels, anon_channels, new_workers = self.start_workers(actor_id, image, num_workers)
+            new_channels, anon_channels, new_workers = self.start_workers(actor_id, image, tenant, num_workers)
         except SpawnerException as e:
             # for now, start_workers will do clean up for a SpawnerException, so we just need
             # to return back to the run loop.
@@ -71,33 +72,29 @@ class Spawner(object):
         # add workers to store first so that the records will be there when the workers go
         # to update their status
         if not stop_existing:
-            # @todo - NOT thread safe
-            workers = json.loads(workers_store[actor_id])
-            workers.extend(new_workers)
-            workers_store[actor_id] = json.dumps(workers)
+            for _, worker in new_workers.items():
+                add_worker(actor_id, worker)
         else:
-            workers_store[actor_id] = json.dumps(new_workers)
-
-
+            workers_store[actor_id] = new_workers
         # tell new workers to subscribe to the actor channel.
         for channel in anon_channels:
             channel.put({'status': 'ok', 'actor_id': actor_id})
         print("Done processing command.")
 
 
-    def start_workers(self, actor_id, image, num_workers):
+    def start_workers(self, actor_id, image, tenant, num_workers):
         print("starting {} workers. actor_id: {} image: {}".format(str(self.num_workers), actor_id, image))
         channels = []
         anon_channels = []
-        workers = []
+        workers = {}
         try:
             for i in range(num_workers):
                 print("starting worker {}".format(str(i)))
-                ch, anon_ch, worker = self.start_worker(image)
+                ch, anon_ch, worker = self.start_worker(image, tenant)
                 print("channel for worker {} is: {}".format(str(i), ch.name))
                 channels.append(ch)
                 anon_channels.append(anon_ch)
-                workers.append(worker)
+                workers[worker['ch_name']] = worker
         except SpawnerException as e:
             print("Caught SpawnerException:{}".format(str(e)))
             # in case of an error, put the actor in error state and kill all workers
@@ -110,10 +107,11 @@ class Spawner(object):
             raise SpawnerException()
         return channels, anon_channels, workers
 
-    def start_worker(self, image):
+    def start_worker(self, image, tenant):
         ch = WorkerChannel()
         # start an actor executor container and wait for a confirmation that image was pulled.
-        worker = run_worker(image, ch.name)
+        worker_dict = run_worker(image, ch.name)
+        worker = Worker(tenant=tenant, **worker_dict)
         print("worker started successfully, waiting on ack that image was pulled...")
         result = ch.get()
         if result['value']['status'] == 'ok':

@@ -9,7 +9,11 @@ def _do_get(getter, key):
     obj = getter(key)
     if obj is None:
         raise KeyError('"{}" not found'.format(key))
-    return json.loads(obj.decode('utf-8'))
+    try:
+        return json.loads(obj.decode('utf-8'))
+    # handle non-JSON data
+    except ValueError:
+        return obj.decode('utf-8')
 
 
 def _do_set(setter, key, value):
@@ -47,6 +51,14 @@ class AbstractStore(collections.MutableMapping):
 
     def update(self, key, field, value):
         "Atomic ``self[key][field] = value``."""
+        pass
+
+    def pop_field(self, key, field):
+        "Atomic pop ``self[key][field]``."""
+        pass
+
+    def update_subfield(self, key, field1, field2, value):
+        "Atomic ``self[key][field1][field2] = value``."""
         pass
 
     def getset(self, key, value):
@@ -96,6 +108,29 @@ class Store(AbstractStore):
         def _update(pipe):
             cur = _do_get(pipe.get, key)
             cur[field] = value
+            pipe.multi()
+            _do_set(pipe.set, key, cur)
+
+        self._db.transaction(_update, key)
+
+    def pop_field(self, key, field):
+        "Atomic pop ``self[key][field]``."""
+        def _pop(pipe):
+            cur = _do_get(pipe.get, key)
+            value = cur.pop(field)
+            pipe.multi()
+            _do_set(pipe.set, key, cur)
+            return value
+
+        return self._db.transaction(_pop, key)
+
+
+    def update_subfield(self, key, field1, field2, value):
+        "Atomic ``self[key][field1][field2] = value``."""
+
+        def _update(pipe):
+            cur = _do_get(pipe.get, key)
+            cur[field1][field2] = value
             pipe.multi()
             _do_set(pipe.set, key, cur)
 

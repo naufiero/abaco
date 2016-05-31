@@ -139,6 +139,7 @@ class Actor(AbacoDAO):
     def display(self):
         """Return a representation fit for display."""
         self.pop('db_id')
+        self.pop('executions')
         return self
 
     def generate_id(self, name, tenant):
@@ -194,7 +195,12 @@ class Execution(AbacoDAO):
                    'tenant': actor.tenant,
                    })
         execution = Execution(**ex)
-        executions_store.update(actor_id, execution.id, execution)
+
+        try:
+            executions_store.update(actor_id, execution.id, execution)
+        except KeyError:
+            # if actor has no executions, a KeyError will be thrown
+            executions_store[actor_id] = {execution.id: execution}
         return execution.id
 
     @classmethod
@@ -247,25 +253,26 @@ def get_worker(actor_id, ch_name):
     except KeyError:
         raise errors.WorkerException("Worker not found.")
 
-
 def delete_worker(actor_id, ch_name):
     """Deletes a worker from the worker store. Uses Redis optimistic locking to provide thread-safety since multiple
     clients could be attempting to delete workers at the same time. Pass db_id as `actor_id`
     parameter.
     """
-    del workers_store[actor_id][ch_name]
+    workers_store.pop_field(actor_id, ch_name)
+
+def add_worker(actor_id, worker):
+    """Add a worker to an actor's collection of workers."""
+    workers_store.update(actor_id, worker['ch_name'], worker)
 
 def update_worker_execution_time(actor_id, ch_name):
     """Pass db_id as `actor_id` parameter."""
     now = time.time()
-    # @todo - check that this works: actor_id[ch_name] is a complex key.
-    workers_store.update(actor_id[ch_name], 'last_execution', now)
-    workers_store.update(actor_id[ch_name], 'last_update', now)
+    workers_store.update_subfield(actor_id, ch_name, 'last_execution', now)
+    workers_store.update_subfield(actor_id, ch_name, 'last_update', now)
 
 def update_worker_status(actor_id, ch_name, status):
     """Pass db_id as `actor_id` parameter."""
-    # @todo - check that this works: actor_id[ch_name] is a complex key.
-    workers_store.update(actor_id[ch_name], 'status', status)
+    workers_store.update_subfield(actor_id, ch_name, 'status', status)
 
 
 def get_permissions(actor_id):
