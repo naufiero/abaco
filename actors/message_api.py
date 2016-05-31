@@ -3,7 +3,7 @@ from flask import Flask
 from request_utils import AbacoApi
 
 from auth import authn_and_authz
-from messages import MessagesResource
+from controllers import MessagesResource
 
 app = Flask(__name__)
 api = AbacoApi(app)

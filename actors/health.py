@@ -30,7 +30,7 @@ def check_workers(actor_id, ttl):
     print("Checking health for actors: {}".format(actor_id))
     workers = get_workers(actor_id)
     print("workers: {}".format(workers))
-    for worker in workers:
+    for _, worker in workers.items():
         # ignore workers on different hosts
         if not Config.get('spawner', 'host_id') == worker['host_id']:
             continue

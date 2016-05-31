@@ -2,7 +2,7 @@
 from flask import Flask
 from request_utils import AbacoApi
 
-from actors import ActorResource, ActorStateResource, ActorsResource, \
+from controllers import ActorResource, ActorStateResource, ActorsResource, \
     ActorExecutionsResource, ActorExecutionResource, \
     ActorExecutionLogsResource
 from auth import authn_and_authz

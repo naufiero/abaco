@@ -1,16 +1,17 @@
 from copy import deepcopy
 import json
 import time
+import uuid
 
 from codes import SUBMITTED
 from config import Config
 import errors
 from request_utils import RequestParser
-from stores import actors_store, logs_store, workers_store
+from stores import actors_store, executions_store, logs_store, permissions_store, workers_store
 
 
 class DbDict(dict):
-    """Class for persisting a Python dictonary."""
+    """Class for persisting a Python dictionary."""
 
     def __getattr__(self, key):
         # returning an AttributeError is important for making deepcopy work. cf.,
@@ -24,7 +25,9 @@ class DbDict(dict):
         self[key] = value
 
     def to_db(self):
-        return json.dumps(self)
+        # json serialization now happening in the store class. @todo - should remove all uses of .to_db
+        return self
+        # return json.dumps(self)
 
 
 class AbacoDAO(DbDict):
@@ -58,8 +61,16 @@ class AbacoDAO(DbDict):
                 except KeyError:
                     raise errors.DAOError("Required field {} missing.".format(name))
             else:
-                value = self.get_derived_value(name, kwargs)
+                # derived value - check to see if already computed
+                if hasattr(self, name):
+                    value = getattr(self, name)
+                else:
+                    value = self.get_derived_value(name, kwargs)
             setattr(self, attr, value)
+
+    def get_uuid(self):
+        """Generate a random uuid."""
+        return str(uuid.uuid4())
 
     @classmethod
     def request_parser(cls):
@@ -75,7 +86,7 @@ class AbacoDAO(DbDict):
     @classmethod
     def from_db(cls, db_json):
         """Construct a DAO from a db serialization."""
-        return cls(**json.loads(db_json))
+        return cls(**db_json)
 
     def get_derived_value(self, name, d):
         """Compute a derived value for the attribute `name` from the dictionary d of attributes provided."""
@@ -106,89 +117,44 @@ class Actor(AbacoDAO):
     def get_derived_value(self, name, d):
         """Compute a derived value for the attribute `name` from the dictionary d of attributes provided."""
         # first, see if the attribute is already in the object:
+        if hasattr(self, 'id'):
+            return
+        # next, see if it was passed:
         try:
-            if d[name]:
-                return d[name]
+            return d[name]
         except KeyError:
             pass
         # if not, generate an id
         try:
-            actor_id, db_id = Actor.generate_id(d['name'], d['tenant'])
+            actor_id, db_id = self.generate_id(d['name'], d['tenant'])
         except KeyError:
             raise errors.DAOError("Required field name or tenant missing")
+        self.id = actor_id
+        self.db_id = db_id
         if name == 'id':
             return actor_id
-        elif name == 'db_id':
+        else:
             return db_id
 
     def display(self):
         """Return a representation fit for display."""
-        # make a deep copy to prevent destructive behavior in the db.
-        result = deepcopy(self)
-        db_id = result.pop('db_id')
-        if not result.executions:
-            return result
-        # strip tenant from execution id's
-        for k,v in result.executions.items():
-            if not '{}_'.format(result.tenant) in k:
-            # if len(k.split('{}_'.format(result.tenant))) < 2:
-                print("Data issue in subscription key: {}, value: {}, for actor with db_id: {} and tenant: {}".format(k, v, db_id, self.tenant))
-                ex_display_id = k
-            else:
-                ex_display_id = k.split('{}_'.format(result.tenant))[1]
-                # change the id in the value as well
-                v['id'] = ex_display_id
-            v.pop('tenant', None)
-            result.executions[ex_display_id] = result.executions.pop(k)
+        self.pop('db_id')
+        return self
 
-        return result
-
-    @classmethod
-    def generate_id(cls, name, tenant):
+    def generate_id(self, name, tenant):
         """Generate an id for a new actor."""
-        idx = 0
-        # @todo - NOT thread safe
-        while True:
-            db_id = '{}_{}_{}'.format(tenant, name, idx)
-            id = '{}_{}'.format(name, idx)
-            if db_id not in actors_store:
-                return id, db_id
-            idx = idx + 1
+        id = self.get_uuid()
+        return id, Actor.get_dbid(tenant, id)
 
     @classmethod
     def get_dbid(cls, tenant, id):
         """Return the key used in redis from the "display_id" and tenant. """
-        return '{}_{}'.format(tenant, id)
-
-    # @classmethod
-    # def from_db(cls, s):
-    #     a = Actor(**json.loads(s))
-    #     return a
+        return str('{}_{}'.format(tenant, id))
 
     @classmethod
     def set_status(cls, actor_id, status):
         """Update the status of an actor"""
-        # @todo - NOT thread safe -- use the new store update method
-        actor = Actor.from_db(actors_store[actor_id])
-        actor.status = status
-        actors_store[actor_id] = actor.to_db()
-
-
-class Worker(AbacoDAO):
-    """Basic data access object for working with Workers."""
-
-    PARAMS = [
-        # param_name, required/optional/provided/derived, attr_name, type, help, default
-        ('tenant', 'required', 'tenant', str, 'The tenant that this worker belongs to.', None),
-        ('image', 'required', 'image', list, 'The list of images associated with this worker', None),
-        ('location', 'required', 'location', str, 'The location of the docker daemon used by this worker.', None),
-        ('cid', 'required', 'cid', str, 'The container ID of this worker.', None),
-        ('ch_name', 'required', 'ch_name', str, 'The name of the associate worker chanel.', None),
-        ('status', 'required', 'status', str, 'Status of the worker.', None),
-        ('host_id', 'required', 'host_id', str, 'id of the host where worker is running.', None),
-        ('host_ip', 'required', 'host_ip', str, 'ip of the host where worker is running.', None),
-        ('last_execution', 'required', 'last_execution', str, 'Last time the worker executed an actor container.', None),
-        ]
+        actors_store.update(actor_id, 'status', status)
 
 
 class Execution(AbacoDAO):
@@ -209,152 +175,119 @@ class Execution(AbacoDAO):
         """Compute a derived value for the attribute `name` from the dictionary d of attributes provided."""
         # first, see if the attribute is already in the object:
         try:
-            actor_id = d['actor_id']
-        except KeyError:
-            raise errors.DAOError("Required field actor_id missing.")
-        try:
             if d[name]:
                 return d[name]
         except KeyError:
             pass
-        # if not, generate an id
-        try:
-            actor_id, db_id = Actor.generate_id(d['name'], d['tenant'])
-        except KeyError:
-            raise errors.DAOError("Required field name or tenant missing")
-        if name == 'id':
-            return actor_id
-        elif name == 'db_id':
-            return db_id
-
-
-class Execution(DbDict):
-    """Basic data access object representing an Actor execution."""
-
-    def __init__(self, actor, d):
-        super(Execution, self).__init__(d)
-        self.tenant = actor.tenant
-        if not self.get('id'):
-            self['id'] = Execution.get_id(actor)
-
-    @classmethod
-    def get_id(cls, actor):
-        idx = 0
-        actor_id = actor.db_id
-        try:
-            excs = actor.executions
-        except KeyError:
-            return actor_id + "_exc_0"
-        if not excs:
-            return actor_id + "_exc_0"
-        while True:
-            id = actor_id + "_exc_" + str(idx)
-            if id not in excs:
-                return id
-            idx = idx + 1
-
-    @classmethod
-    def get_dbid(cls, tenant, id):
-        """Return the key used in redis from the "display_id" and tenant. """
-        return '{}_{}'.format(tenant, id)
+        return self.get_uuid()
 
     @classmethod
     def add_execution(cls, actor_id, ex):
         """
         Add an execution to an actor.
         :param actor_id: str
-        :param ex: dict
+        :param ex: dict describing the execution.
         :return:
         """
         actor = Actor.from_db(actors_store[actor_id])
-        execution = Execution(actor, ex)
-        actor.executions[execution.id] = execution
-        actors_store[actor_id] = actor.to_db()
+        ex.update({'actor_id': actor_id,
+                   'tenant': actor.tenant,
+                   })
+        execution = Execution(**ex)
+        executions_store.update(actor_id, execution.id, execution)
         return execution.id
 
     @classmethod
     def set_logs(cls, exc_id, logs):
         """
         Set the logs for an execution.
-        :param actor_id: str
-        :param ex: dict
+        :param exc_id: the id of the execution (str)
+        :param logs: dict describing the logs
         :return:
         """
         log_ex = Config.get('web', 'log_ex')
         try:
             log_ex = int(log_ex)
-        except Exception:
+        except ValueError:
             log_ex = -1
         if log_ex > 0:
             logs_store.set_with_expiry(exc_id, logs, log_ex)
         else:
-            logs_store[id] = logs
+            logs_store[exc_id] = logs
 
 
-class WorkerException(Exception):
-    def __init__(self, message):
-        Exception.__init__(self, message)
-        self.message = message
+class Worker(AbacoDAO):
+    """Basic data access object for working with Workers."""
+
+    PARAMS = [
+        # param_name, required/optional/provided/derived, attr_name, type, help, default
+        ('tenant', 'required', 'tenant', str, 'The tenant that this worker belongs to.', None),
+        ('ch_name', 'required', 'ch_name', str, 'The worker id and the name of the associated worker chanel.', None),
+        ('image', 'required', 'image', list, 'The list of images associated with this worker', None),
+        ('location', 'required', 'location', str, 'The location of the docker daemon used by this worker.', None),
+        ('cid', 'required', 'cid', str, 'The container ID of this worker.', None),
+        ('status', 'required', 'status', str, 'Status of the worker.', None),
+        ('host_id', 'required', 'host_id', str, 'id of the host where worker is running.', None),
+        ('host_ip', 'required', 'host_ip', str, 'ip of the host where worker is running.', None),
+        ('last_execution', 'required', 'last_execution', str, 'Last time the worker executed an actor container.', None),
+        ]
 
 
 def get_workers(actor_id):
     """Retrieve all workers for an actor. Pass db_id as `actor_id` parameter."""
     try:
-        workers = json.loads(workers_store[actor_id])
+        return workers_store[actor_id]
     except KeyError:
-        return []
-    return workers
+        return {}
 
 def get_worker(actor_id, ch_name):
     """Retrieve a worker from the workers store. Pass db_id as `actor_id` parameter."""
-    workers = get_workers(actor_id)
-    for worker in workers:
-        if worker['ch_name'] == ch_name:
-            return worker
-    raise WorkerException("Worker not found.")
+    try:
+        return workers_store[actor_id][ch_name]
+    except KeyError:
+        raise errors.WorkerException("Worker not found.")
+
 
 def delete_worker(actor_id, ch_name):
     """Deletes a worker from the worker store. Uses Redis optimistic locking to provide thread-safety since multiple
     clients could be attempting to delete workers at the same time. Pass db_id as `actor_id`
     parameter.
     """
-    def safe_delete(pipe):
-        """Removes a worker from the worker store in a thread-safe way; this is the callable function to be used
-        with the redis-py transaction method. See the Pipelines section of the docs:
-        https://github.com/andymccurdy/redis-py
-        """
-        workers = pipe.get(actor_id)
-        workers = json.loads(workers)
-        i = -1
-        for idx, worker in enumerate(workers):
-            if worker.get('ch_name') == ch_name:
-                i = idx
-                break
-        if i > -1:
-            print("safe_delete found worker, removing.")
-            workers.pop(i)
-        else:
-            print("safe_delete did not find worker: {}. workers:{}".format(ch_name, workers))
-        pipe.multi()
-        pipe.set(actor_id, json.dumps(workers))
+    del workers_store[actor_id][ch_name]
 
-    workers_store.transaction(safe_delete, actor_id)
-
-def update_worker_execution_time(actor_id, worker_ch):
+def update_worker_execution_time(actor_id, ch_name):
     """Pass db_id as `actor_id` parameter."""
-    workers = get_workers(actor_id)
     now = time.time()
-    for worker in workers:
-        if worker['ch_name'] == worker_ch:
-            worker['last_execution'] = now
-            worker['last_update'] = now
-    workers_store[actor_id] = json.dumps(workers)
+    # @todo - check that this works: actor_id[ch_name] is a complex key.
+    workers_store.update(actor_id[ch_name], 'last_execution', now)
+    workers_store.update(actor_id[ch_name], 'last_update', now)
 
-def update_worker_status(actor_id, worker_ch, status):
+def update_worker_status(actor_id, ch_name, status):
     """Pass db_id as `actor_id` parameter."""
-    workers = get_workers(actor_id)
-    for worker in workers:
-        if worker['ch_name'] == worker_ch:
-            worker['status'] = status
-            worker['last_update'] = time.time()
-    workers_store[actor_id] = json.dumps(workers)
+    # @todo - check that this works: actor_id[ch_name] is a complex key.
+    workers_store.update(actor_id[ch_name], 'status', status)
+
+
+def get_permissions(actor_id):
+    """ Return all permissions for an actor
+    :param actor_id:
+    :return:
+    """
+    try:
+        permissions = json.loads(permissions_store[actor_id])
+        return permissions
+    except KeyError:
+        raise errors.PermissionsException("Actor {} does not exist".format(actor_id))
+
+def add_permission(user, actor_id, level):
+    """Add a permission for a user and level to an actor."""
+    try:
+        permissions = get_permissions(actor_id)
+    except errors.PermissionsException:
+        permissions = []
+    for pem in permissions:
+        if pem.get('user') == 'user' and pem.get('level') == level:
+            return
+    permissions.append({'user': user,
+                        'level': level})
+    permissions_store[actor_id] = json.dumps(permissions)
