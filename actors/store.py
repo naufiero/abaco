@@ -1,22 +1,81 @@
+
 import collections
+import json
 
 import redis
 
 
-class Store(collections.MutableMapping):
+def _do_get(getter, key):
+    obj = getter(key)
+    if obj is None:
+        raise KeyError('"{}" not found'.format(key))
+    return json.loads(obj.decode('utf-8'))
 
-    def __init__(self, host, port, db=0):
-        self._db = redis.StrictRedis(host=host, port=port, db=db, decode_responses=True)
+
+def _do_set(setter, key, value):
+    obj = json.dumps(value)
+    setter(key, obj.encode('utf-8'))
+
+
+class StoreMutexException(Exception):
+    pass
+
+
+class AbstractStore(collections.MutableMapping):
+    """A persitent dictionary."""
 
     def __getitem__(self, key):
-        obj = self._db.get(key)
-        if obj is None:
-            raise KeyError('"{}" not found'.format(key))
-        return obj
+        pass
 
     def __setitem__(self, key, value):
-        obj = value
-        self._db.set(key, obj)
+        pass
+
+    def __delitem__(self, key):
+        pass
+
+    def __iter__(self):
+        """Iterator for the keys."""
+        pass
+
+    def __len__(self):
+        """Size of db."""
+        pass
+
+    def set_with_expiry(self, key, obj, ex):
+        """Set `key` to `obj` with automatic expiration of `ex` seconds."""
+        pass
+
+    def update(self, key, field, value):
+        "Atomic ``self[key][field] = value``."""
+        pass
+
+    def getset(self, key, value):
+        "Atomically: ``self[key] = value`` and return previous ``self[key]``."
+        pass
+
+    def mutex_acquire(self, key):
+        """Try to use key as a mutex.
+        Raise StoreMutexException if not available.
+        """
+
+        busy = self.getset(key, True)
+        if busy:
+            raise StoreMutexException('{} is busy'.format(key))
+
+    def mutex_release(self, key):
+        self[key] = False
+
+
+class Store(AbstractStore):
+
+    def __init__(self, host, port, db=0):
+        self._db = redis.StrictRedis(host=host, port=port, db=db)
+
+    def __getitem__(self, key):
+        return _do_get(self._db.get, key)
+
+    def __setitem__(self, key, value):
+        _do_set(self._db.set, key, value)
 
     def __delitem__(self, key):
         self._db.delete(key)
@@ -31,8 +90,20 @@ class Store(collections.MutableMapping):
         """Set `key` to `obj` with automatic expiration of `ex` seconds."""
         self._db.set(key, obj, ex=ex)
 
-    def transaction(self, callable, *args):
-        """ Convenience wrapper around redis-py transaction. See the Pipelines section of the docs:
-        https://github.com/andymccurdy/redis-py
-        """
-        self._db.transaction(callable, args)
+    def update(self, key, field, value):
+        "Atomic ``self[key][field] = value``."""
+
+        def _update(pipe):
+            cur = _do_get(pipe.get, key)
+            cur[field] = value
+            pipe.multi()
+            _do_set(pipe.set, key, cur)
+
+        self._db.transaction(_update, key)
+
+    def getset(self, key, value):
+        "Atomically: ``self[key] = value`` and return previous ``self[key]``."
+
+        value = self._db.getset(key, json.dumps(value).encode('utf-8'))
+        if value is not None:
+            return json.loads(value.decode('utf-8'))

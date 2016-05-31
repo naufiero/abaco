@@ -32,22 +32,19 @@ class Spawner(object):
         """Stop existing workers; used when updating an actor's image."""
 
         try:
-            workers = json.loads(workers_store[actor_id])
-            print("Found existing workers: {}".format(str(workers)))
+            workers_dict = json.loads(workers_store[actor_id])
         except KeyError:
-            print("No existing workers.")
             workers = {}
 
         # if there are existing workers, we need to close the actor message channel and
         # gracefully shutdown the existing worker processes.
-        if len(workers) > 0:
+        if len(workers_dict.items()) > 0:
             # first, close the actor msg channel to prevent any new messages from being pulled
             # by the old workers.
             actor_ch = ActorMsgChannel(actor_id)
             actor_ch.close()
-
             # now, send messages to workers for a graceful shutdown:
-            for worker in workers:
+            for _, worker in workers_dict.items():
                 ch = WorkerChannel(name=worker['ch_name'])
                 ch.put('stop')
 

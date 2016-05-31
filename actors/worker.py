@@ -1,82 +1,20 @@
-import json
 import os
 import threading
-import time
 
-from flask import g
-from flask_restful import Resource
 import channelpy
 
 from channels import ActorMsgChannel, CommandChannel,WorkerChannel
 from codes import ERROR, READY, BUSY
 from docker_utils import DockerError, DockerStartContainerError, execute_actor, pull_image
-from models import Actor, Execution, get_workers, get_worker, delete_worker, \
-  update_worker_status, update_worker_execution_time, WorkerException
-from request_utils import APIException, ok, error, RequestParser
+from errors import WorkerException
+from models import Actor, Execution, get_workers, delete_worker, \
+  update_worker_status, update_worker_execution_time
 from stores import actors_store, workers_store
 
 
 # keep_running will be updated by the thread listening on the worker channel when a graceful shutdown is
 # required.
 keep_running = True
-
-class WorkersResource(Resource):
-    def get(self, actor_id):
-        id = Actor.get_dbid(g.tenant, actor_id)
-        try:
-            Actor.from_db(actors_store[id])
-        except KeyError:
-            raise APIException("actor not found: {}'".format(actor_id), 400)
-        try:
-            workers = get_workers(id)
-        except WorkerException as e:
-            raise APIException(e.message, 404)
-        return ok(result=workers, msg="Workers retrieved successfully.")
-
-    def validate_post(self):
-        parser = RequestParser()
-        parser.add_argument('num', type=int, help="Number of workers to start (default is 1).")
-        args = parser.parse_args()
-        return args
-
-    def post(self, actor_id):
-        """Start new workers for an actor"""
-        id = Actor.get_dbid(g.tenant, actor_id)
-        try:
-            actor = Actor.from_db(actors_store[id])
-        except KeyError:
-            raise APIException(
-                "actor not found: {}'".format(actor_id), 404)
-        args = self.validate_post()
-        num = args.get('num')
-        if not num or num == 0:
-            num = 1
-        ch = CommandChannel()
-        ch.put_cmd(actor_id=actor.db_id, image=actor.image, num=num, stop_existing=False)
-        return ok(result=None, msg="Scheduled {} new worker(s) to start.".format(str(num)))
-
-
-class WorkerResource(Resource):
-    def get(self, actor_id, ch_name):
-        id = Actor.get_dbid(g.tenant, actor_id)
-        try:
-            Actor.from_db(actors_store[id])
-        except KeyError:
-            raise WorkerException("actor not found: {}'".format(actor_id))
-        try:
-            worker = get_worker(id, ch_name)
-        except WorkerException as e:
-            raise APIException(e.message, 404)
-        return ok(result=worker, msg="Worker retrieved successfully.")
-
-    def delete(self, actor_id, ch_name):
-        id = Actor.get_dbid(g.tenant, actor_id)
-        try:
-            worker = get_worker(id, ch_name)
-        except WorkerException as e:
-            raise APIException(e.message, 404)
-        shutdown_worker(ch_name)
-        return ok(result=worker, msg="Worker scheduled to be stopped.")
 
 def shutdown_worker(ch_name):
     """Gracefully shutdown a single worker."""
@@ -86,7 +24,7 @@ def shutdown_worker(ch_name):
 def shutdown_workers(actor_id):
     """Graceful shutdown of all workers for an actor. Pass db_id as the `actor_id` argument."""
     workers = get_workers(actor_id)
-    for worker in workers:
+    for _, worker in workers.items():
         shutdown_worker(worker['ch_name'])
 
 def process_worker_ch(worker_ch, actor_id, actor_ch):

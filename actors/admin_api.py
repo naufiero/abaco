@@ -2,7 +2,7 @@ from flask import Flask
 from request_utils import AbacoApi
 
 from auth import authn_and_authz, PermissionsResource
-from worker import WorkersResource, WorkerResource
+from controllers import WorkersResource, WorkerResource
 
 app = Flask(__name__)
 api = AbacoApi(app)

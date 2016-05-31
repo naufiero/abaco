@@ -11,7 +11,8 @@ from flask_restful import Resource
 import jwt
 
 from config import Config
-from models import Actor
+from errors import PermissionsException
+from models import Actor, get_permissions
 from request_utils import APIException, ok, RequestParser
 from stores import actors_store, permissions_store
 
@@ -29,13 +30,6 @@ def get_pub_key():
 PUB_KEY = get_pub_key()
 
 TOKEN_RE = re.compile('Bearer (.+)')
-
-PERMISSION_LEVELS = ('READ', 'UPDATE')
-
-class PermissionsException(Exception):
-    def __init__(self, message):
-        Exception.__init__(self, message)
-        self.message = message
 
 
 def get_pub_key():
@@ -179,17 +173,6 @@ def authorization():
     if not has_pem:
         raise APIException("Not authorized")
 
-def get_permissions(actor_id):
-    """ Return all permissions for an actor
-    :param actor_id:
-    :return:
-    """
-    try:
-        permissions = json.loads(permissions_store[actor_id])
-        return permissions
-    except KeyError:
-        raise PermissionsException("Actor {} does not exist".format(actor_id))
-
 def check_permissions(user, actor_id, level):
     """Check the permissions store for user and level"""
     permissions = get_permissions(actor_id)
@@ -198,55 +181,3 @@ def check_permissions(user, actor_id, level):
             if pem['level'] >= level:
                 return True
     return False
-
-def add_permission(user, actor_id, level):
-    """Add a permission for a user and level to an actor."""
-    try:
-        permissions = get_permissions(actor_id)
-    except PermissionsException:
-        permissions = []
-    for pem in permissions:
-        if pem.get('user') == 'user' and pem.get('level') == level:
-            return
-    permissions.append({'user': user,
-                        'level': level})
-    permissions_store[actor_id] = json.dumps(permissions)
-
-
-class PermissionsResource(Resource):
-    def get(self, actor_id):
-        id = Actor.get_dbid(g.tenant, actor_id)
-        try:
-            Actor.from_db(actors_store[id])
-        except KeyError:
-            raise APIException(
-                "actor not found: {}'".format(actor_id), 404)
-        try:
-            permissions = get_permissions(id)
-        except PermissionsException as e:
-            raise APIException(e.message, 404)
-        return ok(result=permissions, msg="Permissions retrieved successfully.")
-
-    def validate_post(self):
-        parser = RequestParser()
-        parser.add_argument('user', type=str, required=True, help="User owning the permission.")
-        parser.add_argument('level', type=str, required=True,
-                            help="Level of the permission: {}".format(PERMISSION_LEVELS))
-        args = parser.parse_args()
-        if not args['level'] in PERMISSION_LEVELS:
-            raise APIException("Invalid permission level: {}. \
-            The valid values are {}".format(args['level'], PERMISSION_LEVELS))
-        return args
-
-    def post(self, actor_id):
-        """Add new permissions for an actor"""
-        id = Actor.get_dbid(g.tenant, actor_id)
-        try:
-            Actor.from_db(actors_store[id])
-        except KeyError:
-            raise APIException(
-                "actor not found: {}'".format(actor_id), 404)
-        args = self.validate_post()
-        add_permission(args['user'], id, args['level'])
-        permissions = get_permissions(id)
-        return ok(result=permissions, msg="Permission added successfully.")
