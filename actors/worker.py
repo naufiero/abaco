@@ -8,8 +8,7 @@ from channels import ActorMsgChannel, CommandChannel,WorkerChannel
 from codes import ERROR, READY, BUSY
 from docker_utils import DockerError, DockerStartContainerError, execute_actor, pull_image
 from errors import WorkerException
-from models import Actor, Execution, get_workers, delete_worker, \
-  update_worker_status, update_worker_execution_time
+from models import Actor, Execution, Worker
 from stores import actors_store, workers_store
 
 
@@ -24,7 +23,7 @@ def shutdown_worker(ch_name):
 
 def shutdown_workers(actor_id):
     """Graceful shutdown of all workers for an actor. Pass db_id as the `actor_id` argument."""
-    workers = get_workers(actor_id)
+    workers = Worker.get_workers(actor_id)
     for _, worker in workers.items():
         shutdown_worker(worker['ch_name'])
 
@@ -51,7 +50,7 @@ def process_worker_ch(worker_ch, actor_id, actor_ch):
         elif msg == 'stop':
             print("Received stop message, stopping worker...")
             try:
-                delete_worker(actor_id, worker_ch.name)
+                Worker.delete_worker(actor_id, worker_ch.name)
             except WorkerException:
                 pass
             keep_running = False
@@ -70,7 +69,7 @@ def subscribe(actor_id, worker_ch):
     print("Worker subscribing to actor channel...")
     global keep_running
     while keep_running:
-        update_worker_status(actor_id, worker_ch.name, READY)
+        Worker.update_worker_status(actor_id, worker_ch.name, READY)
         try:
             msg = actor_ch.get(timeout=2)
         except channelpy.ChannelTimeoutException:
@@ -106,7 +105,7 @@ def subscribe(actor_id, worker_ch):
         exc_id = Execution.add_execution(actor_id, stats)
         print("Added execution: {}".format(exc_id))
         Execution.set_logs(exc_id, logs)
-        update_worker_execution_time(actor_id, worker_ch.name)
+        Worker.update_worker_execution_time(actor_id, worker_ch.name)
 
 def main(worker_ch_name, image):
     worker_ch = WorkerChannel(name=worker_ch_name)

@@ -6,7 +6,7 @@ from flask_restful import Resource, Api, inputs
 from channels import ActorMsgChannel, CommandChannel
 from codes import SUBMITTED, PERMISSION_LEVELS
 from errors import PermissionsException, WorkerException
-from models import Actor, Execution, get_worker, get_workers, add_permission, get_permissions
+from models import Actor, Execution, Worker, get_permissions, add_permission
 from request_utils import RequestParser, APIException, ok
 from stores import actors_store, executions_store, logs_store, permissions_store
 from worker import shutdown_workers, shutdown_worker
@@ -257,7 +257,7 @@ class MessagesResource(Resource):
         ch = ActorMsgChannel(actor_id=dbid)
         ch.put_msg(message=args['message'], d=d)
         # make sure at least one worker is available
-        workers = get_workers(dbid)
+        workers = Worker.get_workers(dbid)
         if len(workers.items()) < 1:
             ch = CommandChannel()
             actor = Actor.from_db(actors_store[dbid])
@@ -274,7 +274,7 @@ class WorkersResource(Resource):
         except KeyError:
             raise APIException("actor not found: {}'".format(actor_id), 400)
         try:
-            workers = get_workers(dbid)
+            workers = Worker.get_workers(dbid)
         except WorkerException as e:
             raise APIException(e.msg, 404)
         return ok(result=workers, msg="Workers retrieved successfully.")
@@ -310,7 +310,7 @@ class WorkerResource(Resource):
         except KeyError:
             raise WorkerException("actor not found: {}'".format(actor_id))
         try:
-            worker = get_worker(id, ch_name)
+            worker = Worker.get_worker(id, ch_name)
         except WorkerException as e:
             raise APIException(e.msg, 404)
         return ok(result=worker, msg="Worker retrieved successfully.")
@@ -318,7 +318,7 @@ class WorkerResource(Resource):
     def delete(self, actor_id, ch_name):
         id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            worker = get_worker(id, ch_name)
+            worker = Worker.get_worker(id, ch_name)
         except WorkerException as e:
             raise APIException(e.msg, 404)
         shutdown_worker(ch_name)

@@ -10,7 +10,7 @@ from requests.exceptions import ReadTimeout
 
 from config import Config
 from codes import BUSY
-from models import update_worker_status
+from models import Worker
 
 AE_IMAGE = os.environ.get('AE_IMAGE', 'jstubbs/abaco_core')
 
@@ -138,7 +138,7 @@ def execute_actor(actor_id, worker_ch, image, msg, d={}, privileged=False):
         # if there was an error starting the container, user will need to debig
         raise DockerStartContainerError("Could not start container {}. Exception {}".format(container.get('Id'), str(e)))
     start = timeit.default_timer()
-    update_worker_status(actor_id, worker_ch.name, BUSY)
+    Worker.update_worker_status(actor_id, worker_ch.name, BUSY)
     running = True
     # create a separate cli for checkin stats objects since these should be fast and we don't want to wait
     stats_cli = docker.AutoVersionClient(base_url=dd, timeout=1)

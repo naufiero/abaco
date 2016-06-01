@@ -16,7 +16,7 @@ import channelpy
 import codes
 from config import Config
 from docker_utils import rm_container, DockerError, container_running, run_container_with_docker
-from models import Actor, delete_worker, get_workers
+from models import Actor, Worker
 from channels import CommandChannel, WorkerChannel
 from stores import actors_store
 from worker import shutdown_worker
@@ -46,12 +46,12 @@ def check_workers(actor_id, ttl):
                 rm_container(worker['cid'])
             except DockerError:
                 pass
-            delete_worker(actor_id, worker['ch_name'])
+            Worker.delete_worker(actor_id, worker['ch_name'])
             continue
         if not result == 'ok':
             print("Worker responded unexpectedly: {}, deleting worker.".format(result))
             rm_container(worker['cid'])
-            delete_worker(actor_id, worker['ch_name'])
+            Worker.delete_worker(actor_id, worker['ch_name'])
         else:
             print("Worker ok.")
         # now check if the worker has been idle beyond the ttl:
@@ -75,7 +75,7 @@ def manage_workers(actor_id):
     except KeyError:
         print("Did not find actor; returning.")
         return
-    workers = get_workers(actor_id)
+    workers = Worker.get_workers(actor_id)
     #TODO - implement policy
 
 def main():

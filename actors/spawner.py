@@ -6,7 +6,7 @@ import rabbitpy
 from codes import ERROR
 from config import Config
 from docker_utils import DockerError, run_worker
-from models import Actor, Worker, add_worker
+from models import Actor, Worker
 from stores import workers_store
 from channels import ActorMsgChannel, CommandChannel, WorkerChannel
 
@@ -32,7 +32,7 @@ class Spawner(object):
         """Stop existing workers; used when updating an actor's image."""
 
         try:
-            workers_dict = json.loads(workers_store[actor_id])
+            workers_dict = workers_store[actor_id]
         except KeyError:
             workers_dict = {}
 
@@ -73,7 +73,7 @@ class Spawner(object):
         # to update their status
         if not stop_existing:
             for _, worker in new_workers.items():
-                add_worker(actor_id, worker)
+                Worker.add_worker(actor_id, worker)
         else:
             workers_store[actor_id] = new_workers
         # tell new workers to subscribe to the actor channel.
