@@ -276,7 +276,7 @@ class WorkersResource(Resource):
         try:
             workers = get_workers(dbid)
         except WorkerException as e:
-            raise APIException(e.message, 404)
+            raise APIException(e.msg, 404)
         return ok(result=workers, msg="Workers retrieved successfully.")
 
     def validate_post(self):
@@ -312,7 +312,7 @@ class WorkerResource(Resource):
         try:
             worker = get_worker(id, ch_name)
         except WorkerException as e:
-            raise APIException(e.message, 404)
+            raise APIException(e.msg, 404)
         return ok(result=worker, msg="Worker retrieved successfully.")
 
     def delete(self, actor_id, ch_name):
@@ -320,7 +320,7 @@ class WorkerResource(Resource):
         try:
             worker = get_worker(id, ch_name)
         except WorkerException as e:
-            raise APIException(e.message, 404)
+            raise APIException(e.msg, 404)
         shutdown_worker(ch_name)
         return ok(result=worker, msg="Worker scheduled to be stopped.")
 
@@ -336,7 +336,7 @@ class PermissionsResource(Resource):
         try:
             permissions = get_permissions(id)
         except PermissionsException as e:
-            raise APIException(e.message, 404)
+            raise APIException(e.msg, 404)
         return ok(result=permissions, msg="Permissions retrieved successfully.")
 
     def validate_post(self):
