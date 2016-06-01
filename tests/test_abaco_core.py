@@ -32,13 +32,13 @@ def headers():
     return headers
 
 def test_remove_initial_actors(headers):
-    url = '{}/{}'.format(base_url, '/actors')
+    url = '{}/actors'.format(base_url)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     for act in result:
-        url = '{}/{}/{}'.format(base_url, '/actors', act.get('id'))
+        url = '{}/actors/{}'.format(base_url, act.get('id'))
         rsp = requests.delete(url, headers=headers)
-        result = basic_response_checks(rsp)
+        basic_response_checks(rsp)
 
 def basic_response_checks(rsp):
     assert rsp.status_code in [200, 201]
@@ -58,29 +58,41 @@ def test_list_actors(headers):
 
 def test_register_actor(headers):
     url = '{}/{}'.format(base_url, '/actors')
-    data = {'image': 'jstubbs/abaco_test', 'name': 'test'}
+    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite'}
     rsp = requests.post(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
     assert 'description' in result
-    assert 'executions' in result
+    assert 'tenant' in result
     assert result['image'] == 'jstubbs/abaco_test'
-    assert result['name'] == 'test'
-    assert result['id'] == 'test_0'
+    assert result['name'] == 'abaco_test_suite'
+    assert result['id'] is not None
+
+def get_actor_id(headers, name='abaco_test_suite'):
+    url = '{}/{}'.format(base_url, '/actors')
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    for k in result:
+        if k.get('name') == name:
+            return k.get('id')
+    # didn't find the test actor
+    assert False
 
 def test_list_actor(headers):
-    url = '{}/actors/test_0'.format(base_url)
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert 'description' in result
-    assert 'executions' in result
+    assert 'tenant' in result
     assert result['image'] == 'jstubbs/abaco_test'
-    assert result['name'] == 'test'
-    assert result['id'] == 'test_0'
+    assert result['name'] == 'abaco_test_suite'
+    assert result['id'] is not None
 
 def test_actor_is_ready(headers):
     count = 0
+    actor_id = get_actor_id(headers)
     while count < 10:
-        url = '{}/actors/test_0'.format(base_url)
+        url = '{}/actors/{}'.format(base_url, actor_id)
         rsp = requests.get(url, headers=headers)
         result = basic_response_checks(rsp)
         if result['status'] == 'READY':
@@ -89,8 +101,28 @@ def test_actor_is_ready(headers):
         count += 1
     assert False
 
+
+# ###################
+# executions and logs
+# ###################
+
+def test_list_executions(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/executions'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    assert len(result.get('ids')) == 0
+
+def test_list_messages(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/messages'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    assert result.get('messages') == 0
+
 def test_execute_actor(headers):
-    url = '{}/actors/test_0/messages'.format(base_url)
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/messages'.format(base_url, actor_id)
     data = {'message': 'testing execution'}
     rsp = requests.post(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
@@ -99,13 +131,13 @@ def test_execute_actor(headers):
     count = 0
     while count < 10:
         time.sleep(3)
-        url = '{}/actors/test_0/executions'.format(base_url)
+        url = '{}/actors/{}/executions'.format(base_url, actor_id)
         rsp = requests.get(url, headers=headers)
         result = basic_response_checks(rsp)
         ids = result.get('ids')
         if ids:
             assert len(ids) == 1
-            assert ids[0] ==  'test_0_exc_0'
+            assert ids[0] is not None
             assert result.get('total_executions') == 1
             assert result.get('total_cpu')
             assert result.get('total_io')
@@ -115,11 +147,30 @@ def test_execute_actor(headers):
     assert False
 
 def test_list_execution_logs(headers):
-    url = '{}/actors/test_0/executions/test_0_exc_0/logs'.format(base_url)
+    actor_id = get_actor_id(headers)
+    # get execution id
+    url = '{}/actors/{}/executions'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    exec_id = result.get('ids')[0]
+    url = '{}/actors/{}/executions/{}/logs'.format(base_url, actor_id, exec_id)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert 'Contents of MSG: testing execution' in result
     assert 'PATH' in result
+
+def test_update_actor(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}'.format(base_url, actor_id)
+    data = {'image': 'jstubbs/abaco_test2'}
+    rsp = requests.put(url, data=data, headers=headers)
+    result = basic_response_checks(rsp)
+    assert 'description' in result
+    assert 'tenant' in result
+    assert result['image'] == 'jstubbs/abaco_test2'
+    assert result['name'] == 'abaco_test_suite'
+    assert result['id'] is not None
+
 
 
 # ################
@@ -127,22 +178,25 @@ def test_list_execution_logs(headers):
 # ################
 
 def test_list_workers(headers):
-    url = '{}/actors/test_0/workers'.format(base_url)
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/workers'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert len(result) > 0
-    worker = result[0]
+    # get the first worker
+    worker = result[result.keys()[0]]
     assert worker.get('image') == 'jstubbs/abaco_test'
     assert worker.get('status') == 'READY'
     assert worker.get('location')
     assert worker.get('cid')
-    assert worker.get('last_update')
+    assert worker.get('last_execution')
     assert worker.get('ch_name')
 
 def test_add_worker(headers):
-    url = '{}/actors/test_0/workers'.format(base_url)
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/workers'.format(base_url, actor_id)
     rsp = requests.post(url, headers=headers)
-    result = basic_response_checks(rsp)
+    basic_response_checks(rsp)
     time.sleep(8)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
@@ -150,31 +204,34 @@ def test_add_worker(headers):
 
 def test_delete_worker(headers):
     # get the list of workers
-    url = '{}/actors/test_0/workers'.format(base_url)
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/workers'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
 
-    # delete the last one
-    id = result[1].get('ch_name')
-    url = '{}/actors/test_0/workers/{}'.format(base_url, id)
+    # delete the first one
+    id = result[result.keys()[0]].get('ch_name')
+    url = '{}/actors/{}/workers/{}'.format(base_url, actor_id, id)
     rsp = requests.delete(url, headers=headers)
     result = basic_response_checks(rsp)
     time.sleep(4)
 
     # get the update list of workers
-    url = '{}/actors/test_0/workers'.format(base_url)
+    url = '{}/actors/{}/workers'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert len(result) == 1
 
 def test_list_permissions(headers):
-    url = '{}/actors/test_0/permissions'.format(base_url)
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/permissions'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert len(result) == 1
 
 def test_add_permissions(headers):
-    url = '{}/actors/test_0/permissions'.format(base_url)
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/permissions'.format(base_url, actor_id)
     data = {'user': 'tester', 'level': 'UPDATE'}
     rsp = requests.post(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
@@ -183,23 +240,112 @@ def test_add_permissions(headers):
     assert len(result) == 2
 
 
+# ##############################
+# tenancy - tests for bleed over
+# ##############################
+
+def test_tenant_list_actors():
+    # passing another tenant should result in 0 actors.
+    headers = {'tenant': 'abaco_test_suite_tenant'}
+    url = '{}/{}'.format(base_url, '/actors')
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    assert len(result) == 0
+
+def test_tenant_register_actor():
+    headers = {'tenant': 'abaco_test_suite_tenant'}
+    url = '{}/{}'.format(base_url, '/actors')
+    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite_other_tenant'}
+    rsp = requests.post(url, data=data, headers=headers)
+    result = basic_response_checks(rsp)
+    assert 'description' in result
+    assert 'tenant' in result
+    assert result['image'] == 'jstubbs/abaco_test'
+    assert result['name'] == 'abaco_test_suite_other_tenant'
+    assert result['id'] is not None
+
+def test_tenant_actor_is_ready():
+    headers = {'tenant': 'abaco_test_suite_tenant'}
+    count = 0
+    actor_id = get_actor_id(headers, name='abaco_test_suite_other_tenant')
+    while count < 10:
+        url = '{}/actors/{}'.format(base_url, actor_id)
+        rsp = requests.get(url, headers=headers)
+        result = basic_response_checks(rsp)
+        if result['status'] == 'READY':
+            return
+        time.sleep(3)
+        count += 1
+    assert False
+
+def test_tenant_list_registered_actors():
+    # passing another tenant should result in 1 actor.
+    headers = {'tenant': 'abaco_test_suite_tenant'}
+    url = '{}/{}'.format(base_url, '/actors')
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    assert len(result) == 1
+
+def test_tenant_list_actor():
+    headers = {'tenant': 'abaco_test_suite_tenant'}
+    actor_id = get_actor_id(headers, name='abaco_test_suite_other_tenant')
+    url = '{}/actors/{}'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    assert 'description' in result
+    assert 'tenant' in result
+    assert result['image'] == 'jstubbs/abaco_test'
+    assert result['name'] == 'abaco_test_suite_other_tenant'
+    assert result['id'] is not None
+
+def test_tenant_list_executions():
+    headers = {'tenant': 'abaco_test_suite_tenant'}
+    actor_id = get_actor_id(headers, name='abaco_test_suite_other_tenant')
+    url = '{}/actors/{}/executions'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    assert len(result.get('ids')) == 0
+
+def test_tenant_list_messages():
+    headers = {'tenant': 'abaco_test_suite_tenant'}
+    actor_id = get_actor_id(headers, name='abaco_test_suite_other_tenant')
+    url = '{}/actors/{}/messages'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    assert result.get('messages') == 0
+
+def test_tenant_list_workers():
+    headers = {'tenant': 'abaco_test_suite_tenant'}
+    actor_id = get_actor_id(headers, name='abaco_test_suite_other_tenant')
+    url = '{}/actors/{}/workers'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    assert len(result) > 0
+    # get the first worker
+    worker = result[result.keys()[0]]
+    assert worker.get('image') == 'jstubbs/abaco_test'
+    assert worker.get('status') == 'READY'
+    assert worker.get('location')
+    assert worker.get('cid')
+    assert worker.get('ch_name')
+
+
 # ##############
 # Clean up
 # ##############
 
-def test_update_actor(headers):
-    url = '{}/actors/test_0'.format(base_url)
-    data = {'image': 'jstubbs/abaco_test2'}
-    rsp = requests.put(url, data=data, headers=headers)
-    result = basic_response_checks(rsp)
-    assert 'description' in result
-    assert 'executions' in result
-    assert result['image'] == 'jstubbs/abaco_test2'
-    assert result['name'] == 'test'
-    assert result['id'] == 'test_0'
-
 def test_remove_final_actors(headers):
-    url = '{}/{}'.format(base_url, '/actors')
+    url = '{}/actors'.format(base_url)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    for act in result:
+        url = '{}/actors/{}'.format(base_url, act.get('id'))
+        rsp = requests.delete(url, headers=headers)
+        result = basic_response_checks(rsp)
+
+def test_tenant_remove_final_actors():
+    headers = {'tenant': 'abaco_test_suite_tenant'}
+    url = '{}/actors'.format(base_url)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     for act in result:
