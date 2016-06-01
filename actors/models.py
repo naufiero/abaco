@@ -238,41 +238,46 @@ class Worker(AbacoDAO):
         ('last_execution', 'required', 'last_execution', str, 'Last time the worker executed an actor container.', None),
         ]
 
+    @classmethod
+    def get_workers(cls, actor_id):
+        """Retrieve all workers for an actor. Pass db_id as `actor_id` parameter."""
+        try:
+            return workers_store[actor_id]
+        except KeyError:
+            return {}
 
-def get_workers(actor_id):
-    """Retrieve all workers for an actor. Pass db_id as `actor_id` parameter."""
-    try:
-        return workers_store[actor_id]
-    except KeyError:
-        return {}
+    @classmethod
+    def get_worker(cls, actor_id, ch_name):
+        """Retrieve a worker from the workers store. Pass db_id as `actor_id` parameter."""
+        try:
+            return workers_store[actor_id][ch_name]
+        except KeyError:
+            raise errors.WorkerException("Worker not found.")
 
-def get_worker(actor_id, ch_name):
-    """Retrieve a worker from the workers store. Pass db_id as `actor_id` parameter."""
-    try:
-        return workers_store[actor_id][ch_name]
-    except KeyError:
-        raise errors.WorkerException("Worker not found.")
+    @classmethod
+    def delete_worker(cls, actor_id, ch_name):
+        """Deletes a worker from the worker store. Uses Redis optimistic locking to provide thread-safety since multiple
+        clients could be attempting to delete workers at the same time. Pass db_id as `actor_id`
+        parameter.
+        """
+        workers_store.pop_field(actor_id, ch_name)
 
-def delete_worker(actor_id, ch_name):
-    """Deletes a worker from the worker store. Uses Redis optimistic locking to provide thread-safety since multiple
-    clients could be attempting to delete workers at the same time. Pass db_id as `actor_id`
-    parameter.
-    """
-    workers_store.pop_field(actor_id, ch_name)
+    @classmethod
+    def add_worker(cls, actor_id, worker):
+        """Add a worker to an actor's collection of workers."""
+        workers_store.update(actor_id, worker['ch_name'], worker)
 
-def add_worker(actor_id, worker):
-    """Add a worker to an actor's collection of workers."""
-    workers_store.update(actor_id, worker['ch_name'], worker)
+    @classmethod
+    def update_worker_execution_time(cls, actor_id, ch_name):
+        """Pass db_id as `actor_id` parameter."""
+        now = time.time()
+        workers_store.update_subfield(actor_id, ch_name, 'last_execution', now)
+        workers_store.update_subfield(actor_id, ch_name, 'last_update', now)
 
-def update_worker_execution_time(actor_id, ch_name):
-    """Pass db_id as `actor_id` parameter."""
-    now = time.time()
-    workers_store.update_subfield(actor_id, ch_name, 'last_execution', now)
-    workers_store.update_subfield(actor_id, ch_name, 'last_update', now)
-
-def update_worker_status(actor_id, ch_name, status):
-    """Pass db_id as `actor_id` parameter."""
-    workers_store.update_subfield(actor_id, ch_name, 'status', status)
+    @classmethod
+    def update_worker_status(cls, actor_id, ch_name, status):
+        """Pass db_id as `actor_id` parameter."""
+        workers_store.update_subfield(actor_id, ch_name, 'status', status)
 
 
 def get_permissions(actor_id):
