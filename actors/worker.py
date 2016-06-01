@@ -1,4 +1,5 @@
 import os
+import sys
 import threading
 
 import channelpy
@@ -35,7 +36,10 @@ def process_worker_ch(worker_ch, actor_id, actor_ch):
     global keep_running
     print("Worker subscribing to worker channel...")
     while True:
-        msg = worker_ch.get()
+        try:
+            msg = worker_ch.get(timeout=2)
+        except channelpy.ChannelTimeoutException:
+            continue
         print("Received message in worker channel: {}".format(msg))
         print("Type(msg)={}".format(type(msg)))
         if type(msg) == dict:
@@ -52,6 +56,7 @@ def process_worker_ch(worker_ch, actor_id, actor_ch):
                 pass
             keep_running = False
             actor_ch.close()
+            sys.exit()
 
 def subscribe(actor_id, worker_ch):
     """
@@ -63,12 +68,17 @@ def subscribe(actor_id, worker_ch):
     t = threading.Thread(target=process_worker_ch, args=(worker_ch, actor_id, actor_ch))
     t.start()
     print("Worker subscribing to actor channel...")
+    global keep_running
     while keep_running:
         update_worker_status(actor_id, worker_ch.name, READY)
         try:
             msg = actor_ch.get(timeout=2)
         except channelpy.ChannelTimeoutException:
             continue
+        except channelpy.ChannelClosedException:
+            print("Channel closed, worker exiting...")
+            keep_running = False
+            sys.exit()
         print("Received message {}. Starting actor container...".format(str(msg)))
         # the msg object is a dictionary with an entry called message and an arbitrary
         # set of k:v pairs coming in from the query parameters.
