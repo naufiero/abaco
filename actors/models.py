@@ -260,7 +260,10 @@ class Worker(AbacoDAO):
         clients could be attempting to delete workers at the same time. Pass db_id as `actor_id`
         parameter.
         """
-        workers_store.pop_field(actor_id, ch_name)
+        try:
+            workers_store.pop_field(actor_id, ch_name)
+        except KeyError:
+            raise errors.WorkerException("Worker not found.")
 
     @classmethod
     def add_worker(cls, actor_id, worker):
