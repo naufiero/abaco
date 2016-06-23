@@ -28,7 +28,7 @@ def get_actor_ids():
 def check_workers(actor_id, ttl):
     """Check health of all workers for an actor."""
     print("Checking health for actors: {}".format(actor_id))
-    workers = get_workers(actor_id)
+    workers = Worker.get_workers(actor_id)
     print("workers: {}".format(workers))
     for _, worker in workers.items():
         # ignore workers on different hosts
