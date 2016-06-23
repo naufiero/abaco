@@ -2,16 +2,16 @@
 abaco
 =====
 
-Actor Based Co(ntainers)mputing
+Actor Based Co(ntainers)mputing: Containers-as-a-service via the Actor model.
 
 Intro
 =====
 
-abaco is a web service and distributed system implementing the actor model of concurrent computation
-where each actor is associated with a Docker container. Actor
-containers are executed in response to messages posted to their inbox. In the
-process, state, logs and execution statistics are collected. Many aspects of the
-system are configurable.
+abaco is a web service and distributed system that implements the actor model of concurrent computation
+whereby each actor registered in the system is associated with a Docker image. Actor
+containers are executed in response to messages posted to their inbox which itself is given by a URI exposed via
+abaco. In the process of executing the actor container, state, logs and execution statistics are collected.
+Many aspects of the system are configurable.
 
 
 Quickstart
@@ -72,7 +72,7 @@ The services are now running behind ``nginx`` which should be listening on 8000.
             "version": "0.01"
         }
 
-   abaco assigned a uuid to the actor (in this case ``e68ebbb7-4986-46ee-9332-a1f5cfc6a533``) and associated with the
+   abaco assigned a uuid to the actor (in this case ``e68ebbb7-4986-46ee-9332-a1f5cfc6a533``) and associated it with the
    image `jstubbs/abaco_test` which it began pulling from the public Docker hub.
 
 3. Notice that abaco returned a status of ``SUBMITTED`` for the actor; behind the
@@ -171,6 +171,7 @@ The services are now running behind ``nginx`` which should be listening on 8000.
    The response will look something like:
 
     .. code-block:: JSON
+
         {
             "msg": "Actor execution retrieved successfully.",
             "result": {
@@ -185,7 +186,7 @@ The services are now running behind ``nginx`` which should be listening on 8000.
         }
 
 
-6. You can also retrieve the logs for any execution:
+6. You can also retrieve the logs (as in docker logs) for any execution:
 
    .. code-block:: bash
 
@@ -204,19 +205,21 @@ The services are now running behind ``nginx`` which should be listening on 8000.
 
    As mentioned earlier, this test container simply  echo's the environment, and we see that from the logs. Notice that
    our ``MSG`` variable showed up, as well as a couple other variables: ``_abaco_api_server`` and ``_abaco_username``.
-   The abaco system has a configurable authentication mechanism for securing the services with standards such as JWT
-   (https://tools.ietf.org/html/rfc7519).
+   The username is showing up as "anonymous" since the development configuration is using no authentication; however,
+   the abaco system has a configurable authentication mechanism for securing the services with standards such as JWT
+   (https://tools.ietf.org/html/rfc7519), and when such authentication mechanisms are configured, the username will
+   be populated.
 
 
 
 Additional Features
 ===================
 
-The quick start introduced the basic features of abaco, but there's a lot more to explore.
+The quick start introduced the basic features of abaco. Here we list some of the more advanced features.
 
-- Admin API: In abaco, messages sent to an actor for execution are queued and processed by the actor's "workers". Workers
+- **Admin API**: In abaco, messages sent to an actor for execution are queued and processed by the actor's "workers". Workers
   are processes that have access to the docker daemon and the actor's image, and workers take care of launching the
-  actor containers, reading the docker stats api for the execution, store logs for the execution, etc. abaco has a
+  actor containers, reading the docker stats api for the execution, storing logs for the execution, etc. abaco has a
   separate administration api which can be used to manage the workers for an actor. This
   API is available via the ``workers`` collection for any given actor: for example, to retrieve the workers for our
   actor from the quickstart we would make a GET request like so:
@@ -225,7 +228,8 @@ The quick start introduced the basic features of abaco, but there's a lot more t
 
     $ curl localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533/workers
 
-  The response will container a list of all workers including the container id, host ip and status.
+  The response contains the list of all workers and supporting metadata including the worker's container id, the
+  host ip where the working is running and its status.
 
   .. code-block:: JSON
 
@@ -252,41 +256,42 @@ The quick start introduced the basic features of abaco, but there's a lot more t
   ``num`` to specify a number of workers to have (default is 1). Note that when an actor has multiple workers, messages
   will be processed in parallel. We can also delete a worker by making a DELETE request to the worker's URI.
 
-- Privileged containers: By default, all actor containers are started in non-privileges mode, but when registering an
-  actor, the user can specify the actor is ``privileged`` in which case containers will be started in privileged mode
-  with the docker daemon mounted. This can be used, for example, to kick off automated Docker builds of other images.
+- **Privileged containers**: By default, all actor containers are started in non-privileged mode, but when registering an
+  actor, the user can specify that the actor is ``privileged``, in which case the actor's containers will be started in
+  privileged mode with the docker daemon mounted. This can be used, for example, to kick off automated Docker builds of
+  other images.
 
-- Stateless actors: By default, actors are assumed to be statefull (that is, have side effects or maintain
+- **Stateless actors**: By default, actors are assumed to be statefull (that is, have side effects or maintain
   state between executions), but when registered, an actor can be set as "stateless" indicating that they can be
   automatically scaled (that is, add additional workers) without race conditions (see below).
 
-- Health checks and auto-scaling: currently, abaco runs a health check process to ensure that workers are healthy and
-  available for messages in an actor's queue. The health check agent can create new workers and/or destroy existing
-  workers as needed, depending on an actor's queue size. We are currently working on formalized policies that can be
-  set in the ``abaco.conf`` file to allow for more robust auto-scaling, including that of stateless actors.
+- **Health checks and auto-scaling**: currently, abaco runs health check processes to ensure that workers are healthy and
+  available for processing messages in an actor's queue. Health check agents can create new workers and/or destroy
+  existing workers as needed, depending on an actor's queue size. We are currently working on formalized policies
+  that can be set in the ``abaco.conf`` file to allow for more robust auto-scaling, including that of stateless actors.
 
-- Hot updates and graceful shutdowns: workers can be sent a "shutdown" command which will cause the worker to exit. If
+- **Hot updates and graceful shutdowns**: workers can be sent a "shutdown" command which will cause the worker to exit. If
   the worker is currently processing an actor execution, the execution will conclude before the worker exits. When
   updating an actor's image, abaco first gracefully shuts down all workers before launching new workers with the updated
   image so that actors are in effect updated in real time with no downtime or execution interruption.
 
-- Scalable architecture and Multihost deployments: Abaco was architected to scale easily to meet the demands of
+- **Scalable architecture and Multihost deployments**: Abaco was architected to scale easily to meet the demands of
   large workloads across thousands of actors. While the quickstart launched all abaco processes (or actors!) on a single
-  host, but the system can be deployed and scaled up across any number of hosts. See the ``ansible``
+  host, the system can be easily deployed and scaled up across any number of hosts. See the ``ansible``
   directory for scripts used to deploy abaco in production-like environments. For more information on the abaco
   architecture see (https://github.com/TACC/abaco/blob/master/docs/architecture.rst).
   UPDATE: with the announcement of
   Docker 1.12 and embedded orchestration, parts of this section will be updated to make deploying on a swarm
   cluster seamless and automatic from the compose file.
 
-- Configurable: Many aspects of the abaco system are configured in the abaco.conf file. The example contained in this
+- **Configurable**: Many aspects of the abaco system are configurable via the abaco.conf file. The example contained in this
   repository is self-documenting.
 
-- Multi-tenant: A single deployment can serve multiple organization or "tenants" which have logical separation within
-  the abaco system. The tenants can be configured in the ``abaco.conf`` file and read out of the request through either
+- **Multi-tenant**: A single abaco instance can serve multiple organization or "tenants" which have logical separation
+  within the system. The tenants can be configured in the ``abaco.conf`` file and read out of the request through either
   a JWT or a special tenant header.
 
-- Integration with the Agave (http://agaveapi.co/) science-as-a-service API platform: abaco can be used as an "event
+- **Integration with the Agave (http://agaveapi.co/) science-as-a-service API platform**: abaco can be used as an "event
   processor" in conjunction with the Agave API platform. When deployed and configured with Agave's JWT authentication,
   abaco will inject the necessary authentication tokens needed for making requests directly to Agave APIs on behalf of the
   original end-user. Additionally, we are developing base images that contain Agave language SDKs and other tools so that
