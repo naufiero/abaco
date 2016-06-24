@@ -153,6 +153,11 @@ class Actor(AbacoDAO):
         return str('{}_{}'.format(tenant, id))
 
     @classmethod
+    def get_display_id(cls, tenant, dbid):
+        """Return the display id from the dbid."""
+        return dbid.strip('{}_'.format(tenant))
+
+    @classmethod
     def set_status(cls, actor_id, status):
         """Update the status of an actor"""
         actors_store.update(actor_id, 'status', status)
@@ -221,6 +226,11 @@ class Execution(AbacoDAO):
         else:
             logs_store[exc_id] = logs
 
+    def display(self):
+        """Return a display version of the execution."""
+        tenant = self.pop('tenant')
+        self.actor_id = Actor.get_display_id(tenant, self.actor_id)
+        return self
 
 class Worker(AbacoDAO):
     """Basic data access object for working with Workers."""

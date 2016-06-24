@@ -192,10 +192,10 @@ class ActorExecutionResource(Resource):
         except KeyError:
             raise APIException("No executions found for actor {}.".format(actor_id))
         try:
-            exc = excs[execution_id]
+            exc = Execution.from_db(excs[execution_id])
         except KeyError:
             raise APIException("Execution not found {}.".format(execution_id))
-        return ok(result=exc, msg="Actor execution retrieved successfully.")
+        return ok(result=exc.display(), msg="Actor execution retrieved successfully.")
 
 
 class ActorExecutionLogsResource(Resource):
