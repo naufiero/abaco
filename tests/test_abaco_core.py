@@ -44,7 +44,7 @@ def basic_response_checks(rsp):
     assert rsp.status_code in [200, 201]
     assert  'application/json' in rsp.headers['content-type']
     data = json.loads(rsp.content)
-    assert 'msg' in data.keys()
+    assert 'message' in data.keys()
     assert 'status' in data.keys()
     assert 'result' in data.keys()
     assert 'version' in data.keys()

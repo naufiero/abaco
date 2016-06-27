@@ -20,7 +20,12 @@ curl -X DELETE localhost:8000/actors/foo_1
 # pass json in
 curl -X POST -H "Content-Type: application/json" -d '{"image": "jstubbs/abaco_test", "name": "foo", "default_environment":{"key1": "value1"} }' localhost:8000/actors
 
+# CORS support
+# basic GET - response should have Access-Control-Allow-Origin
+curl -v -H "Origin: http://example.com"  localhost:8000/actors
 
+# options request - response should have Access-Control-Allow-[Origin, Methods, Headers]
+curl -v -H "Origin: http://example.com" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: X-Requested-With" -X OPTIONS  localhost:8000/actors
 
 # add, message, and update example
 
@@ -42,3 +47,5 @@ for i in {1..40}; do curl -H "X-Jwt-Assertion-AGAVE-PROD: $jwt" -X POST --data "
 
 # start a container with pyredis
 docker run --rm -it -v $(pwd)/local-dev.conf:/etc/abaco.conf jstubbs/abaco_core bash
+
+
