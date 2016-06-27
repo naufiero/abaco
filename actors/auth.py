@@ -110,7 +110,7 @@ def check_jwt(req):
 def get_api_server(tenant_name):
     # todo - lookup tenant in tenants table
     if tenant_name.upper() == 'AGAVE-PROD':
-        return 'https://public.tenants.prod.agaveapi.co'
+        return 'https://public.agaveapi.co'
     if tenant_name.upper() == 'ARAPORT-ORG':
         return 'https://api.araport.org'
     if tenant_name.upper() == 'DESIGNSAFE':
