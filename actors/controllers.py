@@ -254,6 +254,9 @@ class MessagesResource(Resource):
         if hasattr(g, 'api_server'):
             d['_abaco_api_server'] = g.api_server
         dbid = Actor.get_dbid(g.tenant, actor_id)
+        # create an execution
+        exc = Execution.add_execution(dbid, {'cpu': 0, 'io': 0, 'runtime': 0, 'status': SUBMITTED})
+        d['_abaco_execution_id'] = exc
         ch = ActorMsgChannel(actor_id=dbid)
         ch.put_msg(message=args['message'], d=d)
         # make sure at least one worker is available
@@ -262,8 +265,8 @@ class MessagesResource(Resource):
             ch = CommandChannel()
             actor = Actor.from_db(actors_store[dbid])
             ch.put_cmd(actor_id=dbid, image=actor.image, tenant=g.tenant, num=1, stop_existing=False)
-
-        return ok(result={'msg': args['message']})
+        return ok(result={'execution_id': exc,
+                          'msg': args['message']})
 
 
 class WorkersResource(Resource):

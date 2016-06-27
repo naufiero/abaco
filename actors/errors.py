@@ -15,5 +15,9 @@ class WorkerException(BaseAbacoError):
     pass
 
 
+class ExecutionException(BaseAbacoError):
+    pass
+
+
 class PermissionsException(BaseAbacoError):
     pass

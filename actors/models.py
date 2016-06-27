@@ -175,6 +175,7 @@ class Execution(AbacoDAO):
         ('io', 'required', 'io', str,
          'Block I/O usage, in number of 512-byte sectors read from and written to, by the execution.', None),
         ('id', 'derived', 'id', str, 'Human readable id for this execution.', None),
+        ('status', 'required', 'status', str, 'Status of the execution.', None)
     ]
 
     def get_derived_value(self, name, d):
@@ -191,7 +192,7 @@ class Execution(AbacoDAO):
     def add_execution(cls, actor_id, ex):
         """
         Add an execution to an actor.
-        :param actor_id: str
+        :param actor_id: str; the dbid of the actor
         :param ex: dict describing the execution.
         :return:
         """
@@ -207,6 +208,28 @@ class Execution(AbacoDAO):
             # if actor has no executions, a KeyError will be thrown
             executions_store[actor_id] = {execution.id: execution}
         return execution.id
+
+    @classmethod
+    def finalize_execution(cls, actor_id, execution_id, status, stats):
+        """Update an execution status and stats after the execution is complete or killed.
+         `actor_id` should be the dbid of the actor.
+         `execution_id` should be the id of the execution returned from a prior call to add_execution.
+         `status` should be the final status of the execution.
+         `stats` parameter should be a dictionary with io, cpu, and runtime."""
+        if not 'io' in stats:
+            raise errors.ExecutionException("'io' parameter required to finalize execution.")
+        if not 'cpu' in stats:
+            raise errors.ExecutionException("'cpu' parameter required to finalize execution.")
+        if not 'runtime' in stats:
+            raise errors.ExecutionException("'runtime' parameter required to finalize execution.")
+        try:
+            executions_store.update_subfield(actor_id, execution_id, 'status', status)
+            executions_store.update_subfield(actor_id, execution_id, 'io', stats['io'])
+            executions_store.update_subfield(actor_id, execution_id, 'cpu', stats['cpu'])
+            executions_store.update_subfield(actor_id, execution_id, 'runtime', stats['runtime'])
+        except KeyError:
+            raise errors.ExecutionException("Execution {} not found.".format(execution_id))
+
 
     @classmethod
     def set_logs(cls, exc_id, logs):
