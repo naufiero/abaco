@@ -5,7 +5,7 @@ import threading
 import channelpy
 
 from channels import ActorMsgChannel, CommandChannel,WorkerChannel
-from codes import ERROR, READY, BUSY
+from codes import ERROR, READY, BUSY, COMPLETE
 from docker_utils import DockerError, DockerStartContainerError, execute_actor, pull_image
 from errors import WorkerException
 from models import Actor, Execution, Worker
@@ -83,6 +83,7 @@ def subscribe(actor_id, worker_ch):
         # set of k:v pairs coming in from the query parameters.
         message = msg.pop('message', '')
         actor = Actor.from_db(actors_store[actor_id])
+        execution_id = msg['_abaco_execution_id']
         privileged = False
         if actor['privileged'] == 'TRUE':
             privileged = True
@@ -102,9 +103,9 @@ def subscribe(actor_id, worker_ch):
             continue
         # add the execution to the actor store
         print("Actor container finished successfully. Got stats object:{}".format(str(stats)))
-        exc_id = Execution.add_execution(actor_id, stats)
-        print("Added execution: {}".format(exc_id))
-        Execution.set_logs(exc_id, logs)
+        Execution.finalize_execution(actor_id, execution_id, COMPLETE, stats)
+        print("Added execution: {}".format(execution_id))
+        Execution.set_logs(execution_id, logs)
         Worker.update_worker_execution_time(actor_id, worker_ch.name)
 
 def main(worker_ch_name, image):

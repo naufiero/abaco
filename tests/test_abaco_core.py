@@ -56,6 +56,24 @@ def test_list_actors(headers):
     result = basic_response_checks(rsp)
     assert len(result) == 0
 
+def test_cors_list_actors(headers):
+    url = '{}/{}'.format(base_url, '/actors')
+    headers['Origin'] = 'http://example.com'
+    rsp = requests.get(url, headers=headers)
+    basic_response_checks(rsp)
+    assert 'Access-Control-Allow-Origin' in rsp.headers
+
+def test_cors_options_list_actors(headers):
+    url = '{}/{}'.format(base_url, '/actors')
+    headers['Origin'] = 'http://example.com'
+    headers['Access-Control-Request-Method'] = 'POST'
+    headers['Access-Control-Request-Headers'] = 'X-Requested-With'
+    rsp = requests.options(url, headers=headers)
+    assert rsp.status_code == 200
+    assert 'Access-Control-Allow-Origin' in rsp.headers
+    assert 'Access-Control-Allow-Methods' in rsp.headers
+    assert 'Access-Control-Allow-Headers' in rsp.headers
+
 def test_register_actor(headers):
     url = '{}/{}'.format(base_url, '/actors')
     data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite'}
@@ -120,6 +138,26 @@ def test_list_messages(headers):
     result = basic_response_checks(rsp)
     assert result.get('messages') == 0
 
+def test_cors_list_messages(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/messages'.format(base_url, actor_id)
+    headers['Origin'] = 'http://example.com'
+    rsp = requests.get(url, headers=headers)
+    basic_response_checks(rsp)
+    assert 'Access-Control-Allow-Origin' in rsp.headers
+
+def test_cors_options_list_messages(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/messages'.format(base_url, actor_id)
+    headers['Origin'] = 'http://example.com'
+    headers['Access-Control-Request-Method'] = 'POST'
+    headers['Access-Control-Request-Headers'] = 'X-Requested-With'
+    rsp = requests.options(url, headers=headers)
+    assert rsp.status_code == 200
+    assert 'Access-Control-Allow-Origin' in rsp.headers
+    assert 'Access-Control-Allow-Methods' in rsp.headers
+    assert 'Access-Control-Allow-Headers' in rsp.headers
+
 def test_execute_actor(headers):
     actor_id = get_actor_id(headers)
     url = '{}/actors/{}/messages'.format(base_url, actor_id)
@@ -127,6 +165,7 @@ def test_execute_actor(headers):
     rsp = requests.post(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
     assert result.get('msg')  == 'testing execution'
+    assert result.get('execution_id')
     # check for the execution to complete
     count = 0
     while count < 10:
@@ -191,6 +230,27 @@ def test_list_workers(headers):
     assert worker.get('cid')
     assert worker.get('last_execution')
     assert worker.get('ch_name')
+
+def test_cors_list_workers(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/workers'.format(base_url, actor_id)
+    headers['Origin'] = 'http://example.com'
+    rsp = requests.get(url, headers=headers)
+    basic_response_checks(rsp)
+    assert 'Access-Control-Allow-Origin' in rsp.headers
+
+def test_cors_options_list_workers(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/workers'.format(base_url, actor_id)
+    headers['Origin'] = 'http://example.com'
+    headers['Access-Control-Request-Method'] = 'POST'
+    headers['Access-Control-Request-Headers'] = 'X-Requested-With'
+    rsp = requests.options(url, headers=headers)
+    assert rsp.status_code == 200
+    assert 'Access-Control-Allow-Origin' in rsp.headers
+    assert 'Access-Control-Allow-Methods' in rsp.headers
+    assert 'Access-Control-Allow-Headers' in rsp.headers
+
 
 def test_add_worker(headers):
     actor_id = get_actor_id(headers)

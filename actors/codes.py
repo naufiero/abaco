@@ -1,5 +1,6 @@
 # Status codes for actor objects
 
+COMPLETE = 'COMPLETE'
 SUBMITTED = 'SUBMITTED'
 READY = 'READY'
 ERROR = 'ERROR'
