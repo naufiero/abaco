@@ -41,12 +41,12 @@ def ok(result, msg="The request was successful"):
     d = {'result': result,
          'status': 'success',
          'version': TAG,
-         'msg': msg}
+         'message': msg}
     return d
 
 def error(result=None, msg="Error processing the request."):
     d = {'result': result,
          'status': 'error',
          'version': TAG,
-         'msg': msg}
+         'message': msg}
     return d
