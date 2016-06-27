@@ -185,6 +185,27 @@ def test_execute_actor(headers):
         count += 1
     assert False
 
+def test_list_execution_details(headers):
+    actor_id = get_actor_id(headers)
+    # get execution id
+    url = '{}/actors/{}/executions'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    exec_id = result.get('ids')[0]
+    url = '{}/actors/{}/executions/{}'.format(base_url, actor_id, exec_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    assert 'actor_id' in result
+    assert 'cpu' in result
+    assert 'executor' in result
+    assert 'id' in result
+    assert 'io' in result
+    assert 'runtime' in result
+    assert 'status' in result
+    assert result['status'] == 'COMPLETE'
+    assert result['actor_id'] == actor_id
+    assert result['id'] == exec_id
+
 def test_list_execution_logs(headers):
     actor_id = get_actor_id(headers)
     # get execution id

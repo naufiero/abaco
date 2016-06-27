@@ -170,6 +170,7 @@ class Execution(AbacoDAO):
         # param_name, required/optional/provided/derived, attr_name, type, help, default
         ('tenant', 'required', 'tenant', str, 'The tenant that this execution belongs to.', None),
         ('actor_id', 'required', 'actor_id', str, 'The human readable id for the actor associated with this execution.', None),
+        ('executor', 'required', 'executor', str, 'The user who triggered this execution.', None),
         ('runtime', 'required', 'runtime', str, 'Runtime, in milliseconds, of the execution.', None),
         ('cpu', 'required', 'cpu', str, 'CPU usage, in user jiffies, of the execution.', None),
         ('io', 'required', 'io', str,

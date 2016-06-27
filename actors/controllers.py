@@ -255,7 +255,11 @@ class MessagesResource(Resource):
             d['_abaco_api_server'] = g.api_server
         dbid = Actor.get_dbid(g.tenant, actor_id)
         # create an execution
-        exc = Execution.add_execution(dbid, {'cpu': 0, 'io': 0, 'runtime': 0, 'status': SUBMITTED})
+        exc = Execution.add_execution(dbid, {'cpu': 0,
+                                             'io': 0,
+                                             'runtime': 0,
+                                             'status': SUBMITTED,
+                                             'executor': g.user})
         d['_abaco_execution_id'] = exc
         ch = ActorMsgChannel(actor_id=dbid)
         ch.put_msg(message=args['message'], d=d)
