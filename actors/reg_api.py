@@ -1,7 +1,8 @@
 
 from flask import Flask
-from request_utils import AbacoApi
+from flask_cors import CORS
 
+from request_utils import AbacoApi
 from controllers import ActorResource, ActorStateResource, ActorsResource, \
     ActorExecutionsResource, ActorExecutionResource, \
     ActorExecutionLogsResource
@@ -9,6 +10,7 @@ from auth import authn_and_authz
 
 
 app = Flask(__name__)
+CORS(app)
 api = AbacoApi(app)
 
 # Authn/z
