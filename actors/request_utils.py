@@ -1,4 +1,5 @@
 import flask.ext.restful.reqparse as reqparse
+from flask import jsonify, request
 from werkzeug.exceptions import ClientDisconnected
 from flask_restful import Api
 
@@ -36,17 +37,29 @@ class AbacoApi(Api):
         else:
             return self.make_response(data=error(), code=500)
 
+def pretty_print(request):
+    """Return whether or not to pretty print based on request"""
+    if hasattr(request.args.get('pretty'), 'upper') and request.args.get('pretty').upper() == 'TRUE':
+        return True
+    return False
 
-def ok(result, msg="The request was successful"):
+def ok(result, msg="The request was successful", request=request):
     d = {'result': result,
          'status': 'success',
          'version': TAG,
          'message': msg}
-    return d
+    if pretty_print(request):
+        d['version'] = 'fooy'
+        return jsonify(d)
+    else:
+        return d
 
-def error(result=None, msg="Error processing the request."):
+def error(result=None, msg="Error processing the request.", request=request):
     d = {'result': result,
          'status': 'error',
          'version': TAG,
          'message': msg}
-    return d
+    if pretty_print(request):
+        return jsonify(d)
+    else:
+        return d

@@ -33,7 +33,7 @@ class ActorsResource(Resource):
         ch = CommandChannel()
         ch.put_cmd(actor_id=actor.db_id, image=actor.image, tenant=args['tenant'])
         add_permission(g.user, actor.db_id, 'UPDATE')
-        return ok(result=actor.display(), msg="Actor created successfully.")
+        return ok(result=actor.display(), msg="Actor created successfully.", request=request)
 
 
 class ActorResource(Resource):
