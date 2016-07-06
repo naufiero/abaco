@@ -2,7 +2,6 @@
 
 nginx:
     image: jstubbs/abaco_nginx
-    name: nginx
     volumes:
       - docs/swagger2.0.json:/docs/swagger2.0.json
     ports:
@@ -10,7 +9,6 @@ nginx:
 
 reg:
     image: jstubbs/abaco_core
-    name: reg
     ports:
         - "5000:5000"
     volumes:
@@ -24,7 +22,6 @@ reg:
 
 mes:
     image: jstubbs/abaco_core
-    name: mes
     ports:
         - "5001:5000"
     volumes:
@@ -38,7 +35,6 @@ mes:
 
 admin:
     image: jstubbs/abaco_core
-    name: admin
     ports:
         - "5003:5000"
     volumes:
@@ -52,7 +48,6 @@ admin:
 
 spawner:
     image: jstubbs/abaco_core
-    name: spawner
     command: "python3 -u /actors/spawner.py"
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
@@ -70,14 +65,12 @@ health:
 
 redis:
     image: redis
-    name: redis
     ports:
         - "6379:6379"
     command: redis-server --appendonly yes
 
 rabbit:
     image: rabbitmq:3.5.3-management
-    name: rabbit
     ports:
         - "5672:5672"
         - "15672:15672"
