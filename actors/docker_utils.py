@@ -74,7 +74,8 @@ def run_container_with_docker(image, command, name=None, environment={}):
     volumes = ['/var/run/docker.sock']
     binds = {'/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'ro': False}}
     try:
-        abaco_conf_host_path = Config.get('spawner', 'abaco_conf_host_path')
+        abaco_conf_host_path = os.environ.get('abaco_conf_host_path',
+                                              Config.get('spawner', 'abaco_conf_host_path'))
         # if an abaco_conf_host_path was configured, mount that into the running container
         volumes.append('/abaco.conf')
         binds[abaco_conf_host_path] = {'bind': '/abaco.conf', 'ro': True}

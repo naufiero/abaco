@@ -17,8 +17,15 @@ Many aspects of the system are configurable.
 Quickstart
 ==========
 
-1. Deploy a development version of the abaco stack using ``docker-compose``. From within
-   the project root execute:
+1. Deploy a development version of the abaco stack using ``docker-compose``. First, change into the
+   project root and export the following variable so that abaco containers know where to find
+   the example configuration file
+
+   .. code-block:: bash
+
+     $ export abaco_path=$(pwd)
+
+   Then start the abaco containers with:
 
    .. code-block:: bash
    
