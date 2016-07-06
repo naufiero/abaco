@@ -1,4 +1,5 @@
 import json
+import os
 import time
 
 import rabbitpy
@@ -131,6 +132,7 @@ def main():
         try:
             sp = Spawner()
             print("spawner made connection to rabbit, entering main loop")
+            print("spawner using abaco_conf_host_path={}".format(os.environ.get('abaco_conf_host_path')))
             sp.run()
         except rabbitpy.exceptions.ConnectionException:
             # rabbit seems to take a few seconds to come up
