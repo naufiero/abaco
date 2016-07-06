@@ -56,7 +56,7 @@ spawner:
         - redis
         - rabbit
     environment:
-        - "abaco_conf_host_path: ${abaco_path}"
+        - "abaco_conf_host_path=${abaco_path}/local-dev.conf"
 
 health:
     image: jstubbs/abaco_core
