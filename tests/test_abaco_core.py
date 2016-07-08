@@ -1,11 +1,17 @@
 # Functional test suite for abaco.
-# Start the local development abaco stack and run these tests with py.test from the cwd.
-
+# Start the local development abaco stack (docker-compose-local.yml) and run these tests with py.test from the cwd.
+#     $ py.test test_abaco_core.py
+#
 # Notes:
 # 1. Running the tests against the docker-compose-local.yml instance (using local-dev.conf) will use an access_control
 #    of none and the tenant configured in local-dev.conf (dev_staging) for all requests (essentially ignore headers).
 #
-# 2.
+# 2. With access control of type 'none'. abaco reads the tenant from a header "tenant" if present. If not present, it
+#    uses the default tenant configured in the abaco.conf file.
+#
+# 3. most tests appear twice, e.g. "test_list_actors" and "test_tenant_list_actors": The first test uses the default
+#    tenant by not setting the tenant header, while the second one sets tenant: abaco_test_suite_tenant; this enables
+#    the suite to test tenancy bleed-over.
 
 import os
 import time
@@ -42,13 +48,18 @@ def test_remove_initial_actors(headers):
 
 def basic_response_checks(rsp):
     assert rsp.status_code in [200, 201]
-    assert  'application/json' in rsp.headers['content-type']
+    assert 'application/json' in rsp.headers['content-type']
     data = json.loads(rsp.content)
     assert 'message' in data.keys()
     assert 'status' in data.keys()
     assert 'result' in data.keys()
     assert 'version' in data.keys()
     return data['result']
+    # result = data['result']
+    # if result is not None:
+    #     assert 'tenant' not in result
+    # return result
+
 
 def test_list_actors(headers):
     url = '{}/{}'.format(base_url, '/actors')
@@ -80,7 +91,6 @@ def test_register_actor(headers):
     rsp = requests.post(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
     assert 'description' in result
-    assert 'tenant' in result
     assert result['image'] == 'jstubbs/abaco_test'
     assert result['name'] == 'abaco_test_suite'
     assert result['id'] is not None
@@ -101,7 +111,6 @@ def test_list_actor(headers):
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert 'description' in result
-    assert 'tenant' in result
     assert result['image'] == 'jstubbs/abaco_test'
     assert result['name'] == 'abaco_test_suite'
     assert result['id'] is not None
@@ -166,6 +175,7 @@ def test_execute_actor(headers):
     result = basic_response_checks(rsp)
     assert result.get('msg')  == 'testing execution'
     assert result.get('execution_id')
+    exc_id = result.get('execution_id')
     # check for the execution to complete
     count = 0
     while count < 10:
@@ -175,12 +185,17 @@ def test_execute_actor(headers):
         result = basic_response_checks(rsp)
         ids = result.get('ids')
         if ids:
-            assert len(ids) == 1
-            assert ids[0] is not None
-            assert result.get('total_executions') == 1
-            assert result.get('total_cpu')
-            assert result.get('total_io')
-            assert result.get('total_runtime')
+            assert exc_id in ids
+        url = '{}/actors/{}/executions/{}'.format(base_url, actor_id, exc_id)
+        rsp = requests.get(url, headers=headers)
+        result = basic_response_checks(rsp)
+        status = result.get('status')
+        assert status
+        if status == 'COMPLETE':
+            assert result.get('actor_id') == actor_id
+            assert result.get('id') == exc_id
+            assert result.get('io')
+            assert 'runtime' in result
             return
         count += 1
     assert False
@@ -226,7 +241,6 @@ def test_update_actor(headers):
     rsp = requests.put(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
     assert 'description' in result
-    assert 'tenant' in result
     assert result['image'] == 'jstubbs/abaco_test2'
     assert result['name'] == 'abaco_test_suite'
     assert result['id'] is not None
@@ -340,7 +354,6 @@ def test_tenant_register_actor():
     rsp = requests.post(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
     assert 'description' in result
-    assert 'tenant' in result
     assert result['image'] == 'jstubbs/abaco_test'
     assert result['name'] == 'abaco_test_suite_other_tenant'
     assert result['id'] is not None
@@ -374,7 +387,6 @@ def test_tenant_list_actor():
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert 'description' in result
-    assert 'tenant' in result
     assert result['image'] == 'jstubbs/abaco_test'
     assert result['name'] == 'abaco_test_suite_other_tenant'
     assert result['id'] is not None
