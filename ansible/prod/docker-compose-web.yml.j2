@@ -1,13 +1,13 @@
 ---
 
 nginx:
-    image: jstubbs/abaco_nginx
+    image: {{ docker_user }}/abaco_nginx
     ports:
         - "80:80"
         - "443:443"
 
 reg:
-    image: jstubbs/abaco_core
+    image: {{ docker_user }}/abaco_core
     ports:
         - "5000:5000"
     environment:
@@ -17,7 +17,7 @@ reg:
         - ./abaco.conf:/etc/abaco.conf
 
 mes:
-    image: jstubbs/abaco_core
+    image: {{ docker_user }}/abaco_core
     ports:
         - "5001:5000"
     environment:
@@ -27,7 +27,7 @@ mes:
         - ./abaco.conf:/etc/abaco.conf
 
 admin:
-    image: jstubbs/abaco_core
+    image: {{ docker_user }}/abaco_core
     ports:
         - "5003:5000"
     environment:
