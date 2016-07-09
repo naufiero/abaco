@@ -1,14 +1,14 @@
 ---
 
 spawner:
-    image: jstubbs/abaco_core
+    image: {{ docker_user }}/abaco_core
     command: "python3 -u /actors/spawner.py"
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
         - ./abaco.conf:/etc/abaco.conf
 
 health:
-    image: jstubbs/abaco_core
+    image: {{ docker_user }}/abaco_core
     command: /actors/health_check.sh
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
