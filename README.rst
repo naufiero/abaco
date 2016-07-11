@@ -135,21 +135,24 @@ The services are now running behind ``nginx`` which should be listening on 8000.
         {
             "msg": "The request was successful",
             "result": {
+                "execution_id": "27326d48-7f00-4a45-a2f7-76fff8d685e6",
                 "msg": "execute yourself"
             },
             "status": "success",
             "version": "0.01"
         }
 
-5. The ``abaco_test`` image simply echo's the environment and does a sleep
-   for 5 seconds. Once the container finishes, an execution is
-   registered for the actor. An actor's executions can be retrieved using the ``executions`` sub-collection.
+   Note that the execution id (in this case, ``27326d48-7f00-4a45-a2f7-76fff8d685e6``) is returned in the response.
+   This execution id can be used to retrieve information about the execution.
+
+5. An actor's executions can be retrieved using the ``executions`` sub-collection.
 
    .. code-block:: bash
 
       $ curl localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533/executions
 
-   The response will include summary statistics of all executions for the actor as well as the id's of each execution:
+   The response will include summary statistics of all executions for the actor as well as the id's of each execution.
+   As expected, we see the execution id returned from the previous step.
 
    .. code-block:: JSON
 
@@ -168,8 +171,10 @@ The services are now running behind ``nginx`` which should be listening on 8000.
             "version": "0.01"
         }
 
-   To see details about a specific execution including runtime, cpu, and io usage, make a get
-   request using the execution id:
+   The ``abaco_test`` image simply echo's the environment and does a sleep
+   for 5 seconds. We can query the executions collection with the execution id at any to get status information
+   about the execution. When the execution finishes, its status will be returned as "COMPLETE" and
+   details about the execution including runtime, cpu, and io usage will be available. For example:
 
     .. code-block:: bash
 
@@ -184,9 +189,11 @@ The services are now running behind ``nginx`` which should be listening on 8000.
             "result": {
                 "actor_id": "e68ebbb7-4986-46ee-9332-a1f5cfc6a533",
                 "cpu": 144132228,
+                "executor": "anonymous",
                 "id": "27326d48-7f00-4a45-a2f7-76fff8d685e6",
                 "io": 438,
                 "runtime": 2,
+                "status": "COMPLETE"
             },
             "status": "success",
             "version": "0.01"
@@ -267,6 +274,15 @@ The quick start introduced the basic features of abaco. Here we list some of the
   actor, the user can specify that the actor is ``privileged``, in which case the actor's containers will be started in
   privileged mode with the docker daemon mounted. This can be used, for example, to kick off automated Docker builds of
   other images.
+
+- **Default environments**: When registering an actor, the operator can provide an arbitrary JSON collection of
+  key/value pairs in the ``default_environment`` parameter. These variables and values will be injected into the
+  environment when executing a container. This can be useful for providing sensitive information such as credentials
+  that cannot be stored in the actor's Docker image.
+
+- **Custom container environments**: When making a POST request to the actor's messages collection to execute an
+  actor container, users can supply additional environment variables and values as query parameters. abaco will update
+  the actor's default environment with these query parameter variables and values, with the latter overriding the former.
 
 - **Stateless actors**: By default, actors are assumed to be statefull (that is, have side effects or maintain
   state between executions), but when registered, an actor can be set as "stateless" indicating that they can be
