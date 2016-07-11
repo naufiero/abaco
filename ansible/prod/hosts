@@ -1,14 +1,14 @@
 
 [db]
-ab-core-prod-vmware ansible_ssh_host=129.114.60.250 ansible_ssh_private_key_file=/home/apim/.ssh/jenkins-prod ansible_ssh_user=root
+ab-core-prod-vmware ansible_ssh_host=129.114.60.250 ansible_ssh_private_key_file=~/.ssh/jenkins-prod ansible_ssh_user=root
 
 
 [compute]
-ab-core-prod-vmware ansible_ssh_host=129.114.60.250 ansible_ssh_private_key_file=/home/apim/.ssh/jenkins-prod ansible_ssh_user=root
+ab-core-prod-vmware ansible_ssh_host=129.114.60.250 ansible_ssh_private_key_file=~/.ssh/jenkins-prod ansible_ssh_user=root
 
 
 [web]
-ab-web-prod-vmware ansible_ssh_host=129.114.60.211 ansible_ssh_private_key_file=/home/apim/.ssh/jenkins-prod ansible_ssh_user=root
+ab-web-prod-vmware ansible_ssh_host=129.114.60.211 ansible_ssh_private_key_file=~/.ssh/jenkins-prod ansible_ssh_user=root
 
 
 [db:vars]
