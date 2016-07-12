@@ -94,6 +94,10 @@ def subscribe(actor_id, worker_ch):
         # dictionary
         environment.update(msg)
         print("Passing update environment: {}".format(environment))
+        # get zmq_socket from msg
+        # create fifo
+        # create fifo reader thread(fifo, zmq_socket)
+        # start the thread
         try:
             stats, logs = execute_actor(actor_id, worker_ch, image, message,
                                         environment, privileged)

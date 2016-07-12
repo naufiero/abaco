@@ -1,6 +1,6 @@
 import json
 
-from flask import g, request
+from flask import g, request, Response
 from flask_restful import Resource, Api, inputs
 
 from channels import ActorMsgChannel, CommandChannel
@@ -217,6 +217,30 @@ class ActorExecutionLogsResource(Resource):
         return ok(result=logs, msg="Logs retrieved successfully.")
 
 
+class ActorExecutionResultResource(Resource):
+    def get(self, actor_id, execution_id):
+        dbid = Actor.get_dbid(g.tenant, actor_id)
+        try:
+            actors_store[dbid]
+        except KeyError:
+            raise APIException(
+                "actor not found: {}'".format(actor_id), 404)
+        try:
+            exc = executions_store[dbid]
+        except KeyError:
+            raise APIException("No executions found for actor {}.".format(actor_id))
+        # write the create_generator function to yield lines
+        try:
+            gen = self.create_generator(exc.zmq)
+            return Response(gen)
+        except KeyError:
+            logs = ""
+        return ok(result=logs, msg="Logs retrieved successfully.")
+
+    def create_generator(self, socket):
+        while True:
+            yield socket.receive()
+
 class MessagesResource(Resource):
 
     def get(self, actor_id):
@@ -254,13 +278,15 @@ class MessagesResource(Resource):
         if hasattr(g, 'api_server'):
             d['_abaco_api_server'] = g.api_server
         dbid = Actor.get_dbid(g.tenant, actor_id)
+        # create a zmq socket
         # create an execution
         exc = Execution.add_execution(dbid, {'cpu': 0,
                                              'io': 0,
                                              'runtime': 0,
                                              'status': SUBMITTED,
                                              'executor': g.user})
-        d['_abaco_execution_id'] = exc
+                                            # also pass in socket
+        d['_abaco_execution_id'] = exc # <--- just the id, need to also pass the socket
         ch = ActorMsgChannel(actor_id=dbid)
         ch.put_msg(message=args['message'], d=d)
         # make sure at least one worker is available
