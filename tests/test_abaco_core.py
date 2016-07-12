@@ -14,6 +14,7 @@
 #    the suite to test tenancy bleed-over.
 
 import os
+import sys
 import time
 
 import pytest
@@ -46,7 +47,7 @@ def test_remove_initial_actors(headers):
         rsp = requests.delete(url, headers=headers)
         basic_response_checks(rsp)
 
-def basic_response_checks(rsp):
+def basic_response_checks(rsp, check_tenant=True):
     assert rsp.status_code in [200, 201]
     assert 'application/json' in rsp.headers['content-type']
     data = json.loads(rsp.content)
@@ -54,11 +55,11 @@ def basic_response_checks(rsp):
     assert 'status' in data.keys()
     assert 'result' in data.keys()
     assert 'version' in data.keys()
-    return data['result']
-    # result = data['result']
-    # if result is not None:
-    #     assert 'tenant' not in result
-    # return result
+    result = data['result']
+    if check_tenant:
+        if result is not None:
+            assert 'tenant' not in result
+    return result
 
 
 def test_list_actors(headers):
@@ -226,11 +227,12 @@ def test_list_execution_logs(headers):
     # get execution id
     url = '{}/actors/{}/executions'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
+    # we don't check tenant because it could (and often does) appear in the logs
+    result = basic_response_checks(rsp, check_tenant=False)
     exec_id = result.get('ids')[0]
     url = '{}/actors/{}/executions/{}/logs'.format(base_url, actor_id, exec_id)
     rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
+    result = basic_response_checks(rsp, check_tenant=False)
     assert 'Contents of MSG: testing execution' in result
     assert 'PATH' in result
 
@@ -255,7 +257,8 @@ def test_list_workers(headers):
     actor_id = get_actor_id(headers)
     url = '{}/actors/{}/workers'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
+    # workers collection returns the tenant_id since it is an admin api
+    result = basic_response_checks(rsp, check_tenant=False)
     assert len(result) > 0
     # get the first worker
     worker = result[result.keys()[0]]
@@ -265,6 +268,7 @@ def test_list_workers(headers):
     assert worker.get('cid')
     assert worker.get('last_execution')
     assert worker.get('ch_name')
+    assert worker.get('tenant')
 
 def test_cors_list_workers(headers):
     actor_id = get_actor_id(headers)
@@ -291,10 +295,11 @@ def test_add_worker(headers):
     actor_id = get_actor_id(headers)
     url = '{}/actors/{}/workers'.format(base_url, actor_id)
     rsp = requests.post(url, headers=headers)
-    basic_response_checks(rsp)
+    # workers collection returns the tenant_id since it is an admin api
+    basic_response_checks(rsp, check_tenant=False)
     time.sleep(8)
     rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
+    result = basic_response_checks(rsp, check_tenant=False)
     assert len(result) == 2
 
 def test_delete_worker(headers):
@@ -302,19 +307,20 @@ def test_delete_worker(headers):
     actor_id = get_actor_id(headers)
     url = '{}/actors/{}/workers'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
+    # workers collection returns the tenant_id since it is an admin api
+    result = basic_response_checks(rsp, check_tenant=False)
 
     # delete the first one
     id = result[result.keys()[0]].get('ch_name')
     url = '{}/actors/{}/workers/{}'.format(base_url, actor_id, id)
     rsp = requests.delete(url, headers=headers)
-    result = basic_response_checks(rsp)
+    result = basic_response_checks(rsp, check_tenant=False)
     time.sleep(4)
 
     # get the update list of workers
     url = '{}/actors/{}/workers'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
+    result = basic_response_checks(rsp, check_tenant=False)
     assert len(result) == 1
 
 def test_list_permissions(headers):
@@ -412,7 +418,8 @@ def test_tenant_list_workers():
     actor_id = get_actor_id(headers, name='abaco_test_suite_other_tenant')
     url = '{}/actors/{}/workers'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
+    # workers collection returns the tenant_id since it is an admin api
+    result = basic_response_checks(rsp, check_tenant=False)
     assert len(result) > 0
     # get the first worker
     worker = result[result.keys()[0]]

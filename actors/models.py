@@ -140,7 +140,7 @@ class Actor(AbacoDAO):
         """Return a representation fit for display."""
         self.pop('db_id')
         self.pop('executions')
-        # self.pop('tenant')
+        self.pop('tenant')
         return self
 
     def generate_id(self, name, tenant):
