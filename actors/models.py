@@ -140,6 +140,7 @@ class Actor(AbacoDAO):
         """Return a representation fit for display."""
         self.pop('db_id')
         self.pop('executions')
+        # self.pop('tenant')
         return self
 
     def generate_id(self, name, tenant):
@@ -155,7 +156,10 @@ class Actor(AbacoDAO):
     @classmethod
     def get_display_id(cls, tenant, dbid):
         """Return the display id from the dbid."""
-        return dbid.strip('{}_'.format(tenant))
+        if tenant + '_' in dbid:
+            return dbid[len(tenant + '_'):]
+        else:
+            return dbid
 
     @classmethod
     def set_status(cls, actor_id, status):
