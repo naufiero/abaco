@@ -49,7 +49,6 @@ def ok(result, msg="The request was successful", request=request):
          'version': TAG,
          'message': msg}
     if pretty_print(request):
-        d['version'] = 'fooy'
         return jsonify(d)
     else:
         return d
