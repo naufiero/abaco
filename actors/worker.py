@@ -79,6 +79,7 @@ def subscribe(actor_id, worker_ch):
             keep_running = False
             sys.exit()
         print("Received message {}. Starting actor container...".format(str(msg)))
+
         # the msg object is a dictionary with an entry called message and an arbitrary
         # set of k:v pairs coming in from the query parameters.
         message = msg.pop('message', '')
@@ -90,10 +91,12 @@ def subscribe(actor_id, worker_ch):
         environment = actor['default_environment']
         print("Actor default environment: {}".format(environment))
         print("Actor privileged: {}".format(privileged))
+
         # overlay the default_environment registered for the actor with the msg
         # dictionary
         environment.update(msg)
         print("Passing update environment: {}".format(environment))
+
         # get zmq_socket from msg
         # create fifo
         # create fifo reader thread(fifo, zmq_socket)
