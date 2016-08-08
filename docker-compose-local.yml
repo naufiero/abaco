@@ -17,7 +17,7 @@ reg:
         server: dev
         api: reg
     links:
-        - redis
+#        - redis
         - rabbit
 
 mes:
@@ -30,7 +30,7 @@ mes:
         server: dev
         api: mes
     links:
-        - redis
+#        - redis
         - rabbit
 
 admin:
@@ -43,7 +43,8 @@ admin:
         server: dev
         api: admin
     links:
-        - redis
+#        - redis
+#        - mongo
         - rabbit
 
 spawner:
@@ -53,7 +54,7 @@ spawner:
         - /var/run/docker.sock:/var/run/docker.sock
         - ./local-dev.conf:/etc/abaco.conf
     links:
-        - redis
+#        - redis
         - rabbit
     environment:
         - "abaco_conf_host_path=${abaco_path}/local-dev.conf"
@@ -65,10 +66,15 @@ health:
         - /var/run/docker.sock:/var/run/docker.sock
         - ./local-dev.conf:/etc/abaco.conf
 
-redis:
-    image: redis
+#redis:
+#    image: redis
+#    ports:
+#        - "6379:6379"
+
+mongo:
+    image: mongo
     ports:
-        - "6379:6379"
+        - "27017:27017"
 
 rabbit:
     image: rabbitmq:3.5.3-management
