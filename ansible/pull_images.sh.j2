@@ -6,5 +6,5 @@ if [ "$ARG" = "" ]; then
   ARG=latest
 fi
 
-docker pull jstubbs/abaco_core:$ARG
-docker pull jstubbs/abaco_nginx:$ARG
+docker pull {{ docker_user }}/abaco_core:$ARG
+docker pull {{ docker_user }}/abaco_nginx:$ARG
