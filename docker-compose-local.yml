@@ -1,0 +1,54 @@
+---
+
+nginx:
+    image: jstubbs/abaco_nginx
+    volumes:
+        - ./local-dev.conf:/etc/abaco.conf
+    ports:
+        - "8000:80"
+
+reg:
+    image: jstubbs/abaco_core
+    ports:
+        - "5000:5000"
+    volumes:
+        - ./local-dev.conf:/etc/abaco.conf
+    environment:
+        server: dev
+        api: reg
+
+mes:
+    image: jstubbs/abaco_core
+    volumes:
+        - ./local-dev.conf:/etc/abaco.conf
+    ports:
+        - "5001:5000"
+    environment:
+        server: dev
+        api: mes
+
+admin:
+    image: jstubbs/abaco_core
+    volumes:
+        - ./local-dev.conf:/etc/abaco.conf
+    ports:
+        - "5003:5000"
+    environment:
+        server: dev
+        api: admin
+
+spawner:
+    image: jstubbs/abaco_core
+    command: "python3 -u /actors/spawner.py"
+    volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - ./local-dev.conf:/etc/abaco.conf
+    environment:
+        - "abaco_conf_host_path=${abaco_path}/local-dev.conf"
+
+health:
+    image: jstubbs/abaco_core
+    command: /actors/health_check.sh
+    volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - ./local-dev.conf:/etc/abaco.conf
