@@ -3,7 +3,8 @@ from functools import partial
 from store import Store, MongoStore
 from config import Config
 
-if Config.get('store', 'use_mongo'):
+use_mongo = Config.get('store', 'use_mongo')
+if hasattr(use_mongo, 'lower') and use_mongo.lower() == 'true':
     config_store = partial(
         MongoStore, Config.get('store', 'host'), Config.getint('store', 'port'))
 
