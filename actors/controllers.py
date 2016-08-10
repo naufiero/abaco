@@ -5,8 +5,10 @@ from flask_restful import Resource, Api, inputs
 
 from channels import ActorMsgChannel, CommandChannel
 from codes import SUBMITTED, PERMISSION_LEVELS
+from config import Config
 from errors import DAOError, PermissionsException, WorkerException
-from models import Actor, Execution, ExecutionsSummary, Worker, get_permissions, add_permission
+from models import dict_to_camel, Actor, Execution, ExecutionsSummary, Worker, get_permissions, \
+    add_permission
 from request_utils import RequestParser, APIException, ok
 from stores import actors_store, executions_store, logs_store, permissions_store
 from worker import shutdown_workers, shutdown_worker
@@ -257,8 +259,13 @@ class MessagesResource(Resource):
             ch = CommandChannel()
             actor = Actor.from_db(actors_store[dbid])
             ch.put_cmd(actor_id=dbid, image=actor.image, tenant=g.tenant, num=1, stop_existing=False)
-        return ok(result={'execution_id': exc,
-                          'msg': args['message']})
+        result={'execution_id': exc, 'msg': args['message']}
+        case = Config.get('web', 'case')
+        if not case == 'camel':
+            return ok(result)
+        else:
+            return ok(dict_to_camel(result))
+
 
 
 class WorkersResource(Resource):
