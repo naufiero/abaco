@@ -70,7 +70,7 @@ class AbacoDAO(DbDict):
 
     def get_uuid(self):
         """Generate a random uuid."""
-        return str(uuid.uuid4())
+        return '{}-{}'.format(str(uuid.uuid1()), self.get_uuid_code())
 
     @classmethod
     def request_parser(cls):
@@ -135,6 +135,12 @@ class Actor(AbacoDAO):
             return actor_id
         else:
             return db_id
+
+    def get_uuid_code(self):
+        """ Return the Agave code for this object.
+        :return: str
+        """
+        return '059'
 
     def display(self):
         """Return a representation fit for display."""
@@ -254,6 +260,12 @@ class Execution(AbacoDAO):
         else:
             logs_store[exc_id] = logs
 
+    def get_uuid_code(self):
+        """ Return the Agave code for this object.
+        :return: str
+        """
+        return '053'
+
     def display(self):
         """Return a display version of the execution."""
         tenant = self.pop('tenant')
@@ -319,6 +331,12 @@ class Worker(AbacoDAO):
     def update_worker_status(cls, actor_id, ch_name, status):
         """Pass db_id as `actor_id` parameter."""
         workers_store.update_subfield(actor_id, ch_name, 'status', status)
+
+    def get_uuid_code(self):
+        """ Return the Agave code for this object.
+        :return: str
+        """
+        return '058'
 
 
 def get_permissions(actor_id):
