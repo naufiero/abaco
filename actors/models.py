@@ -9,6 +9,22 @@ import errors
 from request_utils import RequestParser
 from stores import actors_store, executions_store, logs_store, permissions_store, workers_store
 
+def under_to_camel(value):
+    def camel_case():
+        yield type(value).lower
+        while True:
+            yield type(value).capitalize
+    c = camel_case()
+    return "".join(c.__next__()(x) if x else '_' for x in value.split("_"))
+
+
+def dict_to_camel(d):
+    """Convert all keys in a dictionary to camel case."""
+    for k, v in d.items():
+        d.pop(k)
+        k2 = under_to_camel(k)
+        d[k2] = v
+    return d
 
 class DbDict(dict):
     """Class for persisting a Python dictionary."""
@@ -94,14 +110,6 @@ class AbacoDAO(DbDict):
 
     def case(self):
         """Convert to camel case, if required."""
-        def under_to_camel(value):
-            def camel_case():
-                yield type(value).lower
-                while True:
-                    yield type(value).capitalize
-            c = camel_case()
-            return "".join(c.__next__()(x) if x else '_' for x in value.split("_"))
-
         case = Config.get('web', 'case')
         if not case == 'camel':
             return self
