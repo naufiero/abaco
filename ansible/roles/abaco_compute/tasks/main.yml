@@ -26,7 +26,7 @@
 
 # ignore errors here since this call will fail if there are no containers running
 - name: remove existing compute containers
-  shell: docker rm -f `docker-compose -f  docker-compose-compute.yml ps -q`
+  shell: docker-compose -f  docker-compose-compute.yml down
   sudo: yes
   sudo_user: "{{ linux_user }}"
   ignore_errors: yes
