@@ -45,6 +45,22 @@ class AbacoDAO(DbDict):
     # derived: these fields are derived by the DAO class code and do not need to be passed.
     PARAMS = []
 
+    @classmethod
+    def request_parser(cls):
+        """Return a flask RequestParser object that can be used in post/put processing."""
+        parser = RequestParser()
+        for name, source, attr, typ, help, default in cls.PARAMS:
+            if source == 'derived':
+                continue
+            required = source == 'required'
+            parser.add_argument(name, type=typ, required=required, help=help, default=default)
+        return parser
+
+    @classmethod
+    def from_db(cls, db_json):
+        """Construct a DAO from a db serialization."""
+        return cls(**db_json)
+
     def __init__(self, **kwargs):
         """Construct a DAO from **kwargs. Client can also create from a dictionary, d, using AbacoDAO(**d)"""
         for name, source, attr, typ, help, default in self.PARAMS:
@@ -72,26 +88,33 @@ class AbacoDAO(DbDict):
         """Generate a random uuid."""
         return '{}-{}'.format(str(uuid.uuid1()), self.get_uuid_code())
 
-    @classmethod
-    def request_parser(cls):
-        """Return a flask RequestParser object that can be used in post/put processing."""
-        parser = RequestParser()
-        for name, source, attr, typ, help, default in cls.PARAMS:
-            if source == 'derived':
-                continue
-            required = source == 'required'
-            parser.add_argument(name, type=typ, required=required, help=help, default=default)
-        return parser
-
-    @classmethod
-    def from_db(cls, db_json):
-        """Construct a DAO from a db serialization."""
-        return cls(**db_json)
-
     def get_derived_value(self, name, d):
         """Compute a derived value for the attribute `name` from the dictionary d of attributes provided."""
         raise NotImplementedError
 
+    def case(self):
+        """Convert to camel case, if required."""
+        def under_to_camel(value):
+            def camel_case():
+                yield type(value).lower
+                while True:
+                    yield type(value).capitalize
+            c = camel_case()
+            return "".join(c.__next__()(x) if x else '_' for x in value.split("_"))
+
+        case = Config.get('web', 'case')
+        if not case == 'camel':
+            return self
+        # if camel case, convert all attributes
+        for name, _, _, _, _, _ in self.PARAMS:
+            val = self.pop(name, None)
+            if val:
+                self.__setattr__(under_to_camel(name), val)
+        return self
+
+    def display(self):
+        """A default display method, for those subclasses that do not define their own."""
+        return self.case()
 
 class Actor(AbacoDAO):
     """Basic data access object for working with Actors."""
@@ -147,7 +170,7 @@ class Actor(AbacoDAO):
         self.pop('db_id')
         self.pop('executions')
         self.pop('tenant')
-        return self
+        return self.case()
 
     def generate_id(self, name, tenant):
         """Generate an id for a new actor."""
@@ -270,7 +293,62 @@ class Execution(AbacoDAO):
         """Return a display version of the execution."""
         tenant = self.pop('tenant')
         self.actor_id = Actor.get_display_id(tenant, self.actor_id)
-        return self
+        return self.case()
+
+
+class ExecutionsSummary(AbacoDAO):
+    """ Summary information for all executions performed by an actor. """
+    PARAMS = [
+        # param_name, required/optional/provided/derived, attr_name, type, help, default
+        ('db_id', 'required', 'db_id', str, 'Primary key in the database for this actor.', None),
+        ('ids', 'derived', 'ids', list, 'List of all execution ids.', None),
+        ('total_executions', 'derived', 'total_executions', str, 'Total number of execution.', None),
+        ('total_io', 'derived', 'total_io', str,
+         'Block I/O usage, in number of 512-byte sectors read from and written to, by all executions.', None),
+        ('total_runtime', 'derived', 'total_runtime', str, 'Runtime, in milliseconds, of all executions.', None),
+        ('total_cpu', 'derived', 'total_cpu', str, 'CPU usage, in user jiffies, of all execution.', None),
+        ]
+
+    def compute_summary_stats(self, dbid):
+        try:
+            actors_store[dbid]
+        except KeyError:
+            raise errors.DAOError(
+                "actor not found: {}'".format(dbid), 404)
+        tot = {'total_executions': 0, 'total_cpu': 0, 'total_io': 0, 'total_runtime': 0, 'ids': []}
+        try:
+            executions = executions_store[dbid]
+        except KeyError:
+            executions = {}
+        for id, val in executions.items():
+            tot['ids'].append(id)
+            tot['total_executions'] += 1
+            tot['total_cpu'] += int(val['cpu'])
+            tot['total_io'] += int(val['io'])
+            tot['total_runtime'] += int(val['runtime'])
+        return tot
+
+    def get_derived_value(self, name, d):
+        """Compute a derived value for the attribute `name` from the dictionary d of attributes provided."""
+        # first, see if the attribute is already in the object:
+        try:
+            if d[name]:
+                return d[name]
+        except KeyError:
+            pass
+        # if not, compute and store all values, returning the one requested:
+        try:
+            dbid = d['db_id']
+        except KeyError:
+            raise errors.ExecutionException('db_id is required.')
+        tot = self.compute_summary_stats(dbid)
+        d.update(tot)
+        return tot[name]
+
+    def display(self):
+        self.pop('db_id')
+        return self.case()
+
 
 class Worker(AbacoDAO):
     """Basic data access object for working with Workers."""

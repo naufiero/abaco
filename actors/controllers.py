@@ -5,8 +5,8 @@ from flask_restful import Resource, Api, inputs
 
 from channels import ActorMsgChannel, CommandChannel
 from codes import SUBMITTED, PERMISSION_LEVELS
-from errors import PermissionsException, WorkerException
-from models import Actor, Execution, Worker, get_permissions, add_permission
+from errors import DAOError, PermissionsException, WorkerException
+from models import Actor, Execution, ExecutionsSummary, Worker, get_permissions, add_permission
 from request_utils import RequestParser, APIException, ok
 from stores import actors_store, executions_store, logs_store, permissions_store
 from worker import shutdown_workers, shutdown_worker
@@ -134,22 +134,10 @@ class ActorExecutionsResource(Resource):
     def get(self, actor_id):
         dbid = Actor.get_dbid(g.tenant, actor_id)
         try:
-            actors_store[dbid]
-        except KeyError:
-            raise APIException(
-                "actor not found: {}'".format(actor_id), 404)
-        tot = {'total_executions': 0, 'total_cpu': 0, 'total_io':0, 'total_runtime': 0, 'ids':[]}
-        try:
-            executions = executions_store[dbid]
-        except KeyError:
-            executions = {}
-        for id, val in executions.items():
-            tot['ids'].append(id)
-            tot['total_executions'] += 1
-            tot['total_cpu'] += int(val['cpu'])
-            tot['total_io'] += int(val['io'])
-            tot['total_runtime'] += int(val['runtime'])
-        return ok(result=tot, msg="Actor executions retrieved successfully.")
+            summary = ExecutionsSummary(db_id=dbid)
+        except DAOError as e:
+            raise APIException("actor not found: {}. DAOError: {}'".format(actor_id, e), 404)
+        return ok(result=summary.display(), msg="Actor executions retrieved successfully.")
 
     def post(self, actor_id):
         id = Actor.get_dbid(g.tenant, actor_id)
