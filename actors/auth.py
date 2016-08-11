@@ -102,7 +102,7 @@ def check_jwt(req):
         g.jwt = jwt_header
         g.tenant = tenant_name.upper()
         g.api_server = get_api_server(tenant_name)
-        g.user = decoded['http://wso2.org/claims/enduser']
+        g.user = decoded['http://wso2.org/claims/enduser'].split('@')[0]
         g.token = get_token(req.headers)
     except (jwt.DecodeError, KeyError):
         abort(400, {'message': 'Invalid JWT.'})
