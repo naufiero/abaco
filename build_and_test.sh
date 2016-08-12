@@ -14,7 +14,7 @@ printf "\n\nBuilding core image...\n\n"
 docker build -t jstubbs/abaco_core .
 
 # Build the testsuite image
-printf "\n\nuilding testsuite image...\n\n"
+printf "\n\nBuilding testsuite image...\n\n"
 docker build -t jstubbs/abaco_testsuite -f Dockerfile-test .
 
 # abaco_path variable is needed so that addition containers can find the config file.
@@ -24,11 +24,11 @@ export abaco_path=$(pwd)
 printf "\n\nCamel case tests..\n"
 printf "Updating config file.\n"
 sed -i.bak 's/case: snake/case: camel/g' local-dev.conf
-printf "Config file updated, launching abaco stack.."
+printf "Config file updated, launching abaco stack..\n"
 docker-compose -f docker-compose-local.yml up -d
 printf "Stack launched. Sleeping while stack starts up..."
 sleep 5
-printf "\n\n Stack should be ready. Starting test suite...\n"
+printf "\n\nStack should be ready. Starting test suite...\n"
 docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/abaco.conf -it --rm jstubbs/abaco_testsuite
 
 printf "\n\n********* Test suite complete, removing containers...\n"
@@ -39,10 +39,11 @@ printf "Containers removed."
 printf "\n\nSnake case tests..\n"
 printf "Updating config file.\n"
 sed -i.bak 's/case: camel/case: snake/g' local-dev.conf
-printf " Config file updated, removing all containers...\n"
+printf "Config file updated, removing all containers...\n"
 docker rm -f `docker ps -aq` || true
-printf "Containers removed, launching abaco stack.."
+printf "Containers removed, launching abaco stack..\n"
 docker-compose -f docker-compose-local-db.yml up -d
+sleep 5
 docker-compose -f docker-compose-local.yml up -d
 printf "Stack launched. Sleeping while stack starts up...\n"
 sleep 15
