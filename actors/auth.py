@@ -125,7 +125,7 @@ def get_api_server(tenant_name):
         return 'https://api.tacc.utexas.edu'
     if tenant_name.upper() == 'VDJSERVER-ORG':
         return 'https://vdj-agave-api.tacc.utexas.edu'
-    return 'https://dev.tenants.staging.agaveapi.co'
+    return 'http://localhost:8000'
 
 def get_token(headers):
     """
