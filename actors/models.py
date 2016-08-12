@@ -20,11 +20,10 @@ def under_to_camel(value):
 
 def dict_to_camel(d):
     """Convert all keys in a dictionary to camel case."""
-    for k, v in d.items():
-        d.pop(k)
-        k2 = under_to_camel(k)
-        d[k2] = v
-    return d
+    d2 = {}
+    for k,v in d.items():
+        d2[under_to_camel(k)] = v
+    return d2
 
 class DbDict(dict):
     """Class for persisting a Python dictionary."""
@@ -116,7 +115,7 @@ class AbacoDAO(DbDict):
         # if camel case, convert all attributes
         for name, _, _, _, _, _ in self.PARAMS:
             val = self.pop(name, None)
-            if val:
+            if val is not None:
                 self.__setattr__(under_to_camel(name), val)
         return self
 
@@ -352,7 +351,8 @@ class ExecutionsSummary(AbacoDAO):
                'total_executions': 0,
                'total_cpu': 0,
                'total_io': 0,
-               'total_runtime': 0, 'ids': []}
+               'total_runtime': 0,
+               'ids': []}
         try:
             executions = executions_store[dbid]
         except KeyError:
