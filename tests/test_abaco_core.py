@@ -254,8 +254,10 @@ def test_list_execution_details(headers):
     result = basic_response_checks(rsp)
     if case == 'snake':
         assert 'actor_id' in result
+        assert result['actor_id'] == actor_id
     else:
         assert 'actorId' in result
+        assert result['actorId'] == actor_id
     assert 'cpu' in result
     assert 'executor' in result
     assert 'id' in result
@@ -263,7 +265,6 @@ def test_list_execution_details(headers):
     assert 'runtime' in result
     assert 'status' in result
     assert result['status'] == 'COMPLETE'
-    assert result['actor_id'] == actor_id
     assert result['id'] == exec_id
 
 def test_list_execution_logs(headers):
@@ -310,10 +311,7 @@ def test_list_workers(headers):
     assert worker.get('status') == 'READY'
     assert worker.get('location')
     assert worker.get('cid')
-    if case == 'snake':
-        assert worker.get('last_execution')
-    else:
-        assert worker.get('lastExecution')
+    assert worker.get('last_execution')
     assert worker.get('ch_name')
     assert worker.get('tenant')
 
@@ -474,10 +472,7 @@ def test_tenant_list_workers():
     assert worker.get('status') == 'READY'
     assert worker.get('location')
     assert worker.get('cid')
-    if case == 'snake':
-        assert worker.get('ch_name')
-    else:
-        assert worker.get('chName')
+    assert worker.get('ch_name')
 
 
 # ##############
