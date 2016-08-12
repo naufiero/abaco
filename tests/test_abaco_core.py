@@ -1,4 +1,14 @@
 # Functional test suite for abaco.
+# This test suite now runs in its own docker container. To build the image, run
+#     docker build -f Dockerfile-test -t jstubbs/abaco_testsuite .
+# from within the tests directory.
+#
+# To run the tests execute, first start the development stack using the docker-compose-local.yml in the root directory
+# Then, aldo from the root directoty, execute:
+#     docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/abaco.conf -it --rm jstubbs/abaco_testsuite
+# Change
+
+# #
 # Start the local development abaco stack (docker-compose-local.yml) and run these tests with py.test from the cwd.
 #     $ py.test test_abaco_core.py
 #
@@ -15,13 +25,18 @@
 
 import os
 import sys
+sys.path.append(os.path.split(os.getcwd())[0])
+sys.path.append('/actors')
 import time
 
 import pytest
 import requests
 import json
 
+from actors import models
+
 base_url = os.environ.get('base_url', 'http://localhost:8000')
+case = os.environ.get('case', 'snake')
 
 # #################
 # registration API
@@ -29,7 +44,7 @@ base_url = os.environ.get('base_url', 'http://localhost:8000')
 
 @pytest.fixture(scope='session')
 def headers():
-    jwt = os.environ.get('jwt', open('jwt').read())
+    jwt = os.environ.get('jwt', open('/tests/jwt').read())
     if jwt:
         jwt_header = os.environ.get('jwt_header', 'X-Jwt-Assertion-AGAVE-PROD')
         headers = {jwt_header: jwt}
@@ -50,7 +65,7 @@ def test_remove_initial_actors(headers):
 def basic_response_checks(rsp, check_tenant=True):
     assert rsp.status_code in [200, 201]
     assert 'application/json' in rsp.headers['content-type']
-    data = json.loads(rsp.content)
+    data = json.loads(rsp.content.decode('utf-8'))
     assert 'message' in data.keys()
     assert 'status' in data.keys()
     assert 'result' in data.keys()
@@ -61,6 +76,18 @@ def basic_response_checks(rsp, check_tenant=True):
             assert 'tenant' not in result
     return result
 
+
+def test_dict_to_camel():
+    dic = {"_links": {"messages": "http://localhost:8000/actors/v2/ca39fac2-60a7-11e6-af60-0242ac110009-059/messages",
+                      "owner": "http://localhost:8000/profiles/v2/anonymous",
+                      "self": "http://localhost:8000/actors/v2/ca39fac2-60a7-11e6-af60-0242ac110009-059/executions/458ab16c-60a8-11e6-8547-0242ac110008-053"
+    },
+           "execution_id": "458ab16c-60a8-11e6-8547-0242ac110008-053",
+           "msg": "test"
+    }
+    dcamel = models.dict_to_camel(dic)
+    assert 'executionId' in dcamel
+    assert dcamel['executionId'] == "458ab16c-60a8-11e6-8547-0242ac110008-053"
 
 def test_list_actors(headers):
     url = '{}/{}'.format(base_url, '/actors')
@@ -129,6 +156,13 @@ def test_actor_is_ready(headers):
         count += 1
     assert False
 
+def test_executions_empty_list(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/executions'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    assert 'ids' in result
+    assert len(result['ids']) == 0
 
 # ###################
 # executions and logs
@@ -175,8 +209,12 @@ def test_execute_actor(headers):
     rsp = requests.post(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
     assert result.get('msg')  == 'testing execution'
-    assert result.get('execution_id')
-    exc_id = result.get('execution_id')
+    if case == 'snake':
+        assert result.get('execution_id')
+        exc_id = result.get('execution_id')
+    else:
+        assert result.get('executionId')
+        exc_id = result.get('executionId')
     # check for the execution to complete
     count = 0
     while count < 10:
@@ -193,7 +231,10 @@ def test_execute_actor(headers):
         status = result.get('status')
         assert status
         if status == 'COMPLETE':
-            assert result.get('actor_id') == actor_id
+            if case == 'snake':
+                assert result.get('actor_id') == actor_id
+            else:
+                assert result.get('actorId') == actor_id
             assert result.get('id') == exc_id
             assert result.get('io')
             assert 'runtime' in result
@@ -211,7 +252,10 @@ def test_list_execution_details(headers):
     url = '{}/actors/{}/executions/{}'.format(base_url, actor_id, exec_id)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
-    assert 'actor_id' in result
+    if case == 'snake':
+        assert 'actor_id' in result
+    else:
+        assert 'actorId' in result
     assert 'cpu' in result
     assert 'executor' in result
     assert 'id' in result
@@ -261,12 +305,15 @@ def test_list_workers(headers):
     result = basic_response_checks(rsp, check_tenant=False)
     assert len(result) > 0
     # get the first worker
-    worker = result[result.keys()[0]]
+    worker = result[list(result.keys())[0]]
     assert worker.get('image') == 'jstubbs/abaco_test'
     assert worker.get('status') == 'READY'
     assert worker.get('location')
     assert worker.get('cid')
-    assert worker.get('last_execution')
+    if case == 'snake':
+        assert worker.get('last_execution')
+    else:
+        assert worker.get('lastExecution')
     assert worker.get('ch_name')
     assert worker.get('tenant')
 
@@ -311,7 +358,7 @@ def test_delete_worker(headers):
     result = basic_response_checks(rsp, check_tenant=False)
 
     # delete the first one
-    id = result[result.keys()[0]].get('ch_name')
+    id = result[list(result.keys())[0]].get('ch_name')
     url = '{}/actors/{}/workers/{}'.format(base_url, actor_id, id)
     rsp = requests.delete(url, headers=headers)
     result = basic_response_checks(rsp, check_tenant=False)
@@ -422,12 +469,15 @@ def test_tenant_list_workers():
     result = basic_response_checks(rsp, check_tenant=False)
     assert len(result) > 0
     # get the first worker
-    worker = result[result.keys()[0]]
+    worker = result[list(result.keys())[0]]
     assert worker.get('image') == 'jstubbs/abaco_test'
     assert worker.get('status') == 'READY'
     assert worker.get('location')
     assert worker.get('cid')
-    assert worker.get('ch_name')
+    if case == 'snake':
+        assert worker.get('ch_name')
+    else:
+        assert worker.get('chName')
 
 
 # ##############
