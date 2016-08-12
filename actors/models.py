@@ -140,6 +140,8 @@ class Actor(AbacoDAO):
         ('executions', 'optional', 'executions', dict, 'Executions for this actor.', {}),
 
         ('tenant', 'provided', 'tenant', str, 'The tenant that this actor belongs to.', None),
+        ('api_server', 'provided', 'api_server', str, 'The base URL for the tenant that this actor belongs to.', None),
+        ('owner', 'provided', 'owner', str, 'The user who created this actor.', None),
 
         ('db_id', 'derived', 'db_id', str, 'Primary key in the database for this actor.', None),
         ('id', 'derived', 'id', str, 'Human readable id for this actor.', None),
@@ -175,10 +177,19 @@ class Actor(AbacoDAO):
 
     def display(self):
         """Return a representation fit for display."""
+        self.update(self.get_hypermedia())
         self.pop('db_id')
         self.pop('executions')
         self.pop('tenant')
+        self.pop('api_server')
+        self.pop('owner')
         return self.case()
+
+    def get_hypermedia(self):
+        return {'_links': { 'self': '{}/actors/v2/{}'.format(self.api_server, self.id),
+                            'owner': '{}/profiles/v2/{}'.format(self.api_server, self.owner),
+                            'executions': '{}/actors/v2/{}/executions'.format(self.api_server, self.id)
+        }}
 
     def generate_id(self, name, tenant):
         """Generate an id for a new actor."""
@@ -210,6 +221,7 @@ class Execution(AbacoDAO):
     PARAMS = [
         # param_name, required/optional/provided/derived, attr_name, type, help, default
         ('tenant', 'required', 'tenant', str, 'The tenant that this execution belongs to.', None),
+        ('api_server', 'required', 'api_server', str, 'The base URL for the tenant that this actor belongs to.', None),
         ('actor_id', 'required', 'actor_id', str, 'The human readable id for the actor associated with this execution.', None),
         ('executor', 'required', 'executor', str, 'The user who triggered this execution.', None),
         ('runtime', 'required', 'runtime', str, 'Runtime, in milliseconds, of the execution.', None),
@@ -241,6 +253,7 @@ class Execution(AbacoDAO):
         actor = Actor.from_db(actors_store[actor_id])
         ex.update({'actor_id': actor_id,
                    'tenant': actor.tenant,
+                   'api_server': actor['api_server']
                    })
         execution = Execution(**ex)
 
@@ -297,8 +310,15 @@ class Execution(AbacoDAO):
         """
         return '053'
 
+    def get_hypermedia(self):
+        return {'_links': { 'self': '{}/actors/v2/{}/executions/{}'.format(self.api_server, self.actor_id, self.id),
+                            'owner': '{}/profiles/v2/{}'.format(self.api_server, self.executor),
+                            'logs': '{}/actors/v2/{}/executions/{}/logs'.format(self.api_server, self.actor_id, self.id)
+        }}
+
     def display(self):
         """Return a display version of the execution."""
+        self.update(self.get_hypermedia())
         tenant = self.pop('tenant')
         self.actor_id = Actor.get_display_id(tenant, self.actor_id)
         return self.case()
@@ -308,7 +328,10 @@ class ExecutionsSummary(AbacoDAO):
     """ Summary information for all executions performed by an actor. """
     PARAMS = [
         # param_name, required/optional/provided/derived, attr_name, type, help, default
-        ('db_id', 'required', 'db_id', str, 'Primary key in the database for this actor.', None),
+        ('db_id', 'required', 'db_id', str, 'Primary key in the database for associated actor.', None),
+        ('api_server', 'derived', 'api_server', str, 'Base URL for the tenant that associated actor belongs to.', None),
+        ('actor_id', 'derived', 'actor_id', str, 'id for the actor.', None),
+        ('owner', 'provided', 'owner', str, 'The user who created the associated actor.', None),
         ('ids', 'derived', 'ids', list, 'List of all execution ids.', None),
         ('total_executions', 'derived', 'total_executions', str, 'Total number of execution.', None),
         ('total_io', 'derived', 'total_io', str,
@@ -319,11 +342,17 @@ class ExecutionsSummary(AbacoDAO):
 
     def compute_summary_stats(self, dbid):
         try:
-            actors_store[dbid]
+            actor = actors_store[dbid]
         except KeyError:
             raise errors.DAOError(
                 "actor not found: {}'".format(dbid), 404)
-        tot = {'total_executions': 0, 'total_cpu': 0, 'total_io': 0, 'total_runtime': 0, 'ids': []}
+        tot = {'api_server': actor['api_server'],
+               'actor_id': actor['id'],
+               'owner': actor['owner'],
+               'total_executions': 0,
+               'total_cpu': 0,
+               'total_io': 0,
+               'total_runtime': 0, 'ids': []}
         try:
             executions = executions_store[dbid]
         except KeyError:
@@ -353,7 +382,13 @@ class ExecutionsSummary(AbacoDAO):
         d.update(tot)
         return tot[name]
 
+    def get_hypermedia(self):
+        return {'_links': {'self': '{}/actors/v2/{}/executions'.format(self.api_server, self.actor_id),
+                           'owner': '{}/profiles/v2/{}'.format(self.api_server, self.owner),
+        }}
+
     def display(self):
+        self.update(self.get_hypermedia())
         self.pop('db_id')
         return self.case()
 

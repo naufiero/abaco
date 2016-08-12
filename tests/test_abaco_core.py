@@ -233,8 +233,8 @@ def test_list_execution_logs(headers):
     url = '{}/actors/{}/executions/{}/logs'.format(base_url, actor_id, exec_id)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp, check_tenant=False)
-    assert 'Contents of MSG: testing execution' in result
-    assert 'PATH' in result
+    assert 'Contents of MSG: testing execution' in result['logs']
+    assert 'PATH' in result['logs']
 
 def test_update_actor(headers):
     actor_id = get_actor_id(headers)
