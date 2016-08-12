@@ -30,6 +30,8 @@ class ActorsResource(Resource):
     def post(self):
         args = self.validate_post()
         args['tenant'] = g.tenant
+        args['api_server'] = g.api_server
+        args['owner'] = g.user
         actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
         ch = CommandChannel()
@@ -78,6 +80,8 @@ class ActorResource(Resource):
         else:
             update_image = True
             args['status'] = SUBMITTED
+        args['api_server'] = g.api_server
+        args['owner'] = g.user
         actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
         if update_image:
@@ -190,26 +194,42 @@ class ActorExecutionResource(Resource):
 
 class ActorExecutionLogsResource(Resource):
     def get(self, actor_id, execution_id):
+        def get_hypermedia(actor, exc):
+            return {'_links': {'self': '{}/actors/v2/{}/executions/{}/logs'.format(actor.api_server, actor.id, exc.id),
+                               'owner': '{}/profiles/v2/{}'.format(actor.api_server, actor.owner),
+                               'execution': '{}/actors/v2/{}/executions/{}'.format(actor.api_server, actor.id, exc.id)},
+                    }
         dbid = Actor.get_dbid(g.tenant, actor_id)
         try:
-            actors_store[dbid]
+            actor = Actor.from_db(actors_store[dbid])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
         try:
-            executions_store[dbid]
+            excs = executions_store[dbid]
         except KeyError:
             raise APIException("No executions found for actor {}.".format(actor_id))
+        try:
+            exc = Execution.from_db(excs[execution_id])
+        except KeyError:
+            raise APIException("Execution not found {}.".format(execution_id))
         try:
             logs = logs_store[execution_id]
         except KeyError:
             logs = ""
-        return ok(result=logs, msg="Logs retrieved successfully.")
+        result={'logs': logs}
+        result.update(get_hypermedia(actor, exc))
+        return ok(result, msg="Logs retrieved successfully.")
 
 
 class MessagesResource(Resource):
 
     def get(self, actor_id):
+        def get_hypermedia(actor):
+            return {'_links': {'self': '{}/actors/v2/{}/messages'.format(actor.api_server, actor.id),
+                               'owner': '{}/profiles/v2/{}'.format(actor.api_server, actor.owner),
+                               },
+                       }
         # check that actor exists
         id = Actor.get_dbid(g.tenant, actor_id)
         try:
@@ -217,9 +237,9 @@ class MessagesResource(Resource):
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
-        # TODO
-        # retrieve pending messages from the queue
-        return ok(result={'messages': len(ActorMsgChannel(actor_id=id)._queue._queue)})
+        result={'messages': len(ActorMsgChannel(actor_id=id)._queue._queue)}
+        result.update(get_hypermedia(actor))
+        return ok(result)
 
     def validate_post(self):
         parser = RequestParser()
@@ -228,6 +248,11 @@ class MessagesResource(Resource):
         return args
 
     def post(self, actor_id):
+        def get_hypermedia(actor, exc):
+            return {'_links': {'self': '{}/actors/v2/{}/executions/{}'.format(actor.api_server, actor.id, exc),
+                               'owner': '{}/profiles/v2/{}'.format(actor.api_server, actor.owner),
+                               'messages': '{}/actors/v2/{}/messages'.format(actor.api_server, actor.id)},}
+
         args = self.validate_post()
         d = {}
         # build a dictionary of k:v pairs from the query parameters, and pass a single
@@ -255,11 +280,12 @@ class MessagesResource(Resource):
         ch.put_msg(message=args['message'], d=d)
         # make sure at least one worker is available
         workers = Worker.get_workers(dbid)
+        actor = Actor.from_db(actors_store[dbid])
         if len(workers.items()) < 1:
             ch = CommandChannel()
-            actor = Actor.from_db(actors_store[dbid])
             ch.put_cmd(actor_id=dbid, image=actor.image, tenant=g.tenant, num=1, stop_existing=False)
         result={'execution_id': exc, 'msg': args['message']}
+        result.update(get_hypermedia(actor, exc))
         case = Config.get('web', 'case')
         if not case == 'camel':
             return ok(result)
