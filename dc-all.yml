@@ -1,0 +1,56 @@
+---
+
+mongo:
+    extends:
+        file: docker-compose-local-db.yml
+        service: mongo
+    ports:
+        - "27017:27017"
+
+rabbit:
+    extends:
+        file: docker-compose-local-db.yml
+        service: rabbit
+
+
+nginx:
+    extends:
+        file: docker-compose-local.yml
+        service: nginx
+    volumes:
+        - ./all.conf:/etc/abaco.conf
+
+reg:
+    extends:
+        file: docker-compose-local.yml
+        service: reg
+    volumes:
+        - ./all.conf:/etc/abaco.conf
+
+mes:
+    extends:
+        file: docker-compose-local.yml
+        service: mes
+    volumes:
+        - ./all.conf:/etc/abaco.conf
+
+admin:
+    extends:
+        file: docker-compose-local.yml
+        service: admin
+    volumes:
+        - ./all.conf:/etc/abaco.conf
+
+spawner:
+    extends:
+        file: docker-compose-local.yml
+        service: spawner
+    volumes:
+        - ./all.conf:/etc/abaco.conf
+
+health:
+    extends:
+        file: docker-compose-local.yml
+        service: health
+    volumes:
+        - ./all.conf:/etc/abaco.conf
