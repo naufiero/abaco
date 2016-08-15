@@ -25,13 +25,16 @@ Quickstart
 
      $ export abaco_path=$(pwd)
 
-   Then start the abaco containers with:
+   Then start the abaco containers with the following two commands:
 
    .. code-block:: bash
    
-      $ docker-compose -f docker-compose-local.yml up -d
+      $ docker-compose -f dc-all.yml up -d
 
-The services are now running behind ``nginx`` which should be listening on 8000.
+   If all went well, the services will be running behind ``nginx`` on 8000. We assume the Docker Gateway is running
+   on the default IP for Docker 1.9.1+ which is 172.17.0.1. If this is not the case for your setup, you will need to
+   update the value of `host` within the `store` stanza of the `all.conf` file with the IP address of the Gateway. It
+   also may take several seconds for the mongo db to be ready to accept connections.
 
 
 2. Register an actor -- Initially, the abaco system is empty with no actors defined which can see by making a GET request
