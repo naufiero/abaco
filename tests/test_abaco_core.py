@@ -3,12 +3,16 @@
 #     docker build -f Dockerfile-test -t jstubbs/abaco_testsuite .
 # from within the tests directory.
 #
-# To run the tests execute, first start the development stack using the docker-compose-local.yml in the root directory
-# Then, aldo from the root directoty, execute:
+# To run the tests execute, first start the development stack using:
+#  1. export abaco_path=$(pwd)
+#  2. docker-compose -f docker-compose-local-db.yml up -d (from within the root directory)
+#  3. docker-compose -f docker-compose-local.yml up -d (from within the root directory)
+# Then, also from the root directory, execute:
 #     docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/abaco.conf -it --rm jstubbs/abaco_testsuite
-# Change
+# Change the -e case=camel to -e case=snake depending on the functionality you want to test.
 
-# #
+#
+# # --- Original notes for running natively ------
 # Start the local development abaco stack (docker-compose-local.yml) and run these tests with py.test from the cwd.
 #     $ py.test test_abaco_core.py
 #
@@ -22,6 +26,7 @@
 # 3. most tests appear twice, e.g. "test_list_actors" and "test_tenant_list_actors": The first test uses the default
 #    tenant by not setting the tenant header, while the second one sets tenant: abaco_test_suite_tenant; this enables
 #    the suite to test tenancy bleed-over.
+#
 
 import os
 import sys
@@ -306,7 +311,7 @@ def test_list_workers(headers):
     result = basic_response_checks(rsp, check_tenant=False)
     assert len(result) > 0
     # get the first worker
-    worker = result[list(result.keys())[0]]
+    worker = result[0]
     assert worker.get('image') == 'jstubbs/abaco_test'
     assert worker.get('status') == 'READY'
     assert worker.get('location')
@@ -356,7 +361,7 @@ def test_delete_worker(headers):
     result = basic_response_checks(rsp, check_tenant=False)
 
     # delete the first one
-    id = result[list(result.keys())[0]].get('ch_name')
+    id = result[0].get('ch_name')
     url = '{}/actors/{}/workers/{}'.format(base_url, actor_id, id)
     rsp = requests.delete(url, headers=headers)
     result = basic_response_checks(rsp, check_tenant=False)
@@ -467,7 +472,7 @@ def test_tenant_list_workers():
     result = basic_response_checks(rsp, check_tenant=False)
     assert len(result) > 0
     # get the first worker
-    worker = result[list(result.keys())[0]]
+    worker = result[0]
     assert worker.get('image') == 'jstubbs/abaco_test'
     assert worker.get('status') == 'READY'
     assert worker.get('location')
