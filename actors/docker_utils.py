@@ -83,7 +83,7 @@ def run_container_with_docker(image, command, name=None, environment={}):
         binds[abaco_conf_host_path] = {'bind': '/abaco.conf', 'ro': True}
     except configparser.NoOptionError:
         pass
-    host_config=cli.create_host_config(binds=binds)
+    host_config = cli.create_host_config(binds=binds)
     container = cli.create_container(image=image,
                                      environment=environment,
                                      volumes=volumes,
@@ -121,7 +121,6 @@ def execute_actor(actor_id, worker_ch, image, msg, d={}, privileged=False):
               'runtime': 0 }
     cli = docker.AutoVersionClient(base_url=dd)
     d['MSG'] = msg
-    host_config = {'privileged': privileged}
     binds = {}
     volumes = []
     # if container is privileged, mount the docker daemon so that additional
@@ -131,12 +130,10 @@ def execute_actor(actor_id, worker_ch, image, msg, d={}, privileged=False):
                     'bind': '/var/run/docker.sock',
                     'ro': False }}
         volumes = ['/var/run/docker.sock']
-    container = cli.create_container(image=image,
-                                     environment=d,
-                                     host_config=host_config,
-                                     volumes=volumes)
+    host_config = cli.create_host_config(binds=binds, privileged=privileged)
+    container = cli.create_container(image=image, environment=d, volumes=volumes, host_config=host_config)
     try:
-        cli.start(container=container.get('Id'), binds=binds)
+        cli.start(container=container.get('Id'))
     except Exception as e:
         # if there was an error starting the container, user will need to debig
         raise DockerStartContainerError("Could not start container {}. Exception {}".format(container.get('Id'), str(e)))
