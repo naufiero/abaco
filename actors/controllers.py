@@ -305,7 +305,11 @@ class WorkersResource(Resource):
             workers = Worker.get_workers(dbid)
         except WorkerException as e:
             raise APIException(e.msg, 404)
-        return ok(result=workers, msg="Workers retrieved successfully.")
+        result = []
+        for id, worker in workers.items():
+            worker.update({'id': id})
+            result.append(worker)
+        return ok(result=result, msg="Workers retrieved successfully.")
 
     def validate_post(self):
         parser = RequestParser()
