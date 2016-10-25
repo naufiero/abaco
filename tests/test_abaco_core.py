@@ -124,6 +124,8 @@ def test_register_actor(headers):
     rsp = requests.post(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
     assert 'description' in result
+    assert 'owner' in result
+    # assert result['owner'] == 'jstubbs'
     assert result['image'] == 'jstubbs/abaco_test'
     assert result['name'] == 'abaco_test_suite'
     assert result['id'] is not None
@@ -144,6 +146,7 @@ def test_list_actor(headers):
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert 'description' in result
+    assert 'owner' in result
     assert result['image'] == 'jstubbs/abaco_test'
     assert result['name'] == 'abaco_test_suite'
     assert result['id'] is not None
@@ -285,6 +288,46 @@ def test_list_execution_logs(headers):
     result = basic_response_checks(rsp, check_tenant=False)
     assert 'Contents of MSG: testing execution' in result['logs']
     assert 'PATH' in result['logs']
+
+def test_execute_actor_json(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/messages'.format(base_url, actor_id)
+    data = {'key1': 'value1', 'key2': 'value2'}
+    # pass raw JSON to the messages endpoint.
+    rsp = requests.post(url, json=data, headers=headers)
+    result = basic_response_checks(rsp)
+    if case == 'snake':
+        assert result.get('execution_id')
+        exc_id = result.get('execution_id')
+    else:
+        assert result.get('executionId')
+        exc_id = result.get('executionId')
+    # check for the execution to complete
+    count = 0
+    while count < 10:
+        time.sleep(3)
+        url = '{}/actors/{}/executions'.format(base_url, actor_id)
+        rsp = requests.get(url, headers=headers)
+        result = basic_response_checks(rsp)
+        ids = result.get('ids')
+        if ids:
+            assert exc_id in ids
+        url = '{}/actors/{}/executions/{}'.format(base_url, actor_id, exc_id)
+        rsp = requests.get(url, headers=headers)
+        result = basic_response_checks(rsp)
+        status = result.get('status')
+        assert status
+        if status == 'COMPLETE':
+            if case == 'snake':
+                assert result.get('actor_id') == actor_id
+            else:
+                assert result.get('actorId') == actor_id
+            assert result.get('id') == exc_id
+            assert result.get('io')
+            assert 'runtime' in result
+            return
+        count += 1
+    assert False
 
 def test_update_actor(headers):
     actor_id = get_actor_id(headers)
