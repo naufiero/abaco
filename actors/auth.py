@@ -1,6 +1,7 @@
 # Utilities for authn/z
 import base64
 import json
+import os
 import re
 
 from Crypto.Signature import PKCS1_v1_5
@@ -82,13 +83,15 @@ def authentication():
 def check_jwt(req):
     tenant_name = None
     jwt_header = None
+    jwt_header_name = None
     for k, v in req.headers.items():
         if k.startswith('X-Jwt-Assertion-'):
             tenant_name = k.split('X-Jwt-Assertion-')[1]
             jwt_header = v
+            jwt_header_name = k
             break
     else:
-        # never found a jwt; look for 'Assertion'
+        # never found a jwt; look for 'Assertion'.
         try:
             jwt_header = req.headers['Assertion']
             tenant_name = 'dev_staging'
@@ -100,8 +103,10 @@ def check_jwt(req):
     try:
         decoded = jwt.decode(jwt_header, PUB_KEY)
         g.jwt = jwt_header
+        g.jwt_header_name = jwt_header_name
         g.tenant = tenant_name.upper()
         g.api_server = get_api_server(tenant_name)
+        g.jwt_server = get_jwt_server()
         g.user = decoded['http://wso2.org/claims/enduser'].split('@')[0]
         g.token = get_token(req.headers)
     except (jwt.DecodeError, KeyError):
@@ -126,6 +131,9 @@ def get_api_server(tenant_name):
     if tenant_name.upper() == 'VDJSERVER-ORG':
         return 'https://vdj-agave-api.tacc.utexas.edu'
     return 'http://localhost:8000'
+
+def get_jwt_server():
+    return 'http://api.prod.agaveapi.co'
 
 def get_token(headers):
     """
