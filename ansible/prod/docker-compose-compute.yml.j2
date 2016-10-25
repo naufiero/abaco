@@ -3,6 +3,8 @@
 spawner:
     image: {{ docker_user }}/abaco_core
     command: "python3 -u /actors/spawner.py"
+    environment:
+        AE_IMAGE: "{{ docker_user }}/abaco_core"
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
         - ./abaco.conf:/etc/abaco.conf
@@ -10,6 +12,8 @@ spawner:
 health:
     image: {{ docker_user }}/abaco_core
     command: /actors/health_check.sh
+    environment:
+        AE_IMAGE: "{{ docker_user }}/abaco_core"
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
         - ./abaco.conf:/etc/abaco.conf
