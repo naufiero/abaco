@@ -243,8 +243,24 @@ class MessagesResource(Resource):
 
     def validate_post(self):
         parser = RequestParser()
-        parser.add_argument('message', type=str, required=True, help="The message to send to the actor.")
+        parser.add_argument('message', type=str, required=False, help="The message to send to the actor.")
         args = parser.parse_args()
+        # if a special 'message' object isn't passed, use entire POST payload as message
+        if not args.get('message'):
+            json_data = request.get_json()
+            if json_data:
+                args['message'] = json_data
+                args['_abaco_Content-Type'] = 'application/json'
+            else:
+                # try to get data for mime types not recognized by flask. flask creates a python string for these
+                try:
+                    args['message'] = json.loads(request.data)
+                except TypeError:
+                    raise DAOError('message POST body could not be serialized. Pass JSON data or use the message attribute.')
+                args['_abaco_Content-Type'] = 'str'
+        else:
+            # the special message object is a string
+            args['_abaco_Content-Type'] = 'str'
         return args
 
     def post(self, actor_id):
@@ -264,10 +280,14 @@ class MessagesResource(Resource):
             d[k] = v
         if hasattr(g, 'user'):
             d['_abaco_username'] = g.user
-        if hasattr(g, 'jwt'):
-            d['_abaco_jwt'] = g.jwt
         if hasattr(g, 'api_server'):
             d['_abaco_api_server'] = g.api_server
+        if hasattr(g, 'jwt'):
+            d['_abaco_jwt'] = g.jwt
+        if hasattr(g, 'jwt_server'):
+            d['_abaco_jwt_server'] = g.jwt_server
+        if hasattr(g, 'jwt_header_name'):
+            d['_abaco_jwt_header_name'] = g.jwt_header_name
         dbid = Actor.get_dbid(g.tenant, actor_id)
         # create an execution
         exc = Execution.add_execution(dbid, {'cpu': 0,
@@ -276,6 +296,7 @@ class MessagesResource(Resource):
                                              'status': SUBMITTED,
                                              'executor': g.user})
         d['_abaco_execution_id'] = exc
+        d['_abaco_Content-Type'] = args.get('_abaco_Content-Type', '')
         ch = ActorMsgChannel(actor_id=dbid)
         ch.put_msg(message=args['message'], d=d)
         # make sure at least one worker is available
@@ -354,7 +375,7 @@ class WorkerResource(Resource):
         except WorkerException as e:
             raise APIException(e.msg, 404)
         shutdown_worker(ch_name)
-        return ok(result=worker, msg="Worker scheduled to be stopped.")
+        return ok(result=None, msg="Worker scheduled to be stopped.")
 
 
 class PermissionsResource(Resource):
