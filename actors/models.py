@@ -181,7 +181,6 @@ class Actor(AbacoDAO):
         self.pop('executions')
         self.pop('tenant')
         self.pop('api_server')
-        self.pop('owner')
         return self.case()
 
     def get_hypermedia(self):
