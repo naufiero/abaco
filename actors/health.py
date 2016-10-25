@@ -9,6 +9,7 @@
 # Execute from a container on a schedule as follows:
 # docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock jstubbs/abaco_core python3 -u /actors/health.py
 
+import os
 import time
 
 import channelpy
@@ -20,6 +21,9 @@ from models import Actor, Worker
 from channels import CommandChannel, WorkerChannel
 from stores import actors_store
 from worker import shutdown_worker
+
+AE_IMAGE = os.environ.get('AE_IMAGE', 'jstubbs/abaco_core')
+
 
 def get_actor_ids():
     """Returns the list of actor ids currently registered."""
@@ -81,11 +85,10 @@ def manage_workers(actor_id):
 def main():
     print("Running abaco health checks. Now: {}".format(time.time()))
     ttl = Config.get('workers', 'worker_ttl')
-    if not container_running(image='jstubbs/abaco_core', name='abaco_spawner*')\
-    and not container_running(image='jstubbs/abaco_core', name='apim_spawner*'):
+    if not container_running(name='spawner*'):
         print("No spawners running! Launching new spawner..")
         command = 'python3 -u /actors/spawner.py'
-        run_container_with_docker('jstubbs/abaco_core', command, name='abaco_spawner_0')
+        run_container_with_docker(AE_IMAGE, command, name='abaco_spawner_0', environment={'AE_IMAGE': AE_IMAGE})
     try:
         ttl = int(ttl)
     except Exception:
