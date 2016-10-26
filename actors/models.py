@@ -7,7 +7,7 @@ from codes import SUBMITTED
 from config import Config
 import errors
 from request_utils import RequestParser
-from stores import actors_store, executions_store, logs_store, permissions_store, workers_store
+from stores import actors_store, clients_store, executions_store, logs_store, permissions_store, workers_store
 
 def under_to_camel(value):
     def camel_case():
@@ -24,6 +24,7 @@ def dict_to_camel(d):
     for k,v in d.items():
         d2[under_to_camel(k)] = v
     return d2
+
 
 class DbDict(dict):
     """Class for persisting a Python dictionary."""
@@ -122,6 +123,7 @@ class AbacoDAO(DbDict):
     def display(self):
         """A default display method, for those subclasses that do not define their own."""
         return self.case()
+
 
 class Actor(AbacoDAO):
     """Basic data access object for working with Actors."""
@@ -458,6 +460,42 @@ class Worker(AbacoDAO):
         """
         return '058'
 
+
+class Client(AbacoDAO):
+    """Data access object for OAuth clients generated for workers."""
+
+    PARAMS = [
+        # param_name, required/optional/provided/derived, attr_name, type, help, default
+        ('tenant', 'required', 'tenant', str, 'The tenant of the worker owning the client.', None),
+        ('actor_id', 'required', 'actor_id', str, 'The actor id of the worker owning the client.', None),
+        ('worker_id', 'required', 'worker_id', list, 'The id of the worker owning the client.', None),
+        ('client_key', 'required', 'client_key', str, 'The key of the client.', None),
+        ('client_name', 'required', 'client_name', str, 'The name of the client.', None),
+        ('id', 'derived', 'id', str, 'Unique id in the database for this client', None)
+        ]
+
+    def get_derived_value(self, name, d):
+        """Compute a derived value for the attribute `name` from the dictionary d of attributes provided."""
+        # first, see if the id attribute is already in the object:
+        try:
+            if d[name]:
+                return d[name]
+        except KeyError:
+            pass
+        # combine the tenant_id and client_key to get the unique id
+        return Client.get_client_id(d['tenant_id'], d['client_key'])
+
+    @classmethod
+    def get_client_id(cls, tenant, key):
+        return '{}_{}'.format(tenant, key)
+
+    @classmethod
+    def get_client(cls, tenant, client_key):
+        return Client(clients_store[Client.get_client_id(tenant, client_key)])
+
+    @classmethod
+    def delete_client(cls, tenant, client_key):
+        del clients_store[Client.get_client_id(tenant, client_key)]
 
 def get_permissions(actor_id):
     """ Return all permissions for an actor

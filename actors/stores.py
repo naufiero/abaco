@@ -13,6 +13,7 @@ if hasattr(use_mongo, 'lower') and use_mongo.lower() == 'true':
     logs_store = config_store(db='3')
     permissions_store = config_store(db='4')
     executions_store = config_store(db='5')
+    clients_store = config_store(db='6')
 else:
     config_store = partial(
         Store, Config.get('store', 'host'), Config.getint('store', 'port'))
@@ -22,3 +23,4 @@ else:
     logs_store = config_store(db=3)
     permissions_store = config_store(db=4)
     executions_store = config_store(db=5)
+    clients_store = config_store(db=6)

@@ -21,3 +21,7 @@ class ExecutionException(BaseAbacoError):
 
 class PermissionsException(BaseAbacoError):
     pass
+
+
+class ClientException(BaseAbacoError):
+    pass

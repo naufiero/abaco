@@ -14,9 +14,37 @@ class WorkerChannel(Channel):
                          uri=self.uri)
 
 
+class ClientsChannel(Channel):
+    """Channel for communicating with the clients generator."""
+
+    def __init__(self, name=None):
+        self.uri = Config.get('rabbit', 'uri')
+        super().__init__(name=name,
+                         connection_type=RabbitConnection,
+                         uri=self.uri)
+
+    def request_client(self, tenant, actor_id, worker_id, secret):
+        """Request a new client for a specific tenant and worker."""
+        msg = {'command': 'new',
+               'tenant': tenant,
+               'actor_id': actor_id,
+               'worker_id': worker_id,
+               'secret': secret}
+        return self.put_sync(msg)
+
+    def request_delete_client(self, tenant, actor_id, worker_id, client_id, secret):
+        """Request a client be deleted as part of shutting down a worker."""
+        msg = {'command': 'delete',
+               'tenant': tenant,
+               'actor_id': actor_id,
+               'worker_id': worker_id,
+               'client_id': client_id,
+               'secret': secret}
+        return self.put_sync(msg)
+
+
 class CommandChannel(Channel):
-    """Work with commands on the command channel.
-    """
+    """Work with commands on the command channel."""
 
     def __init__(self):
         self.uri = Config.get('rabbit', 'uri')

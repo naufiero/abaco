@@ -132,6 +132,19 @@ def get_api_server(tenant_name):
         return 'https://vdj-agave-api.tacc.utexas.edu'
     return 'http://localhost:8000'
 
+
+def get_tenants():
+    """Return a list of tenants"""
+    return ['AGAVE-PROD',
+            'ARAPORT-ORG',
+            'DESIGNSAFE',
+            'DEV-STAGING',
+            'IPLANTC-ORG',
+            'IREC',
+            'TACC-PROD',
+            'VDJSERVER-ORG']
+
+
 def get_jwt_server():
     return 'http://api.prod.agaveapi.co'
 
