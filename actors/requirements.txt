@@ -11,3 +11,4 @@ gunicorn==19.3.0
 rabbitpy==0.26.2
 pyzmq==14.3.0
 pymongo==3.3.0
+agavepy
