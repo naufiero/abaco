@@ -282,10 +282,10 @@ class MessagesResource(Resource):
             d['_abaco_username'] = g.user
         if hasattr(g, 'api_server'):
             d['_abaco_api_server'] = g.api_server
-        if hasattr(g, 'jwt'):
-            d['_abaco_jwt'] = g.jwt
-        if hasattr(g, 'jwt_server'):
-            d['_abaco_jwt_server'] = g.jwt_server
+        # if hasattr(g, 'jwt'):
+        #     d['_abaco_jwt'] = g.jwt
+        # if hasattr(g, 'jwt_server'):
+        #     d['_abaco_jwt_server'] = g.jwt_server
         if hasattr(g, 'jwt_header_name'):
             d['_abaco_jwt_header_name'] = g.jwt_header_name
         dbid = Actor.get_dbid(g.tenant, actor_id)

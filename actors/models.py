@@ -433,7 +433,7 @@ class Worker(AbacoDAO):
         parameter.
         """
         try:
-            workers_store.pop_field(actor_id, ch_name)
+            wk = workers_store.pop_field(actor_id, ch_name)
         except KeyError:
             raise errors.WorkerException("Worker not found.")
 
@@ -462,7 +462,12 @@ class Worker(AbacoDAO):
 
 
 class Client(AbacoDAO):
-    """Data access object for OAuth clients generated for workers."""
+    """
+    Data access object for OAuth clients generated for workers.
+    NOTE: this is not the public python API for interacting with clients. Managing clients should be
+    done through the ClientsChannel/clientg actor, since client management involves managing these models but
+    also objects in the third party systems (agave APIM).
+    """
 
     PARAMS = [
         # param_name, required/optional/provided/derived, attr_name, type, help, default
@@ -483,7 +488,7 @@ class Client(AbacoDAO):
         except KeyError:
             pass
         # combine the tenant_id and client_key to get the unique id
-        return Client.get_client_id(d['tenant_id'], d['client_key'])
+        return Client.get_client_id(d['tenant'], d['client_key'])
 
     @classmethod
     def get_client_id(cls, tenant, key):

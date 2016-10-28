@@ -17,7 +17,7 @@ class WorkerChannel(Channel):
 class ClientsChannel(Channel):
     """Channel for communicating with the clients generator."""
 
-    def __init__(self, name=None):
+    def __init__(self, name='clients'):
         self.uri = Config.get('rabbit', 'uri')
         super().__init__(name=name,
                          connection_type=RabbitConnection,
