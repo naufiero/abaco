@@ -45,6 +45,19 @@ spawner:
         - ./local-dev.conf:/etc/abaco.conf
     environment:
         - "abaco_conf_host_path=${abaco_path}/local-dev.conf"
+        - "_abaco_secret=123"
+
+clientg:
+    image: jstubbs/abaco_core
+    command: "python3 -u /actors/clients.py"
+    volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - ./local-dev.conf:/etc/abaco.conf
+    environment:
+        - "abaco_conf_host_path=${abaco_path}/local-dev.conf"
+        - "_abaco_secret=123"
+        - "_abaco_AGAVE-PROD_username=abaco_service"
+        - "_abaco_AGAVE-PROD_password=changeme"
 
 health:
     image: jstubbs/abaco_core
