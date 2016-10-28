@@ -9,7 +9,7 @@ from config import Config
 from docker_utils import DockerError, run_worker
 from models import Actor, Worker
 from stores import workers_store
-from channels import ActorMsgChannel, CommandChannel, WorkerChannel
+from channels import ActorMsgChannel, ClientsChannel, CommandChannel, WorkerChannel
 
 
 class SpawnerException(Exception):
@@ -22,6 +22,7 @@ class Spawner(object):
 
     def __init__(self):
         self.num_workers = int(Config.get('workers', 'init_count'))
+        self.secret = os.environ.get('_abaco_secret')
         self.cmd_ch = CommandChannel()
 
     def run(self):
@@ -77,9 +78,40 @@ class Spawner(object):
                 Worker.add_worker(actor_id, worker)
         else:
             workers_store[actor_id] = new_workers
-        # tell new workers to subscribe to the actor channel.
-        for channel in anon_channels:
-            channel.put({'status': 'ok', 'actor_id': actor_id})
+        # send new workers their clients and tell them to subscribe to the actor channel.
+        for idx, channel in enumerate(anon_channels):
+            print("Getting client for worker {}".format(idx))
+            client_ch = ClientsChannel()
+            client_msg = client_ch.request_client(tenant=tenant,
+                                                  actor_id=actor_id,
+                                                  # new_workers is a dictionary of dictionaries; list(d) creates a
+                                                  # list of keys for a dictionary d. hence, the idx^th entry
+                                                  # of list(ner_workers) should be the key.
+                                                  worker_id=new_workers[list(new_workers)[idx]]['ch_name'],
+                                                  secret=self.secret)
+            # we need to ignore errors when generating clients because it's possible it is not set up for a specific
+            # tenant. we log it instead.
+            if client_msg.get('status') == 'error':
+                print("Error generating client: {}".format(client_msg.get('message')))
+                channel.put({'status': 'ok',
+                             'actor_id': actor_id,
+                             'tenant': tenant,
+                             'client': 'no'})
+            # else, client was generated successfully:
+            else:
+                print("Got a client: {}, {}, {}".format(client_msg['client_id'],
+                                                        client_msg['access_token'],
+                                                        client_msg['refresh_token']))
+                channel.put({'status': 'ok',
+                             'actor_id': actor_id,
+                             'tenant': tenant,
+                             'client': 'yes',
+                             'client_id': client_msg['client_id'],
+                             'client_secret': client_msg['client_secret'],
+                             'access_token': client_msg['access_token'],
+                             'refresh_token': client_msg['refresh_token'],
+                             'api_server': client_msg['api_server'],
+                             })
         print("Done processing command.")
 
 

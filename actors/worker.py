@@ -3,8 +3,9 @@ import sys
 import threading
 
 import channelpy
+from agave import Agave
 
-from channels import ActorMsgChannel, CommandChannel,WorkerChannel
+from channels import ActorMsgChannel, ClientsChannel, CommandChannel,WorkerChannel
 from codes import ERROR, READY, BUSY, COMPLETE
 from docker_utils import DockerError, DockerStartContainerError, execute_actor, pull_image
 from errors import WorkerException
@@ -27,7 +28,7 @@ def shutdown_workers(actor_id):
     for _, worker in workers.items():
         shutdown_worker(worker['ch_name'])
 
-def process_worker_ch(worker_ch, actor_id, actor_ch):
+def process_worker_ch(tenant, worker_ch, actor_id, actor_ch, ag_client):
     """ Target for a thread to listen on the worker channel for a message to stop processing.
     :param worker_ch:
     :return:
@@ -49,6 +50,25 @@ def process_worker_ch(worker_ch, actor_id, actor_ch):
                 ch.put('ok')
         elif msg == 'stop':
             print("Received stop message, stopping worker...")
+            # first, delete an associated client
+            # its possible this worker was not passed a client,
+            # but if so, we need to delete it before shutting down.
+            if ag_client:
+                print("Requesting client {} be deleted.".format(ag_client.api_key))
+                secret = os.environ.get('_abaco_secret')
+                clients_ch = ClientsChannel()
+                msg = clients_ch.request_delete_client(tenant=tenant,
+                                                       actor_id=actor_id,
+                                                       worker_id=worker_ch.name,
+                                                       client_id=ag_client.api_key,
+                                                       secret=secret)
+
+                if msg['status'] == 'ok':
+                    print("Delete request completed successfully.")
+                else:
+                    print("Error deleting client. Message: {}".format(msg['message']))
+            else:
+                print("Did not receive client. Not issueing delete. Exiting.")
             try:
                 Worker.delete_worker(actor_id, worker_ch.name)
             except WorkerException:
@@ -57,14 +77,30 @@ def process_worker_ch(worker_ch, actor_id, actor_ch):
             actor_ch.close()
             sys.exit()
 
-def subscribe(actor_id, worker_ch):
+def subscribe(tenant,
+              actor_id,
+              api_server,
+              client_id,
+              client_secret,
+              access_token,
+              refresh_token,
+              worker_ch):
     """
     Main loop for the Actor executor worker. Subscribes to the actor's inbox and executes actor
     containers when message arrive. Also subscribes to the worker channel for future communications.
     :return:
     """
     actor_ch = ActorMsgChannel(actor_id)
-    t = threading.Thread(target=process_worker_ch, args=(worker_ch, actor_id, actor_ch))
+    ag = None
+    if api_server and client_id and client_secret and access_token and refresh_token:
+        ag = Agave(api_server=api_server,
+                   token=access_token,
+                   refresh_token=refresh_token,
+                   api_key=client_id,
+                   api_secret=client_secret)
+    else:
+        print("Not creating agave client.")
+    t = threading.Thread(target=process_worker_ch, args=(tenant, worker_ch, actor_id, actor_ch, ag))
     t.start()
     print("Worker subscribing to actor channel...")
     global keep_running
@@ -93,6 +129,18 @@ def subscribe(actor_id, worker_ch):
         # overlay the default_environment registered for the actor with the msg
         # dictionary
         environment.update(msg)
+        environment['_abaco_access_token'] = ''
+        # if we have an agave client, get a fresh set of tokens:
+        if ag:
+            try:
+                ag.token.refresh()
+                token = ag.token.token_info['access_token']
+                environment['_abaco_access_token'] = token
+                print("Refreshed the tokens. Passed {} to the environment.".format(token))
+            except Exception as e:
+                print("Got an exception trying to get an access token: {}".format(e))
+        else:
+            print("Agave client `ag` is None -- not passing access token.")
         print("Passing update environment: {}".format(environment))
         try:
             stats, logs = execute_actor(actor_id, worker_ch, image, message,
@@ -129,9 +177,30 @@ def main(worker_ch_name, image):
         print("Worker received error message from spawner: {}. Quiting...".format(str(result)))
         raise WorkerException(str(result))
     actor_id = result.get('actor_id')
+    tenant = result.get('tenant')
     print("Worker received ok from spawner. Message: {}, actor_id:{}".format(result, actor_id))
+    api_server = None
+    client_id = None
+    client_secret = None
+    access_token = None
+    refresh_token = None
+    if result.get('client') == 'yes':
+        api_server = result.get('api_server')
+        client_id = result.get('client_id')
+        client_secret = result.get('client_secret')
+        access_token = result.get('access_token')
+        refresh_token = result.get('refresh_token')
+    else:
+        print("Did not get client:yes, got client:{}".format(result.get('client')))
     Actor.set_status(actor_id, READY)
-    subscribe(actor_id, worker_ch)
+    subscribe(tenant,
+              actor_id,
+              api_server,
+              client_id,
+              client_secret,
+              access_token,
+              refresh_token,
+              worker_ch)
 
 
 if __name__ == '__main__':
