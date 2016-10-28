@@ -5,10 +5,11 @@
   sudo: yes
   sudo_user: "{{ linux_user }}"
 
-- name: Compile docker_compose template
-  template: src={{ abaco_env }}/docker-compose-compute.yml.j2 dest={{ base_dir }}/docker-compose-compute.yml
-  sudo: yes
-  sudo_user: "{{ linux_user }}"
+## Use compose file on the host for now.
+#- name: Compile docker_compose template
+#  template: src={{ abaco_env }}/docker-compose-compute.yml.j2 dest={{ base_dir }}/docker-compose-compute.yml
+#  sudo: yes
+#  sudo_user: "{{ linux_user }}"
 
 - name: Compile pull_images template
   template: src=pull_images.sh.j2 dest=/home/apim/pull_images.sh
