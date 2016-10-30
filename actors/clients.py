@@ -153,7 +153,7 @@ class ClientGenerator(object):
             return None
         # remove the client from the abaco db
         try:
-            Client.delete_client(tenant=cmd['tenant'], client_key=cmd['client_key'])
+            Client.delete_client(tenant=cmd['tenant'], client_key=cmd['client_id'])
         except Exception as e:
             anon_ch.put({'status': 'error',
                         'message': 'Not able to delete client from abaco db. Exception: {}'.format(e)})
