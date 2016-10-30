@@ -106,31 +106,34 @@ class ClientGenerator(object):
     def check_common(self, cmd):
         # validate the secret
         if not cmd.get('secret') == self.secret:
-            return False, 'Invalid secret.', None
+            return False, 'Invalid secret.'
         # validate tenant
         if not cmd.get('tenant') in get_tenants():
-            return False, 'Invalid client passed: {}'.format(cmd.get('tenant')), None
+            return False, 'Invalid client passed: {}'.format(cmd.get('tenant'))
+        return True, ''
+
+    def check_new_params(self, cmd):
+        valid, msg = self.check_common(cmd)
         # validate the actor_id
         try:
             actor = Actor.from_db(actors_store[cmd.get('actor_id')])
         except KeyError:
             return False, "Unable to look up actor with id: {}".format(cmd.get('actor_id')), None
-        return True, '', actor.owner
-
-    def check_new_params(self, cmd):
-        valid, msg, owner = self.check_common(cmd)
         # validate the worker id
         try:
             Worker.get_worker(actor_id=cmd.get('actor_id'), ch_name=cmd.get('worker_id'))
         except WorkerException as e:
             return False, "Unable to look up worker: {}".format(e.msg), None
-        return valid, msg, owner
+        return valid, msg, actor.owner
 
     def check_del_params(self, cmd):
-        valid, msg, owner = self.check_common(cmd)
+        valid, msg = self.check_common(cmd)
         if not cmd.get('client_id'):
             return False, 'client_id parameter required.', None
-        return valid, msg, owner
+        # It's possible the actor record has been deleted so we need to remove the client based solely on
+        # the information on the command.
+        # also, agave owner doesn't matter on delete since we are only using the service account (baseic auth).
+        return valid, msg, 'abaco_service'
 
     def delete_client(self, cmd, anon_ch):
         valid, msg, owner = self.check_del_params(cmd)
@@ -142,7 +145,7 @@ class ClientGenerator(object):
             _, ag = self.get_agave(cmd['tenant'], owner)
         except ClientException as e:
             anon_ch.put({'status': 'error',
-                         'message': 'Could not generate an Agave clientt: {}'.format(e)})
+                         'message': 'Could not generate an Agave client: {}'.format(e)})
             return None
         # remove the client from APIM
         try:
