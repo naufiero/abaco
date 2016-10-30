@@ -68,7 +68,7 @@ def process_worker_ch(tenant, worker_ch, actor_id, actor_ch, ag_client):
                 else:
                     print("Error deleting client. Message: {}".format(msg['message']))
             else:
-                print("Did not receive client. Not issueing delete. Exiting.")
+                print("Did not receive client. Not issuing delete. Exiting.")
             try:
                 Worker.delete_worker(actor_id, worker_ch.name)
             except WorkerException:
