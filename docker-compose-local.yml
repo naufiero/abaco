@@ -27,6 +27,16 @@ mes:
         server: dev
         api: mes
 
+agavemes:
+    image: jstubbs/abaco_core
+    volumes:
+        - ./local-dev.conf:/etc/abaco.conf
+    ports:
+        - "5002:5000"
+    environment:
+        server: dev
+        api: agavemes
+
 admin:
     image: jstubbs/abaco_core
     volumes:
