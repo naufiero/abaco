@@ -18,6 +18,12 @@ elif [ $api = "mes" ]; then
     else
         cd /actors; /usr/bin/gunicorn -w 2 -b :5000 message_api:app
     fi
+elif [ $api = "agavemes" ]; then
+    if [ $server = "dev" ]; then
+        python3 -u /actors/agave_message_api.py
+    else
+        cd /actors; /usr/bin/gunicorn -w 2 -b :5000 agave_message_api:app
+    fi
 fi
 
 while true; do sleep 86400; done
