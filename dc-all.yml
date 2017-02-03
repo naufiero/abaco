@@ -41,6 +41,7 @@ admin:
     volumes:
         - ./all.conf:/etc/abaco.conf
 
+# uncomment to run the client generation
 #gclient:
 #    extends:
 #        file: docker-compose-local.yml
