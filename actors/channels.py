@@ -30,7 +30,7 @@ class ClientsChannel(Channel):
                'actor_id': actor_id,
                'worker_id': worker_id,
                'secret': secret}
-        return self.put_sync(msg)
+        return self.put_sync(msg, timeout=60)
 
     def request_delete_client(self, tenant, actor_id, worker_id, client_id, secret):
         """Request a client be deleted as part of shutting down a worker."""
@@ -40,7 +40,7 @@ class ClientsChannel(Channel):
                'worker_id': worker_id,
                'client_id': client_id,
                'secret': secret}
-        return self.put_sync(msg)
+        return self.put_sync(msg, timeout=60)
 
 
 class CommandChannel(Channel):
@@ -52,9 +52,10 @@ class CommandChannel(Channel):
                          connection_type=RabbitConnection,
                          uri=self.uri)
 
-    def put_cmd(self, actor_id, image, tenant, num=None, stop_existing=True):
+    def put_cmd(self, actor_id, worker_ids, image, tenant, num=None, stop_existing=True):
         """Put a new command on the command channel."""
         msg = {'actor_id': actor_id,
+               'worker_ids': worker_ids,
                'image': image,
                'tenant': tenant,
                'stop_existing': stop_existing}

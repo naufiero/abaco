@@ -28,7 +28,7 @@ def shutdown_workers(actor_id):
     for _, worker in workers.items():
         shutdown_worker(worker['ch_name'])
 
-def process_worker_ch(tenant, worker_ch, actor_id, actor_ch, ag_client):
+def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_client):
     """ Target for a thread to listen on the worker channel for a message to stop processing.
     :param worker_ch:
     :return:
@@ -59,7 +59,7 @@ def process_worker_ch(tenant, worker_ch, actor_id, actor_ch, ag_client):
                 clients_ch = ClientsChannel()
                 msg = clients_ch.request_delete_client(tenant=tenant,
                                                        actor_id=actor_id,
-                                                       worker_id=worker_ch.name,
+                                                       worker_id=worker_id,
                                                        client_id=ag_client.api_key,
                                                        secret=secret)
 
@@ -70,7 +70,7 @@ def process_worker_ch(tenant, worker_ch, actor_id, actor_ch, ag_client):
             else:
                 print("Did not receive client. Not issuing delete. Exiting.")
             try:
-                Worker.delete_worker(actor_id, worker_ch.name)
+                Worker.delete_worker(actor_id, worker_id)
             except WorkerException:
                 pass
             keep_running = False
@@ -79,6 +79,7 @@ def process_worker_ch(tenant, worker_ch, actor_id, actor_ch, ag_client):
 
 def subscribe(tenant,
               actor_id,
+              worker_id,
               api_server,
               client_id,
               client_secret,
@@ -100,12 +101,12 @@ def subscribe(tenant,
                    api_secret=client_secret)
     else:
         print("Not creating agave client.")
-    t = threading.Thread(target=process_worker_ch, args=(tenant, worker_ch, actor_id, actor_ch, ag))
+    t = threading.Thread(target=process_worker_ch, args=(tenant, worker_ch, actor_id, worker_id, actor_ch, ag))
     t.start()
     print("Worker subscribing to actor channel...")
     global keep_running
     while keep_running:
-        Worker.update_worker_status(actor_id, worker_ch.name, READY)
+        Worker.update_worker_status(actor_id, worker_id, READY)
         try:
             msg = actor_ch.get(timeout=2)
         except channelpy.ChannelTimeoutException:
@@ -143,7 +144,7 @@ def subscribe(tenant,
             print("Agave client `ag` is None -- not passing access token.")
         print("Passing update environment: {}".format(environment))
         try:
-            stats, logs = execute_actor(actor_id, worker_ch, image, message,
+            stats, logs = execute_actor(actor_id, worker_id, worker_ch, image, message,
                                         environment, privileged)
         except DockerStartContainerError as e:
             print("Got DockerStartContainerError: {}".format(str(e)))
@@ -154,9 +155,9 @@ def subscribe(tenant,
         Execution.finalize_execution(actor_id, execution_id, COMPLETE, stats)
         print("Added execution: {}".format(execution_id))
         Execution.set_logs(execution_id, logs)
-        Worker.update_worker_execution_time(actor_id, worker_ch.name)
+        Worker.update_worker_execution_time(actor_id, worker_id)
 
-def main(worker_ch_name, image):
+def main(worker_ch_name, worker_id, image):
     worker_ch = WorkerChannel(name=worker_ch_name)
     # first, attempt to pull image from docker hub:
     try:
@@ -195,6 +196,7 @@ def main(worker_ch_name, image):
     Actor.set_status(actor_id, READY)
     subscribe(tenant,
               actor_id,
+              worker_id,
               api_server,
               client_id,
               client_secret,
@@ -207,6 +209,7 @@ if __name__ == '__main__':
     # read channel and image from the environment
     print("Worker starting...")
     worker_ch_name = os.environ.get('ch_name')
+    worker_id = os.environ.get('worker_id')
     image = os.environ.get('image')
     print("Channel name: {}  Image: {} ".format(worker_ch_name, image))
-    main(worker_ch_name, image)
+    main(worker_ch_name, worker_id, image)

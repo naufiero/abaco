@@ -30,7 +30,7 @@ class Spawner(object):
             cmd = self.cmd_ch.get()
             self.process(cmd)
 
-    def stop_workers(self, actor_id):
+    def stop_workers(self, actor_id, worker_ids):
         """Stop existing workers; used when updating an actor's image."""
 
         try:
@@ -47,20 +47,27 @@ class Spawner(object):
             actor_ch.close()
             # now, send messages to workers for a graceful shutdown:
             for _, worker in workers_dict.items():
-                ch = WorkerChannel(name=worker['ch_name'])
-                ch.put('stop')
+                # don't stop the new workers:
+                if worker['id'] not in worker_ids:
+                    ch = WorkerChannel(name=worker['ch_name'])
+                    ch.put('stop')
 
 
     def process(self, cmd):
         print("Processing cmd:{}".format(str(cmd)))
         actor_id = cmd['actor_id']
+        worker_ids = cmd['worker_ids']
         image = cmd['image']
         tenant = cmd['tenant']
         stop_existing = cmd.get('stop_existing', True)
         num_workers = cmd.get('num', self.num_workers)
         print("Actor id:{}".format(actor_id))
         try:
-            new_channels, anon_channels, new_workers = self.start_workers(actor_id, image, tenant, num_workers)
+            new_channels, anon_channels, new_workers = self.start_workers(actor_id,
+                                                                          worker_ids,
+                                                                          image,
+                                                                          tenant,
+                                                                          num_workers)
         except SpawnerException as e:
             # for now, start_workers will do clean up for a SpawnerException, so we just need
             # to return back to the run loop.
@@ -69,7 +76,7 @@ class Spawner(object):
 
         # stop any existing workers:
         if stop_existing:
-            self.stop_workers(actor_id)
+            self.stop_workers(actor_id, worker_ids)
 
         # add workers to store first so that the records will be there when the workers go
         # to update their status
@@ -78,56 +85,68 @@ class Spawner(object):
                 Worker.add_worker(actor_id, worker)
         else:
             workers_store[actor_id] = new_workers
-        # send new workers their clients and tell them to subscribe to the actor channel.
+        # Tell new worker to subscribe to the actor channel.
+        # If abaco is configured to generate clients for the workers, generate them now
+        # and send new workers their clients.
+        generate_clients = Config.get('workers', 'generate_clients').lower()
         for idx, channel in enumerate(anon_channels):
-            print("Getting client for worker {}".format(idx))
-            client_ch = ClientsChannel()
-            client_msg = client_ch.request_client(tenant=tenant,
-                                                  actor_id=actor_id,
-                                                  # new_workers is a dictionary of dictionaries; list(d) creates a
-                                                  # list of keys for a dictionary d. hence, the idx^th entry
-                                                  # of list(ner_workers) should be the key.
-                                                  worker_id=new_workers[list(new_workers)[idx]]['ch_name'],
-                                                  secret=self.secret)
-            # we need to ignore errors when generating clients because it's possible it is not set up for a specific
-            # tenant. we log it instead.
-            if client_msg.get('status') == 'error':
-                print("Error generating client: {}".format(client_msg.get('message')))
+            if generate_clients == 'true':
+                print("Getting client for worker {}".format(idx))
+                client_ch = ClientsChannel()
+                client_msg = client_ch.request_client(tenant=tenant,
+                                                      actor_id=actor_id,
+                                                      # new_workers is a dictionary of dictionaries; list(d) creates a
+                                                      # list of keys for a dictionary d. hence, the idx^th entry
+                                                      # of list(ner_workers) should be the key.
+                                                      worker_id=new_workers[list(new_workers)[idx]]['id'],
+                                                      secret=self.secret)
+                # we need to ignore errors when generating clients because it's possible it is not set up for a specific
+                # tenant. we log it instead.
+                if client_msg.get('status') == 'error':
+                    print("Error generating client: {}".format(client_msg.get('message')))
+                    channel.put({'status': 'ok',
+                                 'actor_id': actor_id,
+                                 'tenant': tenant,
+                                 'client': 'no'})
+                # else, client was generated successfully:
+                else:
+                    print("Got a client: {}, {}, {}".format(client_msg['client_id'],
+                                                            client_msg['access_token'],
+                                                            client_msg['refresh_token']))
+                    channel.put({'status': 'ok',
+                                 'actor_id': actor_id,
+                                 'tenant': tenant,
+                                 'client': 'yes',
+                                 'client_id': client_msg['client_id'],
+                                 'client_secret': client_msg['client_secret'],
+                                 'access_token': client_msg['access_token'],
+                                 'refresh_token': client_msg['refresh_token'],
+                                 'api_server': client_msg['api_server'],
+                                 })
+            else:
+                print("Not generating clients. Config value was: {}".format(generate_clients))
                 channel.put({'status': 'ok',
                              'actor_id': actor_id,
                              'tenant': tenant,
                              'client': 'no'})
-            # else, client was generated successfully:
-            else:
-                print("Got a client: {}, {}, {}".format(client_msg['client_id'],
-                                                        client_msg['access_token'],
-                                                        client_msg['refresh_token']))
-                channel.put({'status': 'ok',
-                             'actor_id': actor_id,
-                             'tenant': tenant,
-                             'client': 'yes',
-                             'client_id': client_msg['client_id'],
-                             'client_secret': client_msg['client_secret'],
-                             'access_token': client_msg['access_token'],
-                             'refresh_token': client_msg['refresh_token'],
-                             'api_server': client_msg['api_server'],
-                             })
+
         print("Done processing command.")
 
 
-    def start_workers(self, actor_id, image, tenant, num_workers):
+    def start_workers(self, actor_id, worker_ids, image, tenant, num_workers):
         print("starting {} workers. actor_id: {} image: {}".format(str(self.num_workers), actor_id, image))
         channels = []
         anon_channels = []
         workers = {}
         try:
             for i in range(num_workers):
-                print("starting worker {}".format(str(i)))
-                ch, anon_ch, worker = self.start_worker(image, tenant)
+                worker_id = worker_ids[i]
+                print("starting worker {} with id: {}".format(i, worker_id))
+                ch, anon_ch, worker = self.start_worker(image, tenant, worker_id)
                 print("channel for worker {} is: {}".format(str(i), ch.name))
                 channels.append(ch)
                 anon_channels.append(anon_ch)
-                workers[worker['ch_name']] = worker
+                workers[worker_id] = worker
         except SpawnerException as e:
             print("Caught SpawnerException:{}".format(str(e)))
             # in case of an error, put the actor in error state and kill all workers
@@ -140,10 +159,10 @@ class Spawner(object):
             raise SpawnerException()
         return channels, anon_channels, workers
 
-    def start_worker(self, image, tenant):
+    def start_worker(self, image, tenant, worker_id):
         ch = WorkerChannel()
         # start an actor executor container and wait for a confirmation that image was pulled.
-        worker_dict = run_worker(image, ch.name)
+        worker_dict = run_worker(image, ch.name, worker_id)
         worker = Worker(tenant=tenant, **worker_dict)
         print("worker started successfully, waiting on ack that image was pulled...")
         result = ch.get()

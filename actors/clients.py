@@ -121,7 +121,7 @@ class ClientGenerator(object):
             return False, "Unable to look up actor with id: {}".format(cmd.get('actor_id')), None
         # validate the worker id
         try:
-            Worker.get_worker(actor_id=cmd.get('actor_id'), ch_name=cmd.get('worker_id'))
+            Worker.get_worker(actor_id=cmd.get('actor_id'), worker_id=cmd.get('worker_id'))
         except WorkerException as e:
             return False, "Unable to look up worker: {}".format(e.msg), None
         return valid, msg, actor.owner

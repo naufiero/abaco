@@ -21,7 +21,7 @@ def auth():
 # Resources
 api.add_resource(WorkersResource, '/actors/<string:actor_id>/workers')
 api.add_resource(PermissionsResource, '/actors/<string:actor_id>/permissions')
-api.add_resource(WorkerResource, '/actors/<string:actor_id>/workers/<string:ch_name>')
+api.add_resource(WorkerResource, '/actors/<string:actor_id>/workers/<string:worker_id>')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=True)
