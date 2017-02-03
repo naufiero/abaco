@@ -41,6 +41,13 @@ admin:
     volumes:
         - ./all.conf:/etc/abaco.conf
 
+#gclient:
+#    extends:
+#        file: docker-compose-local.yml
+#        service: gclient
+#    volumes:
+#        - ./all.conf:/etc/abaco.conf
+
 spawner:
     extends:
         file: docker-compose-local.yml
