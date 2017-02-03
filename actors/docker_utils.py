@@ -92,7 +92,7 @@ def run_container_with_docker(image, command, name=None, environment={}):
     cli.start(container=container.get('Id'))
     return container
 
-def run_worker(image, ch_name):
+def run_worker(image, ch_name, worker_id):
     """
     Run an actor executor worker with a given channel and image
     :return:
@@ -105,11 +105,13 @@ def run_worker(image, ch_name):
                                           command=command,
                                           environment={'ch_name': ch_name,
                                                        'image': image,
+                                                       'worker_id': worker_id,
                                                        '_abaco_secret': os.environ.get('_abaco_secret')})
     # TODO - determines worker structure; should be placed in a proper DAO class.
     return { 'image': image,
              # @todo - location will need to change to support swarm or cluster
              'location': dd,
+             'id': worker_id,
              'cid': container.get('Id'),
              'ch_name': ch_name,
              'status': BUSY,
@@ -117,7 +119,7 @@ def run_worker(image, ch_name):
              'host_ip': host_ip,
              'last_execution': 0}
 
-def execute_actor(actor_id, worker_ch, image, msg, d={}, privileged=False):
+def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=False):
     result = {'cpu': 0,
               'io': 0,
               'runtime': 0 }
@@ -140,7 +142,7 @@ def execute_actor(actor_id, worker_ch, image, msg, d={}, privileged=False):
         # if there was an error starting the container, user will need to debig
         raise DockerStartContainerError("Could not start container {}. Exception {}".format(container.get('Id'), str(e)))
     start = timeit.default_timer()
-    Worker.update_worker_status(actor_id, worker_ch.name, BUSY)
+    Worker.update_worker_status(actor_id, worker_id, BUSY)
     running = True
     # create a separate cli for checkin stats objects since these should be fast and we don't want to wait
     stats_cli = docker.AutoVersionClient(base_url=dd, timeout=1)

@@ -23,9 +23,10 @@
 #
 import json
 import os
+import sys
 import zipfile
 
-from agavepy.agave import Agave
+from agavepy.actors import get_client, get_context
 
 
 class Error(Exception):
@@ -69,22 +70,6 @@ def upload_file(ag, local_path, remote_path, storage_system):
                         fileToUpload=open(local_path))
     print("File uploaded.")
 
-def get_context(msg):
-    context = {}
-    try:
-        d = json.loads(msg)
-        context.update(d)
-    except ValueError as e:
-        pass
-    context.update(os.environ)
-    compress = context.get('compress', 'false')
-    if compress.lower == 'true':
-        compress = True
-    else:
-        compress = False
-    context['compress'] = compress
-    return context
-
 def compress_and_transfer(ag, context):
     # source and dest system and path
     source_system = context['source_system']
@@ -105,30 +90,50 @@ def compress_and_transfer(ag, context):
     upload_file(ag, zip_path, dest_path, dest_system)
     # upload_file(ag, local_path, dest_zip_path, storage_system)
 
-def get_client(context):
-    username = context.get('username', 'jdoe')
-    password = context.get('password', 'abcde')
-    client_key = context.get('client_key', 'iVlh5I4_I6I0b3_NJE2xTUfWAdYa')
-    client_secret = context.get('client_secret', 'h4qMtPMGZH7DqsbFD2mA4Ssx9B0a')
-    base_url = context.get('base_url', 'https://dev.tenants.staging.agaveapi.co')
-    verify = context.get('verify', 'false')
-    if verify.lower == 'true':
-        verify = True
-    else:
-        verify = False
-    ag = Agave(api_server=base_url,
-               username=username,
-               password=password,
-               client_name='agave_abaco_test',
-               api_key=client_key,
-               api_secret=client_secret,
-               verify=verify)
-    return ag
-
 def main():
-    msg = os.environ.get('MSG')
-    context = get_context(msg)
-    ag = get_client(context)
+    ag = get_client()
+    context = get_context()
+    m = context.message_dict
+    file_m = m.get('file')
+    if not file_m:
+        print "Not a file event."
+        sys.exit()
+    status = file_m['status']
+    path = file_m['path']
+    system_id = file_m['systemId']
+    native_format = file_m['nativeFormat']
+    print "Status: {} path:{} system_id:{} format:{} ".format(status, path, system_id, native_format)
+    try:
+        rsp = ag.files.list(systemId=system_id, filePath=path)
+    except Exception as e:
+        print "Got an exception trying to list files: {}".format(e)
+        print "URL on the request: {}".format(e.request.url)
+        print "Request headers: {}".format(e.request.headers)
+        print "Request body: {}".format(e.request.body)
+
+    print "Agave files response: {}".format(rsp)
+    if status == 'STAGING_COMPLETED' or status == 'TRANSFORMING_COMPLETED':
+        if native_format == 'dir':
+            # new project directory, let's add our project skeleton
+            ag.files.manage(systemId=system_id, filePath=path, body={'action':'mkdir', 'path': 'data'})
+            ag.files.manage(systemId=system_id, filePath=path, body={'action':'mkdir', 'path': 'analysis'})
+            ag.files.manage(systemId=system_id, filePath=path, body={'action':'mkdir', 'path': 'logs'})
+        else:
+            print "Skipping since native_format was {}, not 'dir'".format(native_format)
+    else:
+        print "Skipping since status was {}".format(status)
+
+    # just try to list apps:
+    # apps = ag.apps.list()
+    # systems = ag.systems.list()
+#    print "Context: {}".format(context)
+#    print "Apps: {}".format(apps)
+#    print "Systems: {}".format(systems)
+#     print "message_dict: {}".format(context.message_dict)
+
+
+
+def main_prev():
     if not context['compress']:
         source_url = 'agave://{}/{}'.format(context['source_system'],
                                             context['source_path'])

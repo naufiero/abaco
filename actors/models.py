@@ -3,7 +3,8 @@ import json
 import time
 import uuid
 
-from codes import SUBMITTED
+from channels import CommandChannel
+from codes import REQUESTED, SUBMITTED
 from config import Config
 import errors
 from request_utils import RequestParser
@@ -195,6 +196,22 @@ class Actor(AbacoDAO):
         """Generate an id for a new actor."""
         id = self.get_uuid()
         return id, Actor.get_dbid(tenant, id)
+
+    def ensure_one_worker(self):
+        """This method will check the workers store for the actor and request a new worker if none exist."""
+        workers = Worker.get_workers(self.db_id)
+        if len(workers.items()) < 1:
+            worker_ids = [Worker.request_worker(actor_id=self.db_id)]
+            ch = CommandChannel()
+            ch.put_cmd(actor_id=self.db_id,
+                       worker_ids=worker_ids,
+                       image=self.image,
+                       tenant=self.tenant,
+                       num=1,
+                       stop_existing=False)
+            return worker_ids
+        else:
+            return None
 
     @classmethod
     def get_dbid(cls, tenant, id):
@@ -400,7 +417,10 @@ class Worker(AbacoDAO):
     PARAMS = [
         # param_name, required/optional/provided/derived, attr_name, type, help, default
         ('tenant', 'required', 'tenant', str, 'The tenant that this worker belongs to.', None),
-        ('ch_name', 'required', 'ch_name', str, 'The worker id and the name of the associated worker chanel.', None),
+        # `id` is required by the time a client using the __init__ method for a worker object.
+        # They should already have the `id` field having used request_worker first.
+        ('id', 'required', 'id', str, 'The unique id for this worker.', None),
+        ('ch_name', 'required', 'ch_name', str, 'The name of the associated worker chanel.', None),
         ('image', 'required', 'image', list, 'The list of images associated with this worker', None),
         ('location', 'required', 'location', str, 'The location of the docker daemon used by this worker.', None),
         ('cid', 'required', 'cid', str, 'The container ID of this worker.', None),
@@ -411,6 +431,12 @@ class Worker(AbacoDAO):
         ]
 
     @classmethod
+    def get_uuid(cls):
+        """Generate a random uuid."""
+        return '{}-{}'.format(str(uuid.uuid1()), '060')
+
+
+    @classmethod
     def get_workers(cls, actor_id):
         """Retrieve all workers for an actor. Pass db_id as `actor_id` parameter."""
         try:
@@ -419,40 +445,61 @@ class Worker(AbacoDAO):
             return {}
 
     @classmethod
-    def get_worker(cls, actor_id, ch_name):
+    def get_worker(cls, actor_id, worker_id):
         """Retrieve a worker from the workers store. Pass db_id as `actor_id` parameter."""
         try:
-            return workers_store[actor_id][ch_name]
+            return workers_store[actor_id][worker_id]
         except KeyError:
             raise errors.WorkerException("Worker not found.")
 
     @classmethod
-    def delete_worker(cls, actor_id, ch_name):
+    def delete_worker(cls, actor_id, worker_id):
         """Deletes a worker from the worker store. Uses Redis optimistic locking to provide thread-safety since multiple
         clients could be attempting to delete workers at the same time. Pass db_id as `actor_id`
         parameter.
         """
         try:
-            wk = workers_store.pop_field(actor_id, ch_name)
+            wk = workers_store.pop_field(actor_id, worker_id)
         except KeyError:
             raise errors.WorkerException("Worker not found.")
 
     @classmethod
-    def add_worker(cls, actor_id, worker):
-        """Add a worker to an actor's collection of workers."""
-        workers_store.update(actor_id, worker['ch_name'], worker)
+    def request_worker(cls, actor_id):
+        """
+        Add a new worker to the database in requested status. This method returns an id for the worker and
+        should be called before putting a message on the command queue.
+        """
+        worker_id = Worker.get_uuid()
+        worker = {'status': REQUESTED, 'id': worker_id}
+        # it's possible the actor_id is not in the workers_store yet (i.e., new actor with no workers)
+        # In that case we need to catch a KeyError:
+        try:
+            workers_store[actor_id][worker_id] = worker
+        except KeyError:
+            workers_store[actor_id] = {worker_id: worker}
+        return worker_id
 
     @classmethod
-    def update_worker_execution_time(cls, actor_id, ch_name):
+    def add_worker(cls, actor_id, worker):
+        """
+        Add a running worker to an actor's collection of workers. The `worker` parameter should be a complete
+        description of the worker, including the `id` field. The worker should have already been created
+        in the database in 'REQUESTED' status using request_worker, and the `id` should be the same as that
+        returned.
+        """
+        workers_store.update(actor_id, worker['id'], worker)
+
+    @classmethod
+    def update_worker_execution_time(cls, actor_id, worker_id):
         """Pass db_id as `actor_id` parameter."""
         now = time.time()
-        workers_store.update_subfield(actor_id, ch_name, 'last_execution', now)
-        workers_store.update_subfield(actor_id, ch_name, 'last_update', now)
+        workers_store.update_subfield(actor_id, worker_id, 'last_execution', now)
+        workers_store.update_subfield(actor_id, worker_id, 'last_update', now)
 
     @classmethod
-    def update_worker_status(cls, actor_id, ch_name, status):
+    def update_worker_status(cls, actor_id, worker_id, status):
         """Pass db_id as `actor_id` parameter."""
-        workers_store.update_subfield(actor_id, ch_name, 'status', status)
+        workers_store.update_subfield(actor_id, worker_id, 'status', status)
 
     def get_uuid_code(self):
         """ Return the Agave code for this object.

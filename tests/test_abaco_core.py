@@ -384,16 +384,30 @@ def test_cors_options_list_workers(headers):
     assert 'Access-Control-Allow-Headers' in rsp.headers
 
 
-def test_add_worker(headers):
+def test_ensure_one_worker(headers):
     actor_id = get_actor_id(headers)
     url = '{}/actors/{}/workers'.format(base_url, actor_id)
     rsp = requests.post(url, headers=headers)
     # workers collection returns the tenant_id since it is an admin api
-    basic_response_checks(rsp, check_tenant=False)
+    assert rsp.status_code in [200, 201]
+    time.sleep(8)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp, check_tenant=False)
+    assert len(result) == 1
+
+def test_ensure_two_worker(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/workers'.format(base_url, actor_id)
+    data = {'num': '2'}
+    rsp = requests.post(url, data=data, headers=headers)
+    # workers collection returns the tenant_id since it is an admin api
+    assert rsp.status_code in [200, 201]
     time.sleep(8)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp, check_tenant=False)
     assert len(result) == 2
+
+
 
 def test_delete_worker(headers):
     # get the list of workers
@@ -404,7 +418,7 @@ def test_delete_worker(headers):
     result = basic_response_checks(rsp, check_tenant=False)
 
     # delete the first one
-    id = result[0].get('ch_name')
+    id = result[0].get('id')
     url = '{}/actors/{}/workers/{}'.format(base_url, actor_id, id)
     rsp = requests.delete(url, headers=headers)
     result = basic_response_checks(rsp, check_tenant=False)

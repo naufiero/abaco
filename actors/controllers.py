@@ -34,8 +34,13 @@ class ActorsResource(Resource):
         args['owner'] = g.user
         actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
+        worker_id = Worker.request_worker(actor_id=actor.db_id)
         ch = CommandChannel()
-        ch.put_cmd(actor_id=actor.db_id, image=actor.image, tenant=args['tenant'])
+        ch.put_cmd(actor_id=actor.db_id,
+                   worker_ids=[worker_id],
+                   image=actor.image,
+                   tenant=args['tenant'],
+                   stop_existing=False)
         add_permission(g.user, actor.db_id, 'UPDATE')
         return ok(result=actor.display(), msg="Actor created successfully.", request=request)
 
@@ -84,9 +89,10 @@ class ActorResource(Resource):
         args['owner'] = g.user
         actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
+        worker_ids = Worker.request_worker(actor.db_id)
         if update_image:
             ch = CommandChannel()
-            ch.put_cmd(actor_id=actor.db_id, image=actor.image, tenant=args['tenant'])
+            ch.put_cmd(actor_id=actor.db_id, worker_ids=worker_ids, image=actor.image, tenant=args['tenant'])
         # return ok(result={'update_image': str(update_image)},
         #           msg="Actor updated successfully.")
         return ok(result=actor.display(),
@@ -300,11 +306,8 @@ class MessagesResource(Resource):
         ch = ActorMsgChannel(actor_id=dbid)
         ch.put_msg(message=args['message'], d=d)
         # make sure at least one worker is available
-        workers = Worker.get_workers(dbid)
         actor = Actor.from_db(actors_store[dbid])
-        if len(workers.items()) < 1:
-            ch = CommandChannel()
-            ch.put_cmd(actor_id=dbid, image=actor.image, tenant=g.tenant, num=1, stop_existing=False)
+        actor.ensure_one_worker()
         result={'execution_id': exc, 'msg': args['message']}
         result.update(get_hypermedia(actor, exc))
         case = Config.get('web', 'case')
@@ -339,7 +342,7 @@ class WorkersResource(Resource):
         return args
 
     def post(self, actor_id):
-        """Start new workers for an actor"""
+        """Ensure a certain number of workers are running for an actor"""
         id = Actor.get_dbid(g.tenant, actor_id)
         try:
             actor = Actor.from_db(actors_store[id])
@@ -350,31 +353,45 @@ class WorkersResource(Resource):
         num = args.get('num')
         if not num or num == 0:
             num = 1
-        ch = CommandChannel()
-        ch.put_cmd(actor_id=actor.db_id, image=actor.image, tenant=g.tenant, num=num, stop_existing=False)
-        return ok(result=None, msg="Scheduled {} new worker(s) to start.".format(str(num)))
+        dbid = Actor.get_dbid(g.tenant, actor_id)
+        workers = Worker.get_workers(dbid)
+        if len(workers.items()) < num:
+            worker_ids = []
+            num_to_add = int(num) - len(workers.items())
+            for idx in range(num_to_add):
+                worker_ids.append(Worker.request_worker(actor_id))
+            ch = CommandChannel()
+            ch.put_cmd(actor_id=actor.db_id,
+                       worker_ids=worker_ids,
+                       image=actor.image,
+                       tenant=g.tenant,
+                       num=num_to_add,
+                       stop_existing=False)
+            return ok(result=None, msg="Scheduled {} new worker(s) to start. There were only".format(num_to_add))
+        else:
+            return ok(result=None, msg="Actor {} already had {} worker(s).".format(actor_id, num))
 
 
 class WorkerResource(Resource):
-    def get(self, actor_id, ch_name):
+    def get(self, actor_id, worker_id):
         id = Actor.get_dbid(g.tenant, actor_id)
         try:
             Actor.from_db(actors_store[id])
         except KeyError:
             raise WorkerException("actor not found: {}'".format(actor_id))
         try:
-            worker = Worker.get_worker(id, ch_name)
+            worker = Worker.get_worker(id, worker_id)
         except WorkerException as e:
             raise APIException(e.msg, 404)
         return ok(result=worker, msg="Worker retrieved successfully.")
 
-    def delete(self, actor_id, ch_name):
+    def delete(self, actor_id, worker_id):
         id = Actor.get_dbid(g.tenant, actor_id)
         try:
-            worker = Worker.get_worker(id, ch_name)
+            worker = Worker.get_worker(id, worker_id)
         except WorkerException as e:
             raise APIException(e.msg, 404)
-        shutdown_worker(ch_name)
+        shutdown_worker(worker['ch_name'])
         return ok(result=None, msg="Worker scheduled to be stopped.")
 
 
