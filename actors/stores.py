@@ -1,26 +1,22 @@
 from functools import partial
 
-from store import Store, MongoStore
+from store import RedisStore, MongoStore
 from config import Config
 
-use_mongo = Config.get('store', 'use_mongo')
-if hasattr(use_mongo, 'lower') and use_mongo.lower() == 'true':
-    config_store = partial(
-        MongoStore, Config.get('store', 'host'), Config.getint('store', 'port'))
 
-    actors_store = config_store(db='1')
-    workers_store = config_store(db='2')
-    logs_store = config_store(db='3')
-    permissions_store = config_store(db='4')
-    executions_store = config_store(db='5')
-    clients_store = config_store(db='6')
-else:
-    config_store = partial(
-        Store, Config.get('store', 'host'), Config.getint('store', 'port'))
+# redis is used for actor and worker run time state for its speed and transactional semantics.
+redis_config_store = partial(
+    RedisStore, Config.get('store', 'redis_host'), Config.getint('store', 'redis_port'))
 
-    actors_store = config_store(db=1)
-    workers_store = config_store(db=2)
-    logs_store = config_store(db=3)
-    permissions_store = config_store(db=4)
-    executions_store = config_store(db=5)
-    clients_store = config_store(db=6)
+actors_store = redis_config_store(db='1')
+workers_store = redis_config_store(db='2')
+
+
+# Mongo is used for accounting, permissions and logging data for its scalability.
+mongo_config_store = partial(
+    MongoStore, Config.get('store', 'mongo_host'), Config.getint('store', 'mongo_port'))
+
+logs_store = mongo_config_store(db='1')
+permissions_store = mongo_config_store(db='2')
+executions_store = mongo_config_store(db='3')
+clients_store = mongo_config_store(db='4')
