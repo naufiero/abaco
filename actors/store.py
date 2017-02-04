@@ -77,7 +77,13 @@ class AbstractStore(collections.MutableMapping):
         self[key] = False
 
 
-class Store(AbstractStore):
+class AbstractTransactionalStore(AbstractStore):
+    """Adds basic transactional semantics to the AbstractStore interface."""
+    def within_transaction(self, f, key):
+        """Execute a callable, f, within a lock on key `key`."""
+        pass
+
+class RedisStore(AbstractStore):
 
     def __init__(self, host, port, db=0):
         self._db = redis.StrictRedis(host=host, port=port, db=db)

@@ -4,8 +4,11 @@ mongo:
     extends:
         file: docker-compose-local-db.yml
         service: mongo
-    ports:
-        - "27017:27017"
+
+redis:
+    extends:
+        file: docker-compose-local-db.yml
+        service: redis
 
 rabbit:
     extends:
