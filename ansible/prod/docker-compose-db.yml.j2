@@ -8,6 +8,11 @@ redis:
     volumes:
         - /home/apim/data:/data
 
+mongo:
+    image: mongo
+    ports:
+        - "27017:27017"
+
 rabbit:
     image: rabbitmq:3.5.3-management
     ports:

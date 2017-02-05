@@ -7,6 +7,11 @@ redis:
         - "6379:6379"
     command: redis-server --appendonly yes
 
+mongo:
+    image: mongo
+    ports:
+        - "27017:27017"
+
 rabbit:
     image: rabbitmq:3.5.3-management
     name: rabbit

@@ -148,6 +148,29 @@ class RedisStore(AbstractStore):
         if value is not None:
             return json.loads(value.decode('utf-8'))
 
+    def add_if_empty(self, key, field, value):
+        """
+        Atomic ``self[key][field] = value`` if s``self[key]`` does not exist or is empty.
+        Add a value, `value`, to a field, `field`, under key, `key`, only if the key does not exist
+        or it's value is currently empty. Returns the value if it was added; otherwise, returns None.
+        """
+        def _transaction(pipe):
+            try:
+                cur = _do_get(pipe.get, key)
+                if cur is None or cur == {}:
+                    cur[field] = value
+                    pipe.multi()
+                    _do_set(pipe.set, key, cur)
+                    return value
+                else:
+                    return None
+            except KeyError:
+                # if the key doesn't exist at all, go ahead and set the value.
+                obj = {field: value}
+                pipe.multi()
+                _do_set(pipe.set, key, obj)
+            # the key exists in the store; if it is the value empty, and the field:
+        return self._db.transaction(_transaction, key)
 
 class MongoStore(AbstractStore):
 

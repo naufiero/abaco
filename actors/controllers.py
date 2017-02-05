@@ -34,13 +34,14 @@ class ActorsResource(Resource):
         args['owner'] = g.user
         actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
-        worker_id = Worker.request_worker(actor_id=actor.db_id)
-        ch = CommandChannel()
-        ch.put_cmd(actor_id=actor.db_id,
-                   worker_ids=[worker_id],
-                   image=actor.image,
-                   tenant=args['tenant'],
-                   stop_existing=False)
+        actor.ensure_one_worker()
+        # worker_id = Worker.request_worker(actor_id=actor.db_id)
+        # ch = CommandChannel()
+        # ch.put_cmd(actor_id=actor.db_id,
+        #            worker_ids=[worker_id],
+        #            image=actor.image,
+        #            tenant=args['tenant'],
+        #            stop_existing=False)
         add_permission(g.user, actor.db_id, 'UPDATE')
         return ok(result=actor.display(), msg="Actor created successfully.", request=request)
 
