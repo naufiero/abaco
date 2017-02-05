@@ -199,9 +199,9 @@ class Actor(AbacoDAO):
 
     def ensure_one_worker(self):
         """This method will check the workers store for the actor and request a new worker if none exist."""
-        workers = Worker.get_workers(self.db_id)
-        if len(workers.items()) < 1:
-            worker_ids = [Worker.request_worker(actor_id=self.db_id)]
+        worker_id = Worker.ensure_one_worker(self.db_id)
+        if worker_id:
+            worker_ids = [worker_id]
             ch = CommandChannel()
             ch.put_cmd(actor_id=self.db_id,
                        worker_ids=worker_ids,
@@ -464,6 +464,21 @@ class Worker(AbacoDAO):
             raise errors.WorkerException("Worker not found.")
 
     @classmethod
+    def ensure_one_worker(cls, actor_id):
+        """
+        Atomically ensure at least one worker exists in the database. If not, adds a worker to the database in
+        requested status.
+        This method returns an id for the worker if a new worker was added and otherwise returns none.
+        """
+        worker_id = Worker.get_uuid()
+        worker = {'status': REQUESTED, 'id': worker_id}
+        val = workers_store.add_if_empty(actor_id, worker_id, worker)
+        if val:
+            return worker_id
+        else:
+            return None
+
+    @classmethod
     def request_worker(cls, actor_id):
         """
         Add a new worker to the database in requested status. This method returns an id for the worker and
@@ -474,6 +489,8 @@ class Worker(AbacoDAO):
         # it's possible the actor_id is not in the workers_store yet (i.e., new actor with no workers)
         # In that case we need to catch a KeyError:
         try:
+            # we know this worker_id is new since we just generated it, so we don't need to use
+            # workers_store.update()
             workers_store[actor_id][worker_id] = worker
         except KeyError:
             workers_store[actor_id] = {worker_id: worker}
