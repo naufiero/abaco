@@ -1,13 +1,13 @@
 [db]
-ab-staging-compute-js ansible_ssh_host=129.114.16.28 ansible_ssh_private_key_file=~/jupyter-ds-cluster2.pem.ssh/ab-staging ansible_ssh_user=root
+ab-staging-compute-js ansible_ssh_host=129.114.16.28 ansible_ssh_private_key_file=~/jupyter-ds-cluster2.pem.ssh/ab-staging ansible_ssh_user=rodeo
 
 
 [compute]
-ab-staging-compute-js ansible_ssh_host=129.114.16.28 ansible_ssh_private_key_file=~/.ssh/jupyter-ds-cluster2.pem ansible_ssh_user=root
+ab-staging-compute-js ansible_ssh_host=129.114.16.28 ansible_ssh_private_key_file=~/.ssh/jupyter-ds-cluster2.pem ansible_ssh_user=rodeo
 
 
 [web]
-ab-staging-web-js ansible_ssh_host=129.114.19.77 ansible_ssh_private_key_file=~/.ssh/jupyter-ds-cluster2.pem ansible_ssh_user=root
+ab-staging-web-js ansible_ssh_host=129.114.19.77 ansible_ssh_private_key_file=~/.ssh/jupyter-ds-cluster2.pem ansible_ssh_user=rodeo
 
 
 [db:vars]
