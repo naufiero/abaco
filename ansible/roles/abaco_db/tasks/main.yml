@@ -19,7 +19,7 @@
   acl: permissions="rwx" name={{ base_dir }}/pull_images.sh state=present etype=user entity=apim
   sudo: yes
 
-- name: start the containers with docker compose
+- name: ensure database containers are running via docker compose
   shell: docker-compose -f docker-compose-db.yml up -d & chdir={{ base_dir }}
   sudo: yes
   sudo_user: "{{ linux_user }}"
