@@ -244,7 +244,8 @@ def test_execute_actor(headers):
             else:
                 assert result.get('actorId') == actor_id
             assert result.get('id') == exc_id
-            assert result.get('io')
+            # note: it is possible for io to be 0 in which case an `assert result['io']` will fail.
+            assert 'io' in result
             assert 'runtime' in result
             return
         count += 1
@@ -323,7 +324,8 @@ def test_execute_actor_json(headers):
             else:
                 assert result.get('actorId') == actor_id
             assert result.get('id') == exc_id
-            assert result.get('io')
+            # note: it is possible for io to be 0 in which case an `assert result['io']` will fail.
+            assert 'io' in result
             assert 'runtime' in result
             return
         count += 1
