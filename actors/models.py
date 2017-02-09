@@ -140,6 +140,7 @@ class Actor(AbacoDAO):
         ('default_environment', 'optional', 'default_environment', dict, 'Default environmental variables and values.', {}),
         ('status', 'optional', 'status', str, 'Current status of the actor.', SUBMITTED),
         ('executions', 'optional', 'executions', dict, 'Executions for this actor.', {}),
+        ('state', 'optional', 'state', dict, "Current state for this actor.", {}),
 
         ('tenant', 'provided', 'tenant', str, 'The tenant that this actor belongs to.', None),
         ('api_server', 'provided', 'api_server', str, 'The base URL for the tenant that this actor belongs to.', None),

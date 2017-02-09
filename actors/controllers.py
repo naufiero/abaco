@@ -126,14 +126,17 @@ class ActorStateResource(Resource):
 
     def post(self, actor_id):
         dbid = Actor.get_dbid(g.tenant, actor_id)
-        args = self.validate_post()
-        state = args['state']
         try:
             actor = Actor.from_db(actors_store[dbid])
         except KeyError:
             raise APIException(
                 "actor not found: {}'".format(actor_id), 404)
+        if actor.stateless:
+            raise APIException("actor is stateless.", 404)
+        args = self.validate_post()
+        state = args['state']
         actors_store.update(dbid, 'state', state)
+        actor = Actor.from_db(actors_store[dbid])
         return ok(result=actor.display(), msg="State updated successfully.")
 
     def validate_post(self):

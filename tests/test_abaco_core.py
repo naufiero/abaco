@@ -27,7 +27,7 @@
 #    tenant by not setting the tenant header, while the second one sets tenant: abaco_test_suite_tenant; this enables
 #    the suite to test tenancy bleed-over.
 #
-
+import ast
 import os
 import sys
 sys.path.append(os.path.split(os.getcwd())[0])
@@ -130,6 +130,18 @@ def test_register_actor(headers):
     assert result['name'] == 'abaco_test_suite'
     assert result['id'] is not None
 
+def test_register_stateless_actor(headers):
+    url = '{}/{}'.format(base_url, '/actors')
+    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite_statelesss', 'stateless': True}
+    rsp = requests.post(url, data=data, headers=headers)
+    result = basic_response_checks(rsp)
+    assert 'description' in result
+    assert 'owner' in result
+    # assert result['owner'] == 'jstubbs'
+    assert result['image'] == 'jstubbs/abaco_test'
+    assert result['name'] == 'abaco_test_suite_statelesss'
+    assert result['id'] is not None
+
 def get_actor_id(headers, name='abaco_test_suite'):
     url = '{}/{}'.format(base_url, '/actors')
     rsp = requests.get(url, headers=headers)
@@ -150,6 +162,39 @@ def test_list_actor(headers):
     assert result['image'] == 'jstubbs/abaco_test'
     assert result['name'] == 'abaco_test_suite'
     assert result['id'] is not None
+
+def test_list_actor_state(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/state'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    assert 'state' in result
+
+def test_update_actor_state_string(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/state'.format(base_url, actor_id)
+    rsp = requests.post(url, headers=headers, data={'state': 'abc'})
+    result = basic_response_checks(rsp)
+    assert 'state' in result
+    assert result['state'] == 'abc'
+
+def test_update_actor_state_dict(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/state'.format(base_url, actor_id)
+    # update the state
+    rsp = requests.post(url, headers=headers, json={'state': {'foo': 'abc', 'bar': 1, 'baz': True}})
+    result = basic_response_checks(rsp)
+    # retrieve the actor's state:
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    assert 'state' in result
+    assert ast.literal_eval(result['state']) == {'foo': 'abc', 'bar': 1, 'baz': True}
+
+def test_cant_update_stateless_actor_state(headers):
+    actor_id = get_actor_id(headers, name='abaco_test_suite_statelesss')
+    url = '{}/actors/{}/state'.format(base_url, actor_id)
+    rsp = requests.post(url, headers=headers, data={'state': 'abc'})
+    assert rsp.status_code not in range(1-399)
 
 def test_actor_is_ready(headers):
     count = 0
@@ -289,6 +334,13 @@ def test_list_execution_logs(headers):
     result = basic_response_checks(rsp, check_tenant=False)
     assert 'Contents of MSG: testing execution' in result['logs']
     assert 'PATH' in result['logs']
+    assert '_abaco_actor_id' in result['logs']
+    assert '_abaco_api_server' in result['logs']
+    assert '_abaco_actor_state' in result['logs']
+    assert '_abaco_username' in result['logs']
+    assert '_abaco_execution_id' in result['logs']
+    assert '_abaco_Content-Type' in result['logs']
+
 
 def test_execute_actor_json(headers):
     actor_id = get_actor_id(headers)

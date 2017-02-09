@@ -131,6 +131,8 @@ def subscribe(tenant,
         # dictionary
         environment.update(msg)
         environment['_abaco_access_token'] = ''
+        environment['_abaco_actor_id'] = actor_id
+        environment['_abaco_actor_state'] = actor.state
         # if we have an agave client, get a fresh set of tokens:
         if ag:
             try:
