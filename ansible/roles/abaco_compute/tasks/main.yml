@@ -35,3 +35,5 @@
   shell: docker-compose -f docker-compose-compute.yml up -d & chdir={{ base_dir }}
   sudo: yes
   sudo_user: "{{ linux_user }}"
+  environment:
+      COMPOSE_HTTP_TIMEOUT: 120
