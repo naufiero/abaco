@@ -36,4 +36,4 @@
   sudo: yes
   sudo_user: "{{ linux_user }}"
   environment:
-      COMPOSE_HTTP_TIMEOUT: 180
+      COMPOSE_HTTP_TIMEOUT: 240
