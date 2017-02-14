@@ -121,6 +121,7 @@ def subscribe(tenant,
         message = msg.pop('message', '')
         actor = Actor.from_db(actors_store[actor_id])
         execution_id = msg['_abaco_execution_id']
+        Execution.add_worker_id(actor_id, execution_id, worker_id)
         privileged = False
         if actor['privileged'] == 'TRUE':
             privileged = True
@@ -131,7 +132,8 @@ def subscribe(tenant,
         # dictionary
         environment.update(msg)
         environment['_abaco_access_token'] = ''
-        environment['_abaco_actor_id'] = actor_id
+        environment['_abaco_actor_dbid'] = actor_id
+        environment['_abaco_actor_id'] = actor.id
         environment['_abaco_actor_state'] = actor.state
         # if we have an agave client, get a fresh set of tokens:
         if ag:
@@ -146,15 +148,15 @@ def subscribe(tenant,
             print("Agave client `ag` is None -- not passing access token.")
         print("Passing update environment: {}".format(environment))
         try:
-            stats, logs = execute_actor(actor_id, worker_id, worker_ch, image, message,
-                                        environment, privileged)
+            stats, logs, final_state, exit_code = execute_actor(actor_id, worker_id, worker_ch, image,
+                                                                message, environment, privileged)
         except DockerStartContainerError as e:
             print("Got DockerStartContainerError: {}".format(str(e)))
             Actor.set_status(actor_id, ERROR)
             continue
         # add the execution to the actor store
         print("Actor container finished successfully. Got stats object:{}".format(str(stats)))
-        Execution.finalize_execution(actor_id, execution_id, COMPLETE, stats)
+        Execution.finalize_execution(actor_id, execution_id, COMPLETE, stats, final_state, exit_code)
         print("Added execution: {}".format(execution_id))
         Execution.set_logs(execution_id, logs)
         Worker.update_worker_execution_time(actor_id, worker_id)

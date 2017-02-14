@@ -242,12 +242,15 @@ class Execution(AbacoDAO):
         ('api_server', 'required', 'api_server', str, 'The base URL for the tenant that this actor belongs to.', None),
         ('actor_id', 'required', 'actor_id', str, 'The human readable id for the actor associated with this execution.', None),
         ('executor', 'required', 'executor', str, 'The user who triggered this execution.', None),
+        ('worker_id', 'optional', 'worker_id', str, 'The worker who supervised this execution.', None),
         ('runtime', 'required', 'runtime', str, 'Runtime, in milliseconds, of the execution.', None),
         ('cpu', 'required', 'cpu', str, 'CPU usage, in user jiffies, of the execution.', None),
         ('io', 'required', 'io', str,
          'Block I/O usage, in number of 512-byte sectors read from and written to, by the execution.', None),
         ('id', 'derived', 'id', str, 'Human readable id for this execution.', None),
-        ('status', 'required', 'status', str, 'Status of the execution.', None)
+        ('status', 'required', 'status', str, 'Status of the execution.', None),
+        ('exit_code', 'optional', 'exit_code', str, 'The exit code of this execution.', None),
+        ('final_state', 'optional', 'final_state', str, 'The final state of the execution.', None),
     ]
 
     def get_derived_value(self, name, d):
@@ -283,12 +286,29 @@ class Execution(AbacoDAO):
         return execution.id
 
     @classmethod
-    def finalize_execution(cls, actor_id, execution_id, status, stats):
-        """Update an execution status and stats after the execution is complete or killed.
+    def add_worker_id(cls, actor_id, execution_id, worker_id):
+        """
+        :param actor_id: the id of the actor
+        :param execution_id: the id of the execution
+        :param worker_id: the id of the worker that executed this actor.
+        :return:
+        """
+        try:
+            executions_store.update_subfield(actor_id, execution_id, 'worker_id', worker_id)
+        except KeyError:
+            raise errors.ExecutionException("Execution {} not found.".format(execution_id))
+
+    @classmethod
+    def finalize_execution(cls, actor_id, execution_id, status, stats, final_state, exit_code):
+        """
+        Update an execution status and stats after the execution is complete or killed.
          `actor_id` should be the dbid of the actor.
          `execution_id` should be the id of the execution returned from a prior call to add_execution.
          `status` should be the final status of the execution.
-         `stats` parameter should be a dictionary with io, cpu, and runtime."""
+         `stats` parameter should be a dictionary with io, cpu, and runtime.
+         `final_state` parameter should be the `State` object returned from the docker inspect command.
+         `exit_code` parameter should be the exit code of the container.
+         """
         if not 'io' in stats:
             raise errors.ExecutionException("'io' parameter required to finalize execution.")
         if not 'cpu' in stats:
@@ -300,6 +320,8 @@ class Execution(AbacoDAO):
             executions_store.update_subfield(actor_id, execution_id, 'io', stats['io'])
             executions_store.update_subfield(actor_id, execution_id, 'cpu', stats['cpu'])
             executions_store.update_subfield(actor_id, execution_id, 'runtime', stats['runtime'])
+            executions_store.update_subfield(actor_id, execution_id, 'final_state', final_state)
+            executions_store.update_subfield(actor_id, execution_id, 'exit_code', exit_code)
         except KeyError:
             raise errors.ExecutionException("Execution {} not found.".format(execution_id))
 

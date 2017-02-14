@@ -255,6 +255,24 @@ def test_cors_options_list_messages(headers):
     assert 'Access-Control-Allow-Methods' in rsp.headers
     assert 'Access-Control-Allow-Headers' in rsp.headers
 
+def check_execution_details(result, actor_id, exc_id):
+    if case == 'snake':
+        assert result.get('actor_id') == actor_id
+        assert 'worker_id' in result
+        assert 'exit_code' in result
+        assert 'final_state' in result
+    else:
+        assert result.get('actorId') == actor_id
+        assert 'workerId' in result
+        assert 'exitCode' in result
+        assert 'finalState' in result
+        
+    assert result.get('id') == exc_id
+    # note: it is possible for io to be 0 in which case an `assert result['io']` will fail.
+    assert 'io' in result
+    assert 'runtime' in result
+
+
 def test_execute_actor(headers):
     actor_id = get_actor_id(headers)
     url = '{}/actors/{}/messages'.format(base_url, actor_id)
@@ -284,14 +302,7 @@ def test_execute_actor(headers):
         status = result.get('status')
         assert status
         if status == 'COMPLETE':
-            if case == 'snake':
-                assert result.get('actor_id') == actor_id
-            else:
-                assert result.get('actorId') == actor_id
-            assert result.get('id') == exc_id
-            # note: it is possible for io to be 0 in which case an `assert result['io']` will fail.
-            assert 'io' in result
-            assert 'runtime' in result
+            check_execution_details(result, actor_id, exc_id)
             return
         count += 1
     assert False
