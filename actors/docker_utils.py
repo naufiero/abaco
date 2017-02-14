@@ -120,6 +120,21 @@ def run_worker(image, ch_name, worker_id):
              'last_execution': 0}
 
 def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=False):
+    """
+    Creates and runs an actor container and supervises the execution, collecting statistics about resource consumption
+    from the Docker daemon.
+
+    :param actor_id: the dbid of the actor; for updating worker status
+    :param worker_id: the worker id; also for updating worker status
+    :param worker_ch: NO LONGER USED.
+    :param image: the actor's image; worker must have already downloaded this image to the local docker registry.
+    :param msg: the message being passed to the actor.
+    :param d: dictionary representing the environment to instantiate within the actor container.
+    :param privileged: whether this actor is "privileged"; i.e., its container should run in privileged mode with the
+    docker daemon mounted.
+    :return: result (dict), logs (str) - `result`: statistics about resource consumption; `logs`: output from docker logs.
+    """
+    #
     result = {'cpu': 0,
               'io': 0,
               'runtime': 0 }
@@ -149,7 +164,7 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
     try:
         stats_obj = stats_cli.stats(container=container.get('Id'), decode=True)
     except ReadTimeout:
-        # if the container execution is so fast that the inital stats object cannot be created,
+        # if the container execution is so fast that the initial stats object cannot be created,
         # we skip the running loop and return a minimal stats object
         result['cpu'] = 1
         result['runtime'] = 1
@@ -196,6 +211,22 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
                     running = False
     print("container stopped:{}".format(timeit.default_timer()))
     stop = timeit.default_timer()
+    # get info from container execution, including exit code
+    try:
+        container_info = cli.inspect_container(container.get('Id'))
+        try:
+            container_state = container_info['State']
+            try:
+                exit_code = container_state['ExitCode']
+            except KeyError:
+                print("Could not determine ExitCode for container {} in ".format(container.get('Id')))
+                exit_code = 'undetermined'
+        except KeyError:
+            print("Could not determine final state for container {} in ".format(container.get('Id')))
+            container_state = {'unavailable': True}
+    except docker.errors.APIError as e:
+        print("Could not inspect container {}".format(container.get('Id')))
+
     # get logs from container
     logs = cli.logs(container.get('Id'))
     # remove container, ignore errors
@@ -205,4 +236,4 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
     except Exception as e:
         print("Exception trying to remove actor: {}".format(e))
     result['runtime'] = int(stop - start)
-    return result, logs
+    return result, logs, container_state, exit_code
