@@ -1,0 +1,4 @@
+Instructions for new projects:
+
+1. Upload binary image data files to the 'data' directory automatically created here.
+2. When new files arrive,

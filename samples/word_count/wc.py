@@ -1,0 +1,34 @@
+# This function does a basic word count on a string. There are two ways to call it;
+# 1. With a JSON object containing {"text": "the text to count", "reducer": "the id of the reducer actor"}
+# 2. With a string of text to count (in this case, skips calling the reducer).
+
+from agavepy.actors import get_context, get_client
+
+
+def main():
+    context = get_context()
+    try:
+        m = context['message_dict']['text']
+        reducer = context['message_dict']['reducer']
+        print "Got JSON."
+    except Exception:
+        print "Didnt get JSON, using raw message."
+        reducer = None
+        m = context.raw_message
+    wordcount = {}
+    for word in m.split():
+        if word in wordcount:
+            wordcount[word] += 1
+        else:
+            wordcount[word] = 1
+    print "Final word count:"
+    for k,v in wordcount.items():
+        print "{}: {}".format(k, v)
+    if reducer:
+        print "Sending message to reducer {}".format(reducer)
+        ag = get_client()
+        ag.actors.sendMessage(actorId=reducer, body={'message': {'count': wordcount}})
+
+
+if __name__ == '__main__':
+    main()
