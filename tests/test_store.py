@@ -1,0 +1,183 @@
+# Unit test suite for the RedisStore class.
+# This test suite now runs in its own docker container. To build the image, run
+#     docker build -f Dockerfile-test -t jstubbs/abaco_testsuite .
+# from within the tests directory.
+#
+# To run the tests execute, first start the development stack using:
+#  1. export abaco_path=$(pwd)
+#  2. docker-compose -f docker-compose-local-db.yml up -d (from within the root directory)
+#  3. docker-compose -f docker-compose-local.yml up -d (from within the root directory)
+# Then, also from the root directory, execute:
+#     docker run -e base_url=http://172.17.0.1:8000 -v $(pwd)/local-dev.conf:/etc/abaco.conf --entrypoint=py.test -it --rm jstubbs/abaco_testsuite /tests/test_store.py
+
+
+from _datetime import datetime
+import pytest
+import os
+import sys
+import threading
+import time
+import timeit
+sys.path.append(os.path.split(os.getcwd())[0])
+sys.path.append('/actors')
+
+from config import Config
+from store import RedisStore, MongoStore
+
+# this is the store to test
+store = os.environ.get('store', 'redis')
+
+# this is the number of iterations executed in each thread, per test.
+n = 500
+
+@pytest.fixture(scope='session')
+def st():
+    if store == 'redis':
+        rs = RedisStore(Config.get('store', 'redis_host'), Config.getint('store', 'redis_port'), db='11')
+        # override the configured expiration time
+        rs.ex = 1
+        return rs
+    else:
+        ms = MongoStore(Config.get('store', 'mongo_host'), Config.getint('store', 'mongo_port'), db='11')
+        # we want to recreate the index each time so we start off trying to drop it, but the first time we run
+        # after the db is instantiated the index won't exist.
+        try:
+            ms._db.drop_index('exp_1')
+        except Exception:
+            pass
+        ms._db.create_index('exp', expireAfterSeconds=1)
+        return ms
+
+def test_set_key(st):
+    st['test'] = 'val'
+    assert st.get('test') == 'val'
+
+def test_set_with_expiry(st):
+    st.set_with_expiry('test_exp', 'val')
+    assert st.get('test_exp') == 'val'
+    # in our tests, the mongo expiry functionality is NOT dependable; it seems to eventually remove the key but the time
+    # it takes seems to fluctuate. for mongo, we'll test at the end of the suite to make sure the key is removed.
+    if store == 'redis':
+        time.sleep(1)
+        with pytest.raises(KeyError):
+            st['test_exp']
+
+def _thread(st, n):
+    for i in range(n):
+        st.update('test', 'k2', 'w{}'.format(i))
+
+def test_update(st):
+    st['test'] = {'k': 'v',
+                  'k2': 'v2'}
+    t = threading.Thread(target=_thread, args=(st, n))
+    t.start()
+    for i in range(n):
+        st.update('test', 'k', 'v{}'.format(i))
+    t.join()
+    assert st['test'] == {'k': 'v{}'.format(n-1), 'k2': 'w{}'.format(n-1)}
+
+def test_pop_field(st):
+    st['test'] = {'k': 'v', 'k2': 'v2', 'key': 'val'}
+    # this is the naive functionality we want; of course, this is not thread safe:
+    cur = st['test']
+    val = cur.pop('key')
+    st['test'] = cur
+    assert val == 'val'
+    assert st['test'] == {'k': 'v', 'k2': 'v2'}
+
+    # here's the non-threaded test:
+    st['test'] = {'k': 'v', 'k2': 'v2', 'key': 'val'}
+    assert st['test']['key'] == 'val'
+    val = st.pop_field('test', 'key')
+    assert val == 'val'
+    assert not type(st['test']) == str
+
+    # and finally, a threaded test:
+    st['test'] = {'k': 'v', 'k2': 'v2'}
+    for i in range(n):
+        st.update('test', 'key{}'.format(i), 'v{}'.format(i))
+    st['test']['key0'] = 'v0'
+    assert st['test']['key0'] == 'v0'
+    assert st['test']['key{}'.format(n-1)] == 'v{}'.format(n-1)
+    t = threading.Thread(target=_thread, args=(st, n))
+    t.start()
+    for i in range(n):
+        val = st.pop_field('test', 'key{}'.format(i))
+        assert val == 'v{}'.format(i)
+    t.join()
+    assert st['test'] == {'k': 'v', 'k2': 'w{}'.format(n-1)}
+
+def test_update_subfield(st):
+    st['test'] = {'k': {'sub': 'v'},
+                  'k2': 'v2'}
+    t = threading.Thread(target=_thread, args=(st, n))
+    t.start()
+    for i in range(n):
+        st.update_subfield('test', 'k', 'sub', 'v{}'.format(i))
+    t.join()
+    assert st['test'] == {'k': {'sub': 'v{}'.format(n-1)}, 'k2': 'w{}'.format(n-1)}
+
+def test_getset(st):
+    st['test'] = {'k': 'v',
+                  'k2': 'v2'}
+    st['k'] = 'v0'
+    t = threading.Thread(target=_thread, args=(st, n))
+    t.start()
+    for i in range(n):
+        v = st.getset('k', 'v{}'.format(i))
+        if i ==0:
+            assert v == 'v0'
+        else:
+            assert v == 'v{}'.format(i-1)
+    t.join()
+    assert st['test'] == {'k': 'v', 'k2': 'w{}'.format(n-1)}
+    assert st['k'] == 'v{}'.format(n-1)
+
+def test_within_transaction(st):
+    # mongo store does not support within_transaction
+    if not store == 'redis':
+        return
+
+    def _th():
+        """A separate thread that is going to compete with the main thread to make updates on the key."""
+        assert st['k'] == 'v'
+        time.sleep(1)
+        # try to update the value of 'k'; this should take a while since the other thread has a lock
+        start = timeit.default_timer()
+        st['k'] = 'v2'
+        stop = timeit.default_timer()
+        assert st['k'] == 'v2'
+        tot = stop - start
+        assert tot > 2.0
+
+    def _transaction(val):
+        """Represents business logic that should be wrapped in a transaction."""
+        # make sure we are passed the value
+        assert val == 'v'
+        # also, get the key and assert the original value
+        assert st['k'] == 'v'
+        # now sleep some time
+        time.sleep(3)
+        # now, update the key:
+        st['k'] = 'foo'
+        assert st['k'] == 'foo'
+
+    st['k'] = 'v'
+    # first start a new thread that will sleep for 1 second before trying to change the value
+    t = threading.Thread(target=_th)
+    t.start()
+    # now, start a transaction in the main thread:
+    st.within_transaction(_transaction, 'k')
+
+
+def test_set_with_expiry2(st):
+    # in our tests, the mongo expiry functionality is NOT dependable; it seems to eventually remove the key but the time
+    # it takes seems to fluctuate. for mongo, we'll test at the end of the suite to make sure the key is removed.
+    tot = 0
+    while tot < 5:
+        try:
+            st['test_exp']
+        except KeyError:
+            return
+        tot += 1
+        time.sleep(2)
