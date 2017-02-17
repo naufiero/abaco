@@ -266,7 +266,7 @@ def check_execution_details(result, actor_id, exc_id):
         assert 'workerId' in result
         assert 'exitCode' in result
         assert 'finalState' in result
-        
+
     assert result.get('id') == exc_id
     # note: it is possible for io to be 0 in which case an `assert result['io']` will fail.
     assert 'io' in result

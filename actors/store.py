@@ -1,9 +1,14 @@
 
 import collections
+from datetime import datetime
 import json
 
+import configparser
 import redis
 from pymongo import MongoClient
+
+from config import Config
+
 
 def _do_get(getter, key):
     obj = getter(key)
@@ -44,8 +49,8 @@ class AbstractStore(collections.MutableMapping):
         """Size of db."""
         pass
 
-    def set_with_expiry(self, key, obj, ex):
-        """Set `key` to `obj` with automatic expiration of `ex` seconds."""
+    def set_with_expiry(self, key, obj):
+        """Set `key` to `obj` with automatic expiration of the configured seconds."""
         pass
 
     def update(self, key, field, value):
@@ -87,6 +92,10 @@ class RedisStore(AbstractStore):
 
     def __init__(self, host, port, db=0):
         self._db = redis.StrictRedis(host=host, port=port, db=db)
+        try:
+            self.ex = int(Config.get('web', 'log_ex'))
+        except ValueError:
+            self.ex = -1
 
     def __getitem__(self, key):
         return _do_get(self._db.get, key)
@@ -103,9 +112,9 @@ class RedisStore(AbstractStore):
     def __len__(self):
         return self._db.dbsize()
 
-    def set_with_expiry(self, key, obj, ex):
+    def set_with_expiry(self, key, obj):
         """Set `key` to `obj` with automatic expiration of `ex` seconds."""
-        self._db.set(key, obj, ex=ex)
+        self._db.set(key, obj, ex=self.ex)
 
     def update(self, key, field, value):
         "Atomic ``self[key][field] = value``."""
@@ -120,15 +129,30 @@ class RedisStore(AbstractStore):
 
     def pop_field(self, key, field):
         "Atomic pop ``self[key][field]``."""
-        def _pop(pipe):
-            cur = _do_get(pipe.get, key)
-            value = cur.pop(field)
-            pipe.multi()
-            _do_set(pipe.set, key, cur)
-            return value
 
-        return self._db.transaction(_pop, key)
+        # Note: it is problematic to return items from within the _db.transaction() wrapper, as these
+        # We initially had the following implementation, but it did not work: the value returned was a list of
+        # results returned from the redis pipe (e.g. [True]) instead of the actual return value.
+        #     def _pop(pipe):
+        #         cur = _do_get(pipe.get, key)
+        #         value = cur.pop(field)
+        #         pipe.multi()
+        #         _do_set(pipe.set, key, cur)
+        #         return value
+        #
+        #     return self._db.transaction(_pop, key)
 
+        with self._db.pipeline() as pipe:
+            while 1:
+                try:
+                    pipe.watch(key)
+                    cur = _do_get(pipe.get, key)
+                    value = cur.pop(field)
+                    _do_set(pipe.set, key, cur)
+                    pipe.execute()
+                    return value
+                except redis.WatchError:
+                    continue
 
     def update_subfield(self, key, field1, field2, value):
         "Atomic ``self[key][field1][field2] = value``."""
@@ -172,6 +196,16 @@ class RedisStore(AbstractStore):
             # the key exists in the store; if it is the value empty, and the field:
         return self._db.transaction(_transaction, key)
 
+    def within_transaction(self, f, key):
+        """Execute a callable, f, within a lock on key `key`. The executable, f, should take a single argument that
+        is the current value under the key """
+        def _transaction(pipe):
+            cur = _do_get(pipe.get, key)
+            f(cur)
+
+        return self._db.transaction(_transaction, key)
+
+
 class MongoStore(AbstractStore):
 
     def __init__(self, host, port, database='abaco', db='0'):
@@ -195,11 +229,9 @@ class MongoStore(AbstractStore):
         result = self._db.find_one({'_id': key})
         if not result:
             raise KeyError()
-        # return self._decode(result[key])
         return result[key]
 
     def __setitem__(self, key, value):
-        # self._db.save({'_id': key, key: self._encode(value)})
         self._db.save({'_id': key, key: value})
 
     def __delitem__(self, key):
@@ -218,39 +250,30 @@ class MongoStore(AbstractStore):
             return value.decode('utf-8')
         return value
 
-    def set_with_expiry(self, key, obj, ex):
-        """Set `key` to `obj` with automatic expiration of `ex` seconds."""
-        self._db.save({'_id': key, 'exp': ex, key: self._prepset(obj)})
+    def set_with_expiry(self, key, obj):
+        """Set `key` to `obj` with automatic expiration of the configured seconds."""
+        self._db.save({'_id': key, 'exp': datetime.utcnow(), key: self._prepset(obj)})
 
     def update(self, key, field, value):
         "Atomic ``self[key][field] = value``."""
-        # result = self._db.find_and_modify(query={'_id': key},
-        #                          update={'$set': {'{}.{}'.format(key,field): self._encode(value)}})
         result = self._db.find_and_modify(query={'_id': key},
-                                 update={'$set': {'{}.{}'.format(key,field): value}})
+                                          update={'$set': {'{}.{}'.format(key,field): value}})
         if not result:
             raise KeyError()
 
     def pop_field(self, key, field):
         "Atomic pop ``self[key][field]``."""
-        # result = self._db.find_and_modify(query={'_id': key},
-        #                                   update={'$unset': {'{}.{}'.format(key, self._encode(field)): ''}})
         result = self._db.find_and_modify(query={'_id': key},
                                           update={'$unset': {'{}.{}'.format(key, field): ''}})
         result = result.get(key)
-        # return self._decode(result[key])
-        return result[key]
+        return result[field]
 
     def update_subfield(self, key, field1, field2, value):
         "Atomic ``self[key][field1][field2] = value``."""
-        # self._db.update_one({'_id': key}, {'$set': {'{}.{}.{}'.format(key, field1, field2): self._encode(value)}})
         self._db.update_one({'_id': key}, {'$set': {'{}.{}.{}'.format(key, field1, field2): value}})
 
     def getset(self, key, value):
         "Atomically: ``self[key] = value`` and return previous ``self[key]``."
-        # value = self._db.find_and_modify(query={'_id': key},
-        #                                  update={key: self._encode(value)})
         value = self._db.find_and_modify(query={'_id': key},
                                          update={key: value})
-        # return self._decode(value[key])
         return value[key]

@@ -340,7 +340,7 @@ class Execution(AbacoDAO):
         except ValueError:
             log_ex = -1
         if log_ex > 0:
-            logs_store.set_with_expiry(exc_id, logs, log_ex)
+            logs_store.set_with_expiry(exc_id, logs)
         else:
             logs_store[exc_id] = logs
 
