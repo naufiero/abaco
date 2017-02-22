@@ -3,11 +3,15 @@
 import logging
 
 class BaseAbacoError(Exception):
-    def __init__(self, msg=None):
+    def __init__(self, msg=None, code=400):
         self.msg = msg
-
+        self.code = code
 
 class DAOError(BaseAbacoError):
+    pass
+
+
+class ResourceError(BaseAbacoError):
     pass
 
 

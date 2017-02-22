@@ -6,10 +6,10 @@ from flask_restful import Resource, Api, inputs
 from channels import ActorMsgChannel, CommandChannel
 from codes import SUBMITTED, PERMISSION_LEVELS
 from config import Config
-from errors import DAOError, PermissionsException, WorkerException
+from errors import DAOError, ResourceError, PermissionsException, WorkerException
 from models import dict_to_camel, Actor, Execution, ExecutionsSummary, Worker, get_permissions, \
     add_permission
-from request_utils import RequestParser, APIException, ok
+from request_utils import RequestParser, ok
 from stores import actors_store, executions_store, logs_store, permissions_store
 from worker import shutdown_workers, shutdown_worker
 
@@ -52,7 +52,7 @@ class ActorResource(Resource):
         try:
             actor = Actor.from_db(actors_store[dbid])
         except KeyError:
-            raise APIException(
+            raise ResourceError(
                 "actor not found: {}. db_id:{}'".format(actor_id, dbid), 404)
         return ok(result=actor.display(), msg="Actor retrieved successfully.")
 
@@ -75,7 +75,7 @@ class ActorResource(Resource):
         try:
             actor = Actor.from_db(actors_store[dbid])
         except KeyError:
-            raise APIException(
+            raise ResourceError(
                 "actor not found: {}'".format(actor_id), 404)
         previous_image = actor.image
         args = self.validate_put(actor)
@@ -120,7 +120,7 @@ class ActorStateResource(Resource):
         try:
             actor = Actor.from_db(actors_store[dbid])
         except KeyError:
-            raise APIException(
+            raise ResourceError(
                 "actor not found: {}'".format(actor_id), 404)
         return ok(result={'state': actor.get('state') }, msg="Actor state retrieved successfully.")
 
@@ -129,10 +129,10 @@ class ActorStateResource(Resource):
         try:
             actor = Actor.from_db(actors_store[dbid])
         except KeyError:
-            raise APIException(
+            raise ResourceError(
                 "actor not found: {}'".format(actor_id), 404)
         if actor.stateless:
-            raise APIException("actor is stateless.", 404)
+            raise ResourceError("actor is stateless.", 404)
         args = self.validate_post()
         state = args['state']
         actors_store.update(dbid, 'state', state)
@@ -152,7 +152,7 @@ class ActorExecutionsResource(Resource):
         try:
             summary = ExecutionsSummary(db_id=dbid)
         except DAOError as e:
-            raise APIException("actor not found: {}. DAOError: {}'".format(actor_id, e), 404)
+            raise ResourceError("actor not found: {}. DAOError: {}'".format(actor_id, e), 404)
         return ok(result=summary.display(), msg="Actor executions retrieved successfully.")
 
     def post(self, actor_id):
@@ -160,7 +160,7 @@ class ActorExecutionsResource(Resource):
         try:
             actor = Actor.from_db(actors_store[id])
         except KeyError:
-            raise APIException(
+            raise ResourceError(
                 "actor not found: {}'".format(actor_id), 404)
         args = self.validate_post()
         Execution.add_execution(id, args)
@@ -179,7 +179,7 @@ class ActorExecutionsResource(Resource):
             try:
                 int(v)
             except ValueError:
-                raise APIException(message="Argument " + k + " must be an integer.")
+                raise ResourceError(message="Argument " + k + " must be an integer.")
         return args
 
 
@@ -189,16 +189,16 @@ class ActorExecutionResource(Resource):
         try:
             actors_store[dbid]
         except KeyError:
-            raise APIException(
+            raise ResourceError(
                 "actor not found: {}'".format(actor_id), 404)
         try:
             excs = executions_store[dbid]
         except KeyError:
-            raise APIException("No executions found for actor {}.".format(actor_id))
+            raise ResourceError("No executions found for actor {}.".format(actor_id))
         try:
             exc = Execution.from_db(excs[execution_id])
         except KeyError:
-            raise APIException("Execution not found {}.".format(execution_id))
+            raise ResourceError("Execution not found {}.".format(execution_id))
         return ok(result=exc.display(), msg="Actor execution retrieved successfully.")
 
 
@@ -213,16 +213,16 @@ class ActorExecutionLogsResource(Resource):
         try:
             actor = Actor.from_db(actors_store[dbid])
         except KeyError:
-            raise APIException(
+            raise ResourceError(
                 "actor not found: {}'".format(actor_id), 404)
         try:
             excs = executions_store[dbid]
         except KeyError:
-            raise APIException("No executions found for actor {}.".format(actor_id))
+            raise ResourceError("No executions found for actor {}.".format(actor_id))
         try:
             exc = Execution.from_db(excs[execution_id])
         except KeyError:
-            raise APIException("Execution not found {}.".format(execution_id))
+            raise ResourceError("Execution not found {}.".format(execution_id))
         try:
             logs = logs_store[execution_id]
         except KeyError:
@@ -245,7 +245,7 @@ class MessagesResource(Resource):
         try:
             actor = Actor.from_db(actors_store[id])
         except KeyError:
-            raise APIException(
+            raise ResourceError(
                 "actor not found: {}'".format(actor_id), 404)
         result={'messages': len(ActorMsgChannel(actor_id=id)._queue._queue)}
         result.update(get_hypermedia(actor))
@@ -328,11 +328,11 @@ class WorkersResource(Resource):
         try:
             Actor.from_db(actors_store[dbid])
         except KeyError:
-            raise APIException("actor not found: {}'".format(actor_id), 400)
+            raise ResourceError("actor not found: {}'".format(actor_id), 400)
         try:
             workers = Worker.get_workers(dbid)
         except WorkerException as e:
-            raise APIException(e.msg, 404)
+            raise ResourceError(e.msg, 404)
         result = []
         for id, worker in workers.items():
             worker.update({'id': id})
@@ -351,7 +351,7 @@ class WorkersResource(Resource):
         try:
             actor = Actor.from_db(actors_store[id])
         except KeyError:
-            raise APIException(
+            raise ResourceError(
                 "actor not found: {}'".format(actor_id), 404)
         args = self.validate_post()
         num = args.get('num')
@@ -386,7 +386,7 @@ class WorkerResource(Resource):
         try:
             worker = Worker.get_worker(id, worker_id)
         except WorkerException as e:
-            raise APIException(e.msg, 404)
+            raise ResourceError(e.msg, 404)
         return ok(result=worker, msg="Worker retrieved successfully.")
 
     def delete(self, actor_id, worker_id):
@@ -394,7 +394,7 @@ class WorkerResource(Resource):
         try:
             worker = Worker.get_worker(id, worker_id)
         except WorkerException as e:
-            raise APIException(e.msg, 404)
+            raise ResourceError(e.msg, 404)
         shutdown_worker(worker['ch_name'])
         return ok(result=None, msg="Worker scheduled to be stopped.")
 
@@ -405,12 +405,12 @@ class PermissionsResource(Resource):
         try:
             Actor.from_db(actors_store[id])
         except KeyError:
-            raise APIException(
+            raise ResourceError(
                 "actor not found: {}'".format(actor_id), 404)
         try:
             permissions = get_permissions(id)
         except PermissionsException as e:
-            raise APIException(e.msg, 404)
+            raise ResourceError(e.msg, 404)
         return ok(result=permissions, msg="Permissions retrieved successfully.")
 
     def validate_post(self):
@@ -420,7 +420,7 @@ class PermissionsResource(Resource):
                             help="Level of the permission: {}".format(PERMISSION_LEVELS))
         args = parser.parse_args()
         if not args['level'] in PERMISSION_LEVELS:
-            raise APIException("Invalid permission level: {}. \
+            raise ResourceError("Invalid permission level: {}. \
             The valid values are {}".format(args['level'], PERMISSION_LEVELS))
         return args
 
@@ -430,7 +430,7 @@ class PermissionsResource(Resource):
         try:
             Actor.from_db(actors_store[id])
         except KeyError:
-            raise APIException(
+            raise ResourceError(
                 "actor not found: {}'".format(actor_id), 404)
         args = self.validate_post()
         add_permission(args['user'], id, args['level'])
