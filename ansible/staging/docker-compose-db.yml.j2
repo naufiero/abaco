@@ -6,12 +6,14 @@ redis:
         - "6979:6379"
     command: redis-server --appendonly yes
     volumes:
-        - /home/apim/data:/data
+        - /home/apim/redis_data:/data
 
 mongo:
     image: mongo
     ports:
         - "27017:27017"
+    volumes:
+        - /home/apim/mongo_data:/data/db
 
 rabbit:
     image: rabbitmq:3.5.3-management
