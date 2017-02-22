@@ -35,6 +35,10 @@ def check_workers(actor_id, ttl):
     workers = Worker.get_workers(actor_id)
     print("workers: {}".format(workers))
     for _, worker in workers.items():
+        # if the worker has only been requested, it will not have a host_id.
+        if 'host_id' not in worker:
+            # @todo- we will skip for now, but we need something more robust in case the worker is never claimed.
+            continue
         # ignore workers on different hosts
         if not Config.get('spawner', 'host_id') == worker['host_id']:
             continue
