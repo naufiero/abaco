@@ -10,6 +10,11 @@
   sudo: yes
   sudo_user: "{{ linux_user }}"
 
+- name: Compile start_spawner.sh template
+  template: src={{ abaco_env }}/start_spawner.sh dest={{ base_dir }}/start_spawner.sh
+  sudo: yes
+  sudo_user: "{{ linux_user }}"
+
 - name: Compile pull_images template
   template: src=pull_images.sh.j2 dest=/home/apim/pull_images.sh
   sudo: yes
