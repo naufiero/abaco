@@ -14,7 +14,7 @@ import jwt
 from config import Config
 from errors import PermissionsException
 from models import Actor, get_permissions
-from request_utils import APIException, ok, RequestParser
+from request_utils import ok, RequestParser
 from stores import actors_store, permissions_store
 
 
@@ -192,7 +192,7 @@ def authorization():
         else:
             has_pem = check_permissions(user=g.user, actor_id=actor_id, level='UPDATE')
     if not has_pem:
-        raise APIException("Not authorized")
+        raise PermissionsException("Not authorized")
 
 def check_permissions(user, actor_id, level):
     """Check the permissions store for user and level"""

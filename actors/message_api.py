@@ -1,13 +1,13 @@
 from flask import Flask
 from flask_cors import CORS 
 
-from request_utils import AbacoApi
+from request_utils import AgaveApi
 from auth import authn_and_authz
 from controllers import MessagesResource
 
 app = Flask(__name__)
 CORS(app)
-api = AbacoApi(app)
+api = AgaveApi(app)
 
 # Authn/z
 @app.before_request

@@ -2,7 +2,7 @@
 from flask import Flask
 from flask_cors import CORS
 
-from request_utils import AbacoApi
+from request_utils import AgaveApi
 from controllers import ActorResource, ActorStateResource, ActorsResource, \
     ActorExecutionsResource, ActorExecutionResource, \
     ActorExecutionLogsResource
@@ -11,7 +11,7 @@ from auth import authn_and_authz
 
 app = Flask(__name__)
 CORS(app)
-api = AbacoApi(app)
+api = AgaveApi(app)
 
 # Authn/z
 @app.before_request
