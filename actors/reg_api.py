@@ -2,7 +2,7 @@
 from flask import Flask
 from flask_cors import CORS
 
-from request_utils import AgaveApi
+from request_utils import AgaveApi, handle_error
 from controllers import ActorResource, ActorStateResource, ActorsResource, \
     ActorExecutionsResource, ActorExecutionResource, \
     ActorExecutionLogsResource
@@ -17,6 +17,11 @@ api = AgaveApi(app)
 @app.before_request
 def auth():
     authn_and_authz()
+
+# Set up error handling
+@app.errorhandler(Exception)
+def handle_all_errors(e):
+    return handle_error(e)
 
 import logs
 app.logger.addHandler(logs.get_file_handler('reg_api_logs'))
