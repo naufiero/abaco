@@ -25,8 +25,18 @@ def shutdown_worker(ch_name):
 def shutdown_workers(actor_id):
     """Graceful shutdown of all workers for an actor. Pass db_id as the `actor_id` argument."""
     workers = Worker.get_workers(actor_id)
+    # @TODO - this code is not thread safe. we need to update the workers state in a transaction:
     for _, worker in workers.items():
-        shutdown_worker(worker['ch_name'])
+        # if there is already a channel, tell the worker to shut itself down
+        if 'ch_name' in worker:
+            shutdown_worker(worker['ch_name'])
+        else:
+            # otherwise, just remove from db:
+            try:
+                worker_id = worker.get('id')
+                Worker.delete_worker(actor_id, worker_id)
+            except WorkerException as e:
+                print("Got a WorkerException trying to delete worker with id: {}; exception: {}".format(worker_id, e))
 
 def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_client):
     """ Target for a thread to listen on the worker channel for a message to stop processing.
