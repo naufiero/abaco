@@ -150,13 +150,13 @@ class Spawner(object):
         except SpawnerException as e:
             print("Caught SpawnerException:{}".format(str(e)))
             # in case of an error, put the actor in error state and kill all workers
-            Actor.set_status(actor_id, ERROR)
+            Actor.set_status(actor_id, ERROR, status_message=e.message)
             for worker in workers:
                 try:
                     self.kill_worker(worker)
                 except DockerError as e:
                     print("Received DockerError trying to kill worker: {}".format(str(e)))
-            raise SpawnerException()
+            raise SpawnerException(message=e.message)
         return channels, anon_channels, workers
 
     def start_worker(self, image, tenant, worker_id):
@@ -166,12 +166,21 @@ class Spawner(object):
         worker = Worker(tenant=tenant, **worker_dict)
         print("worker started successfully, waiting on ack that image was pulled...")
         result = ch.get()
-        if result['value']['status'] == 'ok':
+        if result.get('status') == 'error':
+            # there was a problem pulling the image; put the actor in an error state:
+            msg = "got an error back from the worker. Message: {}",format(result)
+            print(msg)
+            if 'msg' in result:
+                raise SpawnerException(message=result['msg'])
+            else:
+                raise SpawnerException(message="Internal error starting worker process.")
+        elif result['value']['status'] == 'ok':
             print("received ack from worker.")
             return ch, result['reply_to'], worker
         else:
-            print("Got an error status from worker: {}. Raising an exception.".format(str(result)))
-            raise SpawnerException()
+            msg = "Got an error status from worker: {}. Raising an exception.".format(str(result))
+            print(msg)
+            raise SpawnerException(msg)
 
     def kill_worker(self, worker):
         pass
