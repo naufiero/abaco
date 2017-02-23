@@ -7,4 +7,5 @@ READY = 'READY'
 ERROR = 'ERROR'
 BUSY = 'BUSY'
 
-PERMISSION_LEVELS = ('READ', 'UPDATE')
+# order of permissions implies level; i.e. NONE < READ < EXECUTE < UPDATE
+PERMISSION_LEVELS = ('NONE', 'READ', 'EXECUTE', 'UPDATE')
