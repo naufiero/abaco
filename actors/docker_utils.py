@@ -37,7 +37,7 @@ def rm_container(cid):
     """
     cli = docker.AutoVersionClient(base_url=dd)
     try:
-        cli.remove_container(cid, force=True)
+        rsp = cli.remove_container(cid, force=True)
     except Exception as e:
         raise DockerError("Error removing container {}, exception: {}".format(cid, str(e)))
 
@@ -52,6 +52,11 @@ def pull_image(image):
         rsp = cli.pull(repository=image)
     except Exception as e:
         raise DockerError("Error pulling image {} - exception: {} ".format(image, str(e)))
+    if '"message":"Error' in rsp:
+        if '{} not found'.format(image) in rsp:
+            raise DockerError("Image {} was not found on the public registry.".format(image))
+        else:
+            raise DockerError("There was an error pulling the image: {}".format(rsp))
     return rsp
 
 def container_running(image=None, name=None):
