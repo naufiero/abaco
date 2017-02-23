@@ -42,4 +42,4 @@
   sudo_user: "{{ linux_user }}"
   environment:
       COMPOSE_HTTP_TIMEOUT: 240
-      abaco_path={{ base_dir }}
+      abaco_path: '{{ base_dir }}'
