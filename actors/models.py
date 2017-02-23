@@ -139,6 +139,7 @@ class Actor(AbacoDAO):
         ('privileged', 'optional', 'privileged', bool, 'Whether this actor runs in privileged mode.', False),
         ('default_environment', 'optional', 'default_environment', dict, 'Default environmental variables and values.', {}),
         ('status', 'optional', 'status', str, 'Current status of the actor.', SUBMITTED),
+        ('status_message', 'optional', 'status_message', str, 'Explanation of status.', ''),
         ('executions', 'optional', 'executions', dict, 'Executions for this actor.', {}),
         ('state', 'optional', 'state', dict, "Current state for this actor.", {}),
 
@@ -228,9 +229,11 @@ class Actor(AbacoDAO):
             return dbid
 
     @classmethod
-    def set_status(cls, actor_id, status):
+    def set_status(cls, actor_id, status, status_message=None):
         """Update the status of an actor"""
         actors_store.update(actor_id, 'status', status)
+        if status_message:
+            actors_store.update(actor_id, 'status_message', status_message)
 
 
 class Execution(AbacoDAO):
@@ -248,7 +251,7 @@ class Execution(AbacoDAO):
         ('io', 'required', 'io', str,
          'Block I/O usage, in number of 512-byte sectors read from and written to, by the execution.', None),
         ('id', 'derived', 'id', str, 'Human readable id for this execution.', None),
-        ('status', 'required', 'status', str, 'Status of the execution.', None),
+        ('status', 'required', 'status', str, 'Status of the execution.', None),\
         ('exit_code', 'optional', 'exit_code', str, 'The exit code of this execution.', None),
         ('final_state', 'optional', 'final_state', str, 'The final state of the execution.', None),
     ]
