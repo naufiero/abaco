@@ -32,6 +32,7 @@ PUB_KEY = get_pub_key()
 
 TOKEN_RE = re.compile('Bearer (.+)')
 
+WORLD_USER = 'world'
 
 def get_pub_key():
     pub_key = Config.get('web', 'apim_public_key')
@@ -184,13 +185,17 @@ def authorization():
     if request.method == 'GET':
         has_pem = check_permissions(user=g.user, actor_id=actor_id, level='READ')
     else:
-        # creating a new actor requires no permissions
         print(request.url_rule.rule)
-        if request.method == 'POST' \
-                and ('actors' == request.url_rule.rule or 'actors/' == request.url_rule.rule):
-            has_pem = True
-        else:
-            has_pem = check_permissions(user=g.user, actor_id=actor_id, level='UPDATE')
+        if request.method == 'POST':
+            # creating a new actor requires no permissions
+            if 'actors' == request.url_rule.rule or 'actors/' == request.url_rule.rule:
+                has_pem = True
+            # POST to the messages endpoint requires EXECUTE
+            elif 'messages' in request.url_rule.rule:
+                has_pem = check_permissions(user=g.user, actor_id=actor_id, level='EXECUTE')
+            # otherwise, we require UPDATE
+            else:
+                has_pem = check_permissions(user=g.user, actor_id=actor_id, level='UPDATE')
     if not has_pem:
         raise PermissionsException("Not authorized")
 
@@ -198,6 +203,8 @@ def check_permissions(user, actor_id, level):
     """Check the permissions store for user and level"""
     permissions = get_permissions(actor_id)
     for pem in permissions:
+        if user == WORLD_USER:
+            return True
         if pem['user'] == user:
             if pem['level'] >= level:
                 return True
