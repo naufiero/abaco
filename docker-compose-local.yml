@@ -1,14 +1,14 @@
 ---
 
 nginx:
-    image: jstubbs/abaco_nginx
+    image: abaco/nginx
     volumes:
         - ./local-dev.conf:/etc/abaco.conf
     ports:
         - "8000:80"
 
 reg:
-    image: jstubbs/abaco_core
+    image: abaco/core$TAG
     ports:
         - "5000:5000"
     volumes:
@@ -18,7 +18,7 @@ reg:
         api: reg
 
 mes:
-    image: jstubbs/abaco_core
+    image: abaco/core$TAG
     volumes:
         - ./local-dev.conf:/etc/abaco.conf
     ports:
@@ -28,7 +28,7 @@ mes:
         api: mes
 
 agavemes:
-    image: jstubbs/abaco_core
+    image: abaco/core$TAG
     volumes:
         - ./local-dev.conf:/etc/abaco.conf
     ports:
@@ -38,7 +38,7 @@ agavemes:
         api: agavemes
 
 admin:
-    image: jstubbs/abaco_core
+    image: abaco/core$TAG
     volumes:
         - ./local-dev.conf:/etc/abaco.conf
     ports:
@@ -48,7 +48,7 @@ admin:
         api: admin
 
 spawner:
-    image: jstubbs/abaco_core
+    image: abaco/core$TAG
     command: "python3 -u /actors/spawner.py"
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
@@ -58,7 +58,7 @@ spawner:
         _abaco_secret: 123
 
 clientg:
-    image: jstubbs/abaco_core
+    image: abaco/core$TAG
     command: "python3 -u /actors/clients.py"
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
@@ -70,7 +70,7 @@ clientg:
         _abaco_AGAVE-PROD_password: changeme
 
 health:
-    image: jstubbs/abaco_core
+    image: abaco/core$TAG
     command: /actors/health_check.sh
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock

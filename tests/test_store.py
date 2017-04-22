@@ -1,6 +1,6 @@
 # Unit test suite for the RedisStore class.
 # This test suite now runs in its own docker container. To build the image, run
-#     docker build -f Dockerfile-test -t jstubbs/abaco_testsuite .
+#     docker build -f Dockerfile-test -t abaco/testsuite .
 # from within the tests directory.
 #
 # To run the tests execute, first start the development stack using:
