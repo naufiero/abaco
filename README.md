@@ -1,57 +1,47 @@
 Abaco
 =====
 
-Actor Based Co(mputing)ntainers: Containers-as-a-service via the Actor
-model.
+Actor Based Co(mputing)ntainers: Functions-as-a-service using the Actor model.
+
+[![DOI](https://zenodo.org/badge/39394579.svg)](https://zenodo.org/badge/latestdoi/39394579)
 
 Intro
 -----
 
-Abaco is a web service and distributed system that implements the actor
-model of concurrent computation whereby each actor registered in the
-system is associated with a Docker image. Actor containers are executed
-in response to messages posted to their inbox which itself is given by a
-URI exposed via abaco. In the process of executing the actor container,
-state, logs and execution statistics are collected. Many aspects of the
-system are configurable.
+Abaco is a web service and distributed system that combines the actor model of concurrent computation, Linux containers into a web services platform that provides functions-as-a-service. In Abaco, actor registered in the system is associated with a Docker image. Actor containers are executed in response to messages posted to their inbox which itself is given by a URI exposed via Abaco. In the process of executing the actor container, state, logs and execution statistics are collected. Many aspects of the
+system are configurable. 
 
 Quickstart
 ----------
 
-1.  Deploy a development version of the abaco stack using
+![Usage Workflow](docs/Figure2.png "Abaco Usage, Illustrated")
+
+1.  Deploy a development version of the Abaco stack using
     `docker-compose`. First, change into the project root and export the
     following variable so that abaco containers know where to find the
     example configuration file
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ export abaco_path=$(pwd)
     ```
 
-    Then start the abaco containers with the following command:
+    Then start the Abaco containers with the following two commands:
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ docker-compose -f dc-all.yml up -d
     ```
 
-    If all went well, the services will be running behind `nginx` on
-    8000. We assume the Docker Gateway is running on the default IP for
-    Docker 1.9.1+ which is 172.17.0.1. If this is not the case for your
-    setup, you will need to update the value of host within the store
-    stanza of the all.conf file with the IP address of the Gateway. It
-    also may take several seconds for the mongo db to be ready to accept
-    connections.
+    If all went well, the services will be running behind `nginx` on 8000. We assume the Docker Gateway is running on the default IP for Docker 1.9.1+ which is 172.17.0.1. If this is not the case for your setup, you will need to update the value of host within the store stanza of the all.conf file with the IP address of the Gateway. It also may take several seconds for the mongo db to be ready to accept connections.
 
-2.  Register an actor -- Initially, the abaco system is empty with no
-    actors defined which can see by making a GET request to the root
-    collection:
+2.  Register an actor -- Initially, the Abaco system is empty with no actors defined which can be seen by making a GET request to the root collection:
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ curl localhost:8000/actors
     ```
 
-    abaco will respond with a JSON message that looks something like:
+    Abaco will respond with a JSON message that looks something like:
 
-    > ``` {.sourceCode .JSON}
+    > ```json
     > {
     >     "msg": "Actors retrieved successfully.",
     >     "result": [],
@@ -60,16 +50,15 @@ Quickstart
     > }
     > ```
 
-    To define an actor, pass a name and an image available on the public
-    docker hub.
+    To define an actor, pass a name and an image available on the public Docker Hub.
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ curl -X POST --data "image=jstubbs/abaco_test&name=foo" "localhost:8000/actors"
     ```
 
-    abaco responds in json; you should see something like this:
+    Abaco responds in JSON. You should see something like this:
 
-    ``` {.sourceCode .JSON}
+    ```json
     {
         "msg": "Actor created successfully.",
         "result": {
@@ -88,26 +77,18 @@ Quickstart
     }
     ```
 
-    abaco assigned a uuid to the actor (in this case
-    `e68ebbb7-4986-46ee-9332-a1f5cfc6a533`) and associated it with the
-    image jstubbs/abaco\_test which it began pulling from the public
-    Docker hub.
+    Abaco assigned a uuid to the actor (in this case `e68ebbb7-4986-46ee-9332-a1f5cfc6a533`) and associated it with the image jstubbs/abaco\_test which it began pulling from the public Docker hub.
 
-3.  Notice that abaco returned a status of `SUBMITTED` for the actor;
-    behind the scenes, abaco is starting a worker container to handle
-    messages passed to this actor. The worker must initialize itself
-    (download the image, etc) before the actor is ready. You can
-    retrieve the details about an actor (including the status) by making
-    a `GET` request to a specific actor using its uuid like so:
+3.  Notice that Abaco returned a status of `SUBMITTED` for the actor; behind the scenes, Abaco is starting a worker container to handle messages passed to this actor. The worker must initialize itself (download the image, etc) before the actor is ready. You can retrieve the details about an actor (including the status) by making a `GET` request to a specific actor using its uuid like so:
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ curl localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533
     ```
 
     When the actor's worker is initialized, you will see a response like
     this:
 
-    ``` {.sourceCode .JSON}
+    ```json
     {
         "msg": "Actor retrieved successfully.",
         "result": {
@@ -126,25 +107,17 @@ Quickstart
     }
     ```
 
-    A status of "READY" indicates that actor is capable of processing
-    messages by launching containers from the image.
+    A status of "READY" indicates that actor is capable of processing messages by launching containers from the image.
 
-4.  We're now ready to execute our actor. To do so, make a `POST`
-    request to the messages collection for the actor and pass a message
-    string as the payload.
+4.  We're now ready to execute our actor. To do so, make a `POST` request to the messages collection for the actor and pass a message string as the payload.
 
-    ``` {.sourceCode .bash}
+    ```bash
     $ curl -X POST --data "message=execute yourself"  localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533/messages
     ```
 
-    abaco executes the image registered for
-    `e68ebbb7-4986-46ee-9332-a1f5cfc6a533`, in this case,
-    jstubbs/abaco\_test, and passes in the string `"execute yourself"`
-    as an environmental variable (`$MSG`). abaco will use the default
-    command included in the image when executing the container. The
-    response will look like this:
+    abaco executes the image registered for `e68ebbb7-4986-46ee-9332-a1f5cfc6a533`, in this case, jstubbs/abaco\_test, and passes in the string `"execute yourself"` as an environmental variable (`$MSG`). abaco will use the default command included in the image when executing the container. The response will look like this:
 
-    ``` {.sourceCode .JSON}
+    ```json
     {
         "msg": "The request was successful",
         "result": {
@@ -156,23 +129,17 @@ Quickstart
     }
     ```
 
-    Note that the execution id (in this case,
-    `27326d48-7f00-4a45-a2f7-76fff8d685e6`) is returned in the response.
-    This execution id can be used to retrieve information about the
-    execution.
+    Note that the execution id (in this case, `27326d48-7f00-4a45-a2f7-76fff8d685e6`) is returned in the response. This execution id can be used to retrieve information about the execution.
 
-5.  An actor's executions can be retrieved using the `executions`
-    sub-collection.
+5.  An actor's executions can be retrieved using the `executions` sub-collection.
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ curl localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533/executions
     ```
 
-    The response will include summary statistics of all executions for
-    the actor as well as the id's of each execution. As expected, we see
-    the execution id returned from the previous step.
+    The response will include summary statistics of all executions for the actor as well as the id's of each execution. As expected, we see the execution id returned from the previous step.
 
-    ``` {.sourceCode .JSON}
+    ```json
     {
         "msg": "Actor executions retrieved successfully.",
         "result": {
@@ -189,20 +156,15 @@ Quickstart
     }
     ```
 
-    The `abaco_test` image simply echo's the environment and does a
-    sleep for 5 seconds. We can query the executions collection with the
-    execution id at any to get status information about the execution.
-    When the execution finishes, its status will be returned as
-    "COMPLETE" and details about the execution including runtime, cpu,
-    and io usage will be available. For example:
+    The `abaco_test` image simply echo's the environment and does a sleep for 5 seconds. We can query the executions collection with the execution id at any to get status information about the execution. When the execution finishes, its status will be returned as "COMPLETE" and details about the execution including runtime, cpu, and io usage will be available. For example:
 
-    > ``` {.sourceCode .bash}
+    > ```shell
     > $ curl localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533/executions/27326d48-7f00-4a45-a2f7-76fff8d685e6
     > ```
 
     The response will look something like:
 
-    > ``` {.sourceCode .JSON}
+    > ```json
     > {
     >     "msg": "Actor execution retrieved successfully.",
     >     "result": {
@@ -219,16 +181,15 @@ Quickstart
     > }
     > ```
 
-6.  You can also retrieve the logs (as in docker logs) for any
-    execution:
+6.  You can also retrieve the logs (as in docker logs) for any execution:
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ curl localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533/executions/27326d48-7f00-4a45-a2f7-76fff8d685e6/logs
     ```
 
     Response:
 
-    ``` {.sourceCode .JSON}
+    ```json
     {
         "msg": "Logs retrieved successfully.",
         "result": "Contents of MSG: execute yourself\nEnvironment:\nHOSTNAME=f64b9adb8239\nSHLVL=1\nHOME=/root\n_abaco_api_server=https://dev.tenants.staging.agaveapi.co\nMSG=execute yourself\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nPWD=/\n_abaco_username=anonymous\n",
@@ -237,16 +198,7 @@ Quickstart
     }
     ```
 
-    As mentioned earlier, this test container simply echo's the
-    environment, and we see that from the logs. Notice that our `MSG`
-    variable showed up, as well as a couple other variables:
-    `_abaco_api_server` and `_abaco_username`. The username is showing
-    up as "anonymous" since the development configuration is using no
-    authentication; however, the abaco system has a configurable
-    authentication mechanism for securing the services with standards
-    such as JWT (<https://tools.ietf.org/html/rfc7519>), and when such
-    authentication mechanisms are configured, the username will be
-    populated.
+    As mentioned earlier, this test container simply echo's the environment, and we see that from the logs. Notice that our `MSG` variable showed up, as well as a couple other variables: `_abaco_api_server` and `_abaco_username`. The username is showing up as "anonymous" since the development configuration is using no authentication; however, the abaco system has a configurable authentication mechanism for securing the services with standards such as JWT (<https://tools.ietf.org/html/rfc7519>), and when such authentication mechanisms are configured, the username will be populated.
 
 Additional Features
 -------------------
@@ -265,7 +217,7 @@ some of the more advanced features.
     the workers for our actor from the quickstart we would make a GET
     request like so:
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ curl localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533/workers
     ```
 
@@ -273,7 +225,7 @@ some of the more advanced features.
     metadata including the worker's container id, the host ip where the
     working is running and its status.
 
-    ``` {.sourceCode .JSON}
+    ```json
     {
         "msg": "Workers retrieved successfully.",
         "result": {
@@ -351,16 +303,16 @@ some of the more advanced features.
     orchestration, parts of this section will be updated to make
     deploying on a swarm cluster seamless and automatic from the compose
     file.
--   **Configurable**: Many aspects of the abaco system are configurable
+-   **Configurable**: Many aspects of the Abaco system are configurable
     via the abaco.conf file. The example contained in this repository is
     self-documenting.
--   **Multi-tenant**: A single abaco instance can serve multiple
+-   **Multi-tenant**: A single Abaco instance can serve multiple
     organization or "tenants" which have logical separation within the
     system. The tenants can be configured in the `abaco.conf` file and
     read out of the request through either a JWT or a special tenant
     header.
 -   **Integration with the Agave (<http://agaveapi.co/>)
-    science-as-a-service API platform**: abaco can be used as an "event
+    science-as-a-service API platform**: Abaco can be used as an "event
     processor" in conjunction with the Agave API platform. When deployed
     and configured with Agave's JWT authentication, abaco will inject
     the necessary authentication tokens needed for making requests
