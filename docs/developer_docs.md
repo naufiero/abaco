@@ -39,6 +39,101 @@ restricted to the life of the token, typically 4 hours). It is possible to turn 
 Development
 -----------
 
+To develop the core Abaco services, find or create an issue on github to work in. Checkout the project from github and
+create a local feature branch from the development branch with name I-<issue number> where <issue number> is the number
+of the issue on github.
+
+All core modules live in the actors package. The modules ending in _api.py define Flask applications
+ and associated resources. The resource implementations are all defined in the controllers.py module. The models.py
+ module defines data access classes and methods for interacting with the persistence layer.
+
+The store.py module defines high-level interfaces for interacting with databases and stores.py provides specific
+definitions of Abaco stores used in the models.py module.
+
+The backend processes (e.g. spawners, workers, health checks and clientg) are defined in their own modules with a
+ corresponding main method used for start up.
+
+Channels used for communication between Abaco processes are implemented in the channels.py module.
+
+Once code changes are in place, build a new abaco_core image (all core Abaco processes run out of the same
+core image), relaunch the Abaco container stack, and run the tests. Add new tests as appropriate.
+
+Building the Images, Launching the Stack, and Running the Tests (Linux)
+-----------------------------------------------------------------------
+Note: These instructions work for Linux. OS X and Windows will require different approaches.
+
+**Building the Images**
+
+The core Abaco processes run out of the same abaco_core image. It should be build using the Dockerfile at the root
+of the repository and tagged with a tag equal to the branch name. Export a variable called $TAG with the tag name
+preceeded by a colon (:) character in it.
+
+For example,
+
+    ``` {.sourceCode .bash}
+    $ export TAG=:I-12
+    $ docker build -t abaco/core$TAG .
+    ```
+Auxiliary images can be built from the Dockerfiles within the images folder. In particular, the abaco_nginx image required
+to start up the stack can built from within the images/nginx directory. For example
+
+    ``` {.sourceCode .bash}
+    $ cd images/nginx
+    $ docker build -t abaco/nginx$TAG .
+    ```
+
+**Starting the Development Stack**
+
+Once the images are built, start the development stack by first changing into the project root and
+exporting the abaco_path and TAG variables:
+
+    ``` {.sourceCode .bash}
+    $ export abaco_path=$(pwd)
+    $ export $TAG=:I-12
+    ```
+This variable needs to contain the path to a directory with an abaco.conf file. It is used by Abaco containers to
+know where to find the config file. Note that the abaco.conf contains the default IP address of the Docker0 gateway for
+Mongo and Redis. If your Docker0 gateway IP is different, you will need to updte the abaco.conf file.
+
+Finally, start the Abaco containers with the following command:
+
+    ``` {.sourceCode .bash}
+    $ docker-compose -f dc-all.yml up -d
+    ```
+
+**Running the Tests**
+There are two kinds of tests in the Abaco test suite: unit tests and functional tests. Unit tests target a specific
+module while functional tests target the entire stack. The tests leverage py.test framework and each test module starts
+with "test_" followed by either the name of a module or a description of the functions being tested. For example,
+test_store.py contains unit tests for the store.py module while test_abaco_core.py contains functional tests for
+the Abaco core functionality.
+
+The tests are packaged into their own Docker image for convenience. To run the tests, first build the tests image:
+
+    ``` {.sourceCode .bash}
+    $ docker build -f -t abaco/testsuite$TAG .
+    ```
+
+To run the functional tests, execute the following:
+    ``` {.sourceCode .bash}
+    $ docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/abaco.conf -it --rm abaco/testsuite$TAG
+    ```
+
+Run the unit tests with a command similar to the following, changing the test module as the end as necessary:
+
+    ``` {.sourceCode .bash}
+    $ docker run -e base_url=http://172.17.0.1:8000 -v $(pwd)/local-dev.conf:/etc/abaco.conf --entrypoint=py.test -it --rm abaco/testsuite$TAG /tests/test_store.py
+    ```
+
+Dev, Staging and Master Branches and Environments
+-------------------------------------------------
+The dev, staging and master branches are long-lived branches in the Abaco repository corresponding to the three
+permanent environments: Dev, Staging and Production, respectively. Feature branches should be merged into dev
+once tests are passing. Pushing dev to origin will then trigger an automated CI pipeline job in Jenkins which
+will run tests and automatically deploy to the Dev environment. Deployment is done via Ansible scripts contained
+in the ansible directory.
+
+
 Actors and Communication via Channels
 -------------------------------------
 
@@ -69,18 +164,15 @@ to store the logs for a fixed period of time.
 Client Generation
 -----------------
 
-The Abaco system uses a separate backend process (or "actor") for generating clients. Other actors in the system, such
-as the Spawners, communication
+The Abaco system uses a separate backend process (or "actor") for managing OAuth clients. Each worker gets a new
+OAuth client when it is started, and its client is deleted whenever the worker is destroyed. Currently, the clients
+modules leverages the agave.py module, a Python 3-compatible Agave SDK for managing clients.
 
 
 Dependence on Docker Version
 ----------------------------
 
-
-Running the Tests
------------------
-
-
-Development, Staging and Production
------------------------------------
-
+Various functions within Abaco are implemented by making calls to the docker daemon API using the docker-py client.
+These calls are implemented in the docker_utils.py module. Different versions of the docker-py client library as
+well as the Docker daemon itself present different APIs, and this can impact performance and correctness within
+Abaco. As a result, strict attention to Docker and docker-py versions is necessary.
