@@ -12,7 +12,8 @@ from config import Config
 from codes import BUSY
 from models import Worker
 
-AE_IMAGE = os.environ.get('AE_IMAGE', 'jstubbs/abaco_core')
+TAG = os.environ.get('TAG') or Config.get('general', 'TAG') or ''
+AE_IMAGE = '{}{}'.format(os.environ.get('AE_IMAGE', 'abaco/core'), TAG)
 
 max_run_time = int(Config.get('workers', 'max_run_time'))
 

@@ -8,7 +8,7 @@ from flask_restful import Api
 from config import Config
 from errors import BaseAbacoError
 
-TAG = os.environ.get('service_TAG') or Config.get('general', 'service_TAG')
+TAG = os.environ.get('TAG') or Config.get('general', 'TAG')
 
 
 class RequestParser(reqparse.RequestParser):
