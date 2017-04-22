@@ -8,7 +8,7 @@
 #  2. docker-compose -f docker-compose-local-db.yml up -d (from within the root directory)
 #  3. docker-compose -f docker-compose-local.yml up -d (from within the root directory)
 # Then, also from the root directory, execute:
-#     docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/abaco.conf -it --rm jstubbs/abaco_testsuite
+#     docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/abaco.conf -it --rm abaco/testsuite$TAG
 # Change the -e case=camel to -e case=snake depending on the functionality you want to test.
 
 #
