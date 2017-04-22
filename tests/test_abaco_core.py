@@ -100,6 +100,13 @@ def test_list_actors(headers):
     result = basic_response_checks(rsp)
     assert len(result) == 0
 
+def test_list_nonexistent_actor(headers):
+    url = '{}/{}'.format(base_url, '/actors/bad_actor_id')
+    rsp = requests.get(url, headers=headers)
+    assert rsp.status_code == 404
+    data = json.loads(rsp.content.decode('utf-8'))
+    assert data['status'] == 'error'
+
 def test_cors_list_actors(headers):
     url = '{}/{}'.format(base_url, '/actors')
     headers['Origin'] = 'http://example.com'
