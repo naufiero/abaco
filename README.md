@@ -1,7 +1,7 @@
 Abaco
 =====
 
-Actor Based Co(ntainers)mputing: Containers-as-a-service via the Actor
+Actor Based Co(mputing)ntainers: Containers-as-a-service via the Actor
 model.
 
 Intro
@@ -27,7 +27,7 @@ Quickstart
     $ export abaco_path=$(pwd)
     ```
 
-    Then start the abaco containers with the following two commands:
+    Then start the abaco containers with the following command:
 
     ``` {.sourceCode .bash}
     $ docker-compose -f dc-all.yml up -d
