@@ -53,7 +53,7 @@ class ActorResource(Resource):
             actor = Actor.from_db(actors_store[dbid])
         except KeyError:
             raise ResourceError(
-                "actor not found: {}. db_id:{}'".format(actor_id, dbid), 404)
+                "No actor found with id: {}.".format(actor_id), 404)
         return ok(result=actor.display(), msg="Actor retrieved successfully.")
 
     def delete(self, actor_id):
@@ -76,7 +76,7 @@ class ActorResource(Resource):
             actor = Actor.from_db(actors_store[dbid])
         except KeyError:
             raise ResourceError(
-                "actor not found: {}'".format(actor_id), 404)
+                "No actor found with id: {}.".format(actor_id), 404)
         previous_image = actor.image
         args = self.validate_put(actor)
         args['tenant'] = g.tenant
@@ -121,7 +121,7 @@ class ActorStateResource(Resource):
             actor = Actor.from_db(actors_store[dbid])
         except KeyError:
             raise ResourceError(
-                "actor not found: {}'".format(actor_id), 404)
+                "No actor found with id: {}.".format(actor_id), 404)
         return ok(result={'state': actor.get('state') }, msg="Actor state retrieved successfully.")
 
     def post(self, actor_id):
@@ -130,7 +130,7 @@ class ActorStateResource(Resource):
             actor = Actor.from_db(actors_store[dbid])
         except KeyError:
             raise ResourceError(
-                "actor not found: {}'".format(actor_id), 404)
+                "No actor found with id: {}.".format(actor_id), 404)
         if actor.stateless:
             raise ResourceError("actor is stateless.", 404)
         args = self.validate_post()
@@ -150,9 +150,15 @@ class ActorExecutionsResource(Resource):
     def get(self, actor_id):
         dbid = Actor.get_dbid(g.tenant, actor_id)
         try:
+            actor = Actor.from_db(actors_store[dbid])
+        except KeyError:
+            raise ResourceError(
+                "No actor found with id: {}.".format(actor_id), 404)
+        try:
             summary = ExecutionsSummary(db_id=dbid)
         except DAOError as e:
-            raise ResourceError("actor not found: {}. DAOError: {}'".format(actor_id, e), 404)
+            raise ResourceError("Could not retrieve executions summary for actor: {}. "
+                                "Details: {}".format(actor_id, e), 404)
         return ok(result=summary.display(), msg="Actor executions retrieved successfully.")
 
     def post(self, actor_id):
@@ -161,7 +167,7 @@ class ActorExecutionsResource(Resource):
             actor = Actor.from_db(actors_store[id])
         except KeyError:
             raise ResourceError(
-                "actor not found: {}'".format(actor_id), 404)
+                "No actor found with id: {}.".format(actor_id), 404)
         args = self.validate_post()
         Execution.add_execution(id, args)
         return ok(result=actor.display(), msg="Actor execution added successfully.")
@@ -179,7 +185,7 @@ class ActorExecutionsResource(Resource):
             try:
                 int(v)
             except ValueError:
-                raise ResourceError(message="Argument " + k + " must be an integer.")
+                raise ResourceError(message="Argument {} must be an integer.".format(k))
         return args
 
 
@@ -190,7 +196,7 @@ class ActorExecutionResource(Resource):
             actors_store[dbid]
         except KeyError:
             raise ResourceError(
-                "actor not found: {}'".format(actor_id), 404)
+                "No actor found with id: {}.".format(actor_id), 404)
         try:
             excs = executions_store[dbid]
         except KeyError:
@@ -214,7 +220,7 @@ class ActorExecutionLogsResource(Resource):
             actor = Actor.from_db(actors_store[dbid])
         except KeyError:
             raise ResourceError(
-                "actor not found: {}'".format(actor_id), 404)
+                "No actor found with id: {}.".format(actor_id), 404)
         try:
             excs = executions_store[dbid]
         except KeyError:
@@ -222,7 +228,7 @@ class ActorExecutionLogsResource(Resource):
         try:
             exc = Execution.from_db(excs[execution_id])
         except KeyError:
-            raise ResourceError("Execution not found {}.".format(execution_id))
+            raise ResourceError("Execution {} not found.".format(execution_id))
         try:
             logs = logs_store[execution_id]
         except KeyError:
@@ -246,7 +252,7 @@ class MessagesResource(Resource):
             actor = Actor.from_db(actors_store[id])
         except KeyError:
             raise ResourceError(
-                "actor not found: {}'".format(actor_id), 404)
+                "No actor found with id: {}.".format(actor_id), 404)
         result={'messages': len(ActorMsgChannel(actor_id=id)._queue._queue)}
         result.update(get_hypermedia(actor))
         return ok(result)
@@ -279,6 +285,12 @@ class MessagesResource(Resource):
                                'owner': '{}/profiles/v2/{}'.format(actor.api_server, actor.owner),
                                'messages': '{}/actors/v2/{}/messages'.format(actor.api_server, actor.id)},}
 
+        dbid = Actor.get_dbid(g.tenant, actor_id)
+        try:
+            Actor.from_db(actors_store[dbid])
+        except KeyError:
+            raise ResourceError("No actor found with id: {}.".format(actor_id), 404)
+
         args = self.validate_post()
         d = {}
         # build a dictionary of k:v pairs from the query parameters, and pass a single
@@ -298,7 +310,7 @@ class MessagesResource(Resource):
         #     d['_abaco_jwt_server'] = g.jwt_server
         if hasattr(g, 'jwt_header_name'):
             d['_abaco_jwt_header_name'] = g.jwt_header_name
-        dbid = Actor.get_dbid(g.tenant, actor_id)
+
         # create an execution
         exc = Execution.add_execution(dbid, {'cpu': 0,
                                              'io': 0,
@@ -328,7 +340,7 @@ class WorkersResource(Resource):
         try:
             Actor.from_db(actors_store[dbid])
         except KeyError:
-            raise ResourceError("actor not found: {}'".format(actor_id), 400)
+            raise ResourceError("No actor found with id: {}.".format(actor_id), 404)
         try:
             workers = Worker.get_workers(dbid)
         except WorkerException as e:
@@ -351,8 +363,7 @@ class WorkersResource(Resource):
         try:
             actor = Actor.from_db(actors_store[id])
         except KeyError:
-            raise ResourceError(
-                "actor not found: {}'".format(actor_id), 404)
+            raise ResourceError("No actor found with id: {}.".format(actor_id), 404)
         args = self.validate_post()
         num = args.get('num')
         if not num or num == 0:
@@ -382,7 +393,7 @@ class WorkerResource(Resource):
         try:
             Actor.from_db(actors_store[id])
         except KeyError:
-            raise WorkerException("actor not found: {}'".format(actor_id))
+            raise ResourceError("No actor found with id: {}.".format(actor_id), 404)
         try:
             worker = Worker.get_worker(id, worker_id)
         except WorkerException as e:
@@ -405,8 +416,7 @@ class PermissionsResource(Resource):
         try:
             Actor.from_db(actors_store[id])
         except KeyError:
-            raise ResourceError(
-                "actor not found: {}'".format(actor_id), 404)
+            raise ResourceError("No actor found with id: {}.".format(actor_id), 404)
         try:
             permissions = get_permissions(id)
         except PermissionsException as e:
