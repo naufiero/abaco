@@ -1,4 +1,4 @@
-# Image: jstubbs/abaco_core or agaveapidev/abaco_core
+# Image: abaco/core
 
 from alpine:3.2
 
