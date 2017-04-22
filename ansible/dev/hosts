@@ -11,10 +11,10 @@ ab-staging-web-js ansible_ssh_host=129.114.19.77 ansible_ssh_private_key_file=~/
 
 
 [db:vars]
-    abaco_env=staging
+    abaco_env=dev
 
 [compute:vars]
-    abaco_env=staging
+    abaco_env=dev
 
 [web:vars]
-    abaco_env=staging
+    abaco_env=dev
