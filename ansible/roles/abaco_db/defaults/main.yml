@@ -7,4 +7,4 @@ linux_user: apim
 # environment to deploy; one of 'staging' or 'prod'
 abaco_env: prod
 
-docker_user: agaveapidev
+docker_user: abaco

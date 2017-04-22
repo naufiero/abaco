@@ -8,5 +8,5 @@ linux_user: apim
 abaco_env: prod
 
 # docker user for pulling images
-docker_user: agaveapidev
+docker_user: abaco
 
