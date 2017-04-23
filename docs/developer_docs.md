@@ -15,7 +15,7 @@ workers). Abaco agents look for the environment variable "abaco_conf_host_path" 
 file from on the host. In the local development docker-compose file, we set the abaco_conf_host_path based on the
 variable "abaco_path", which should be a directory containing a config file (for example, the github project
 root). For example, to get started locally, once can put `export abaco_path=$(pwd)` from within the project
-root and the compose file will use the local-dev.conf file there (see the Abaco README.rst in the project root).
+root and the compose file will use the local-dev.conf file there (see the Abaco README.md in the project root).
 
 The abaco.conf file in the project root should be self documenting and contain all possible options. Here we want
 to highlight some of the bigger, more important config options
@@ -40,14 +40,14 @@ Development
 -----------
 
 To develop the core Abaco services, find or create an issue on github to work in. Checkout the project from github and
-create a local feature branch from the development branch with name I-<issue number> where <issue number> is the number
+create a local feature branch from the development branch with name I-xyz where xyz is the number
 of the issue on github.
 
 All core modules live in the actors package. The modules ending in _api.py define Flask applications
  and associated resources. The resource implementations are all defined in the controllers.py module. The models.py
  module defines data access classes and methods for interacting with the persistence layer.
 
-The store.py module defines high-level interfaces for interacting with databases and stores.py provides specific
+The store.py module defines high-level interfaces for interacting with databases, and stores.py provides specific
 definitions of Abaco stores used in the models.py module.
 
 The backend processes (e.g. spawners, workers, health checks and clientg) are defined in their own modules with a
@@ -64,20 +64,20 @@ Note: These instructions work for Linux. OS X and Windows will require different
 
 **Building the Images**
 
-The core Abaco processes run out of the same abaco_core image. It should be build using the Dockerfile at the root
+All core Abaco processes run out of the same abaco/core image. It should be build using the Dockerfile at the root
 of the repository and tagged with a tag equal to the branch name. Export a variable called $TAG with the tag name
-preceeded by a colon (:) character in it.
+preceded by a colon (:) character in it.
 
 For example,
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ export TAG=:I-12
     $ docker build -t abaco/core$TAG .
     ```
-Auxiliary images can be built from the Dockerfiles within the images folder. In particular, the abaco_nginx image required
+Auxiliary images can be built from the Dockerfiles within the images folder. In particular, the abaco/nginx image required
 to start up the stack can built from within the images/nginx directory. For example
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ cd images/nginx
     $ docker build -t abaco/nginx$TAG .
     ```
@@ -87,9 +87,9 @@ to start up the stack can built from within the images/nginx directory. For exam
 Once the images are built, start the development stack by first changing into the project root and
 exporting the abaco_path and TAG variables:
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ export abaco_path=$(pwd)
-    $ export $TAG=:I-12
+    $ export TAG=:I-12
     ```
 This variable needs to contain the path to a directory with an abaco.conf file. It is used by Abaco containers to
 know where to find the config file. Note that the abaco.conf contains the default IP address of the Docker0 gateway for
@@ -97,7 +97,7 @@ Mongo and Redis. If your Docker0 gateway IP is different, you will need to updte
 
 Finally, start the Abaco containers with the following command:
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ docker-compose -f dc-all.yml up -d
     ```
 
@@ -110,18 +110,19 @@ the Abaco core functionality.
 
 The tests are packaged into their own Docker image for convenience. To run the tests, first build the tests image:
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ docker build -f -t abaco/testsuite$TAG .
     ```
 
 To run the functional tests, execute the following:
-    ``` {.sourceCode .bash}
+
+    ```shell
     $ docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/abaco.conf -it --rm abaco/testsuite$TAG
     ```
 
 Run the unit tests with a command similar to the following, changing the test module as the end as necessary:
 
-    ``` {.sourceCode .bash}
+    ```shell
     $ docker run -e base_url=http://172.17.0.1:8000 -v $(pwd)/local-dev.conf:/etc/abaco.conf --entrypoint=py.test -it --rm abaco/testsuite$TAG /tests/test_store.py
     ```
 
@@ -150,23 +151,24 @@ Database Considerations
 -----------------------
 
 We divide up the state persisted in the Abaco system into "stores" defined in the stores.py module. Each of
-these stores represent an independent collection of data (though there are relations) and, in theory, could be
+these stores represent an independent collection of data (though there are relations) and thus can be
 stored in different databases.
 
-One potential option is to use a mix of databases. For example. we could use Redis for current application state
-(e.g. actors_store and workers_store) where transaction semantics could be more useful and the size of the
-dataset will be relatively small, and use Mongo for the accounting and logging data (executions_store and
-logs_store). Naturally, the log data (actual raw logs from the container executions) presents a challenge in
-space, and was one of the primary reasons for adding support for Mongo. We already use a set_with_expiry method
-to store the logs for a fixed period of time.
+We currently use both Redis and MongoDB fi=or different stores. We use Redis for current application state
+(e.g. actors_store and workers_store) where transaction semantics are needed and the size of the
+dataset will be relatively small. We use Mongo for the permissions, accounting and logging data (permissions_store,
+executions_store and logs_store). Naturally, the log data (actual raw logs from the container executions) presents a
+challenge in space, and was one of the primary reasons for adding support for Mongo. We already use a set_with_expiry
+method to store the logs for a fixed period of time.
 
 
 Client Generation
 -----------------
 
 The Abaco system uses a separate backend process (or "actor") for managing OAuth clients. Each worker gets a new
-OAuth client when it is started, and its client is deleted whenever the worker is destroyed. Currently, the clients
-modules leverages the agave.py module, a Python 3-compatible Agave SDK for managing clients.
+OAuth client when it is started, and its client is deleted whenever the worker is destroyed. This way, the actor
+containers can be started with a fresh OAuth access token. Currently, the clients modules leverages the agave.py module,
+a Python 3-compatible Agave SDK for managing clients.
 
 
 Dependence on Docker Version
