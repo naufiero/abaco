@@ -108,7 +108,7 @@ class ActorResource(Resource):
         args['owner'] = g.user
         actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
-        logger.infp("updated actor {} stored in db.".format(actor_id))
+        logger.info("updated actor {} stored in db.".format(actor_id))
         worker_ids = Worker.request_worker(actor.db_id)
         if update_image:
             ch = CommandChannel()
@@ -217,7 +217,7 @@ class ActorExecutionsResource(Resource):
 
 class ActorExecutionResource(Resource):
     def get(self, actor_id, execution_id):
-        logger.debug("top of GET /actors/{}/executions/{}: {}.".format(actor_id, execution_id))
+        logger.debug("top of GET /actors/{}/executions/{}.".format(actor_id, execution_id))
         dbid = Actor.get_dbid(g.tenant, actor_id)
         try:
             actors_store[dbid]
@@ -246,7 +246,7 @@ class ActorExecutionLogsResource(Resource):
                                'owner': '{}/profiles/v2/{}'.format(actor.api_server, actor.owner),
                                'execution': '{}/actors/v2/{}/executions/{}'.format(actor.api_server, actor.id, exc.id)},
                     }
-        logger.debug("top of GET /actors/{}/executions/{}/logs actor: {}.".format(actor_id, execution_id))
+        logger.debug("top of GET /actors/{}/executions/{}/logs.".format(actor_id, execution_id))
         dbid = Actor.get_dbid(g.tenant, actor_id)
         try:
             actor = Actor.from_db(actors_store[dbid])
