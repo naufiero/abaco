@@ -13,6 +13,7 @@ reg:
         - "5000:5000"
     volumes:
         - ./local-dev.conf:/etc/abaco.conf
+        - ./abaco.log:/var/log/abaco.log
     environment:
         server: dev
         api: reg
@@ -21,6 +22,7 @@ mes:
     image: abaco/core$TAG
     volumes:
         - ./local-dev.conf:/etc/abaco.conf
+        - ./abaco.log:/var/log/abaco.log
     ports:
         - "5001:5000"
     environment:

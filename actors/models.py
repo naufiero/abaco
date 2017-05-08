@@ -10,6 +10,10 @@ import errors
 from request_utils import RequestParser
 from stores import actors_store, clients_store, executions_store, logs_store, permissions_store, workers_store
 
+from logs import get_logger
+logger = get_logger(__name__)
+
+
 def under_to_camel(value):
     def camel_case():
         yield type(value).lower
@@ -85,13 +89,15 @@ class AbacoDAO(DbDict):
                 try:
                     value = kwargs[name]
                 except KeyError:
-                    raise errors.DAOError("Required field {} missing".format(name))
+                    logger.debug("required missing field: {}. ".format(name))
+                    raise errors.DAOError("Required field {} missing.".format(name))
             elif source == 'optional':
                 value = kwargs.get(name, default)
             elif source == 'provided':
                 try:
                     value = kwargs[name]
                 except KeyError:
+                    logger.debug("provided field missing: {}.".format(name))
                     raise errors.DAOError("Required field {} missing.".format(name))
             else:
                 # derived value - check to see if already computed
@@ -165,6 +171,7 @@ class Actor(AbacoDAO):
         try:
             actor_id, db_id = self.generate_id(d['name'], d['tenant'])
         except KeyError:
+            logger.debug("name or tenant missing from actor dict: {}.".format(d))
             raise errors.DAOError("Required field name or tenant missing")
         self.id = actor_id
         self.db_id = db_id
@@ -201,9 +208,13 @@ class Actor(AbacoDAO):
 
     def ensure_one_worker(self):
         """This method will check the workers store for the actor and request a new worker if none exist."""
+        logger.debug("top of Actor.ensure_one_worker().")
         worker_id = Worker.ensure_one_worker(self.db_id)
+        logger.debug("Worker.ensure_one_worker returned worker_id: {}".format(worker_id))
         if worker_id:
             worker_ids = [worker_id]
+            logger.info("Actor.ensure_one_worker() putting message on command channel for worker_id: {}".format(
+                worker_id))
             ch = CommandChannel()
             ch.put_cmd(actor_id=self.db_id,
                        worker_ids=worker_ids,
@@ -213,6 +224,7 @@ class Actor(AbacoDAO):
                        stop_existing=False)
             return worker_ids
         else:
+            logger.debug("Actor.ensure_one_worker() returning None.")
             return None
 
     @classmethod
@@ -231,6 +243,7 @@ class Actor(AbacoDAO):
     @classmethod
     def set_status(cls, actor_id, status, status_message=None):
         """Update the status of an actor"""
+        logger.debug("top of set_status for status: {}".format(status))
         actors_store.update(actor_id, 'status', status)
         if status_message:
             actors_store.update(actor_id, 'status_message', status_message)
@@ -274,6 +287,7 @@ class Execution(AbacoDAO):
         :param ex: dict describing the execution.
         :return:
         """
+        logger.debug("top of add_execution for actor: {} and execution: {}.".format(actor_id, ex))
         actor = Actor.from_db(actors_store[actor_id])
         ex.update({'actor_id': actor_id,
                    'tenant': actor.tenant,
@@ -286,6 +300,7 @@ class Execution(AbacoDAO):
         except KeyError:
             # if actor has no executions, a KeyError will be thrown
             executions_store[actor_id] = {execution.id: execution}
+        logger.info("Execution: {} saved for actor: {}.".format(ex, actor_id))
         return execution.id
 
     @classmethod
@@ -296,9 +311,15 @@ class Execution(AbacoDAO):
         :param worker_id: the id of the worker that executed this actor.
         :return:
         """
+        logger.debug("top of add_worker_id() for actor: {} execution: {} worker: {}".format(
+            actor_id, execution_id, worker_id))
         try:
             executions_store.update_subfield(actor_id, execution_id, 'worker_id', worker_id)
-        except KeyError:
+            logger.debug("worker added to execution: {} actor: {} worker: {}".format(
+            execution_id, actor_id, worker_id))
+        except KeyError as e:
+            logger.error("Could not add an execution. KeyError: {}. actor: {}. ex: {}. worker: {}".format(
+                e, actor_id, execution_id, worker_id))
             raise errors.ExecutionException("Execution {} not found.".format(execution_id))
 
     @classmethod
@@ -312,11 +333,17 @@ class Execution(AbacoDAO):
          `final_state` parameter should be the `State` object returned from the docker inspect command.
          `exit_code` parameter should be the exit code of the container.
          """
+        params_str = "actor: {}. ex: {}. status: {}. final_state: {}. exit_code: {}. stats: {}".format(
+            actor_id, execution_id, status, final_state, exit_code, stats)
+        logger.debug("top of finalize_execution. Params: {}".format(params_str))
         if not 'io' in stats:
+            logger.error("Could not finalize execution. io missing. Params: {}".format(params_str))
             raise errors.ExecutionException("'io' parameter required to finalize execution.")
         if not 'cpu' in stats:
+            logger.error("Could not finalize execution. cpu missing. Params: {}".format(params_str))
             raise errors.ExecutionException("'cpu' parameter required to finalize execution.")
         if not 'runtime' in stats:
+            logger.error("Could not finalize execution. runtime missing. Params: {}".format(params_str))
             raise errors.ExecutionException("'runtime' parameter required to finalize execution.")
         try:
             executions_store.update_subfield(actor_id, execution_id, 'status', status)
@@ -326,8 +353,8 @@ class Execution(AbacoDAO):
             executions_store.update_subfield(actor_id, execution_id, 'final_state', final_state)
             executions_store.update_subfield(actor_id, execution_id, 'exit_code', exit_code)
         except KeyError:
+            logger.error("Could not finalize execution. execution not found. Params: {}".format(params_str))
             raise errors.ExecutionException("Execution {} not found.".format(execution_id))
-
 
     @classmethod
     def set_logs(cls, exc_id, logs):
@@ -343,8 +370,10 @@ class Execution(AbacoDAO):
         except ValueError:
             log_ex = -1
         if log_ex > 0:
+            logger.info("Storing log with expiry. exc_id: {}".format(exc_id))
             logs_store.set_with_expiry(exc_id, logs)
         else:
+            logger.info("Storing log without expiry. exc_id: {}".format(exc_id))
             logs_store[exc_id] = logs
 
     def get_uuid_code(self):
@@ -421,6 +450,7 @@ class ExecutionsSummary(AbacoDAO):
         try:
             dbid = d['db_id']
         except KeyError:
+            logger.error("db_id missing from call to get_derived_value. d: {}".format(d))
             raise errors.ExecutionException('db_id is required.')
         tot = self.compute_summary_stats(dbid)
         d.update(tot)
@@ -484,9 +514,12 @@ class Worker(AbacoDAO):
         clients could be attempting to delete workers at the same time. Pass db_id as `actor_id`
         parameter.
         """
+        logger.debug("top of delete_worker().")
         try:
             wk = workers_store.pop_field(actor_id, worker_id)
-        except KeyError:
+            logger.info("worker deleted. actor: {}. worker: {}.".format(actor_id, worker_id))
+        except KeyError as e:
+            logger.info("KeyError deleting worker. actor: {}. worker: {}. exception: {}".format(actor_id, worker_id, e))
             raise errors.WorkerException("Worker not found.")
 
     @classmethod
@@ -496,12 +529,15 @@ class Worker(AbacoDAO):
         requested status.
         This method returns an id for the worker if a new worker was added and otherwise returns none.
         """
+        logger.debug("top of ensure_one_worker.")
         worker_id = Worker.get_uuid()
         worker = {'status': REQUESTED, 'id': worker_id}
         val = workers_store.add_if_empty(actor_id, worker_id, worker)
         if val:
+            logger.info("got worker: {} from add_if_empty.".format(val))
             return worker_id
         else:
+            logger.debug("did not get worker from add_if_empty.")
             return None
 
     @classmethod
@@ -510,6 +546,7 @@ class Worker(AbacoDAO):
         Add a new worker to the database in requested status. This method returns an id for the worker and
         should be called before putting a message on the command queue.
         """
+        logger.debug("top of request_worker().")
         worker_id = Worker.get_uuid()
         worker = {'status': REQUESTED, 'id': worker_id}
         # it's possible the actor_id is not in the workers_store yet (i.e., new actor with no workers)
@@ -518,8 +555,10 @@ class Worker(AbacoDAO):
             # we know this worker_id is new since we just generated it, so we don't need to use
             # workers_store.update()
             workers_store[actor_id][worker_id] = worker
+            logger.info("added additional worker with id: {} to workers_store.".format(worker_id))
         except KeyError:
             workers_store[actor_id] = {worker_id: worker}
+            logger.info("added first worker with id: {} to workers_store.".format(worker_id))
         return worker_id
 
     @classmethod
@@ -530,19 +569,25 @@ class Worker(AbacoDAO):
         in the database in 'REQUESTED' status using request_worker, and the `id` should be the same as that
         returned.
         """
+        logger.debug("top of add_worker().")
         workers_store.update(actor_id, worker['id'], worker)
+        logger.info("worker {} added to actor: {}".format(worker, actor_id))
 
     @classmethod
     def update_worker_execution_time(cls, actor_id, worker_id):
         """Pass db_id as `actor_id` parameter."""
+        logger.debug("top of update_worker_execution_time().")
         now = time.time()
         workers_store.update_subfield(actor_id, worker_id, 'last_execution', now)
         workers_store.update_subfield(actor_id, worker_id, 'last_update', now)
+        logger.info("worker execution time updated. worker_id: {}".format(worker_id))
 
     @classmethod
     def update_worker_status(cls, actor_id, worker_id, status):
         """Pass db_id as `actor_id` parameter."""
+        logger.debug("top of update_worker_status().")
         workers_store.update_subfield(actor_id, worker_id, 'status', status)
+        logger.info("worker status updated to: {}. worker_id: {}".format(status, worker_id))
 
     def get_uuid_code(self):
         """ Return the Agave code for this object.
@@ -605,13 +650,16 @@ def get_permissions(actor_id):
 
 def add_permission(user, actor_id, level):
     """Add a permission for a user and level to an actor."""
+    logger.debug("top of add_permission().")
     try:
         permissions = get_permissions(actor_id)
     except errors.PermissionsException:
         permissions = []
     for pem in permissions:
         if pem.get('user') == 'user' and pem.get('level') == level:
+            logger.debug("user: {} alreay had permission: {} for actor: {}".format(user, level, actor_id))
             return
     permissions.append({'user': user,
                         'level': level})
+    logger.info("permission: {} added for user: {} and actor: {}".format(level, user, actor_id))
     permissions_store[actor_id] = json.dumps(permissions)

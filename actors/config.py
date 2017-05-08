@@ -20,8 +20,8 @@ def read_config():
             place = p
             break
     if not parser.read(place):
-        raise RuntimeError("couldn't read config file from {0}"
-                           .format(', '.join(place)))
+        raise RuntimeError("couldn't read config file; tried these places: {0}"
+                           .format(', '.join(places)))
     return parser
 
 Config = read_config()
