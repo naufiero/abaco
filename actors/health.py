@@ -24,7 +24,7 @@ from worker import shutdown_worker
 
 AE_IMAGE = os.environ.get('AE_IMAGE', 'jstubbs/abaco_core')
 
-from logs import get_logger
+from logs import get_logger, get_log_file_strategy
 logger = get_logger(__name__)
 
 
@@ -108,8 +108,17 @@ def main():
     if not container_running(name='spawner*'):
         logger.critical("No spawners running! Launching new spawner..")
         command = 'python3 -u /actors/spawner.py'
+        # check logging strategy to determine log file name:
+        if get_log_file_strategy() == 'split':
+            log_file = 'spawner.log'
+        else:
+            log_file = 'abaco.log'
         try:
-            run_container_with_docker(AE_IMAGE, command, name='abaco_spawner_0', environment={'AE_IMAGE': AE_IMAGE})
+            run_container_with_docker(AE_IMAGE,
+                                      command,
+                                      name='abaco_spawner_0',
+                                      environment={'AE_IMAGE': AE_IMAGE},
+                                      log_file=log_file)
         except Exception as e:
             logger.critical("Could not restart spanwer. Exception: {}".format(e))
     try:
