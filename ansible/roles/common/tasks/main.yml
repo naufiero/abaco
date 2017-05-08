@@ -10,7 +10,7 @@
   become_user: apim
   become_method: sudo
 
-  - name: ensure log files are present
+- name: ensure log files are present
   file: path={{ item }} state=touch
   become: yes
   become_user: apim
