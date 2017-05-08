@@ -21,7 +21,7 @@ dd = Config.get('docker', 'dd')
 host_id = Config.get('spawner', 'host_id')
 host_ip = Config.get('spawner', 'host_ip')
 
-from logs import get_logger
+from logs import get_logger, get_log_file_strategy
 logger = get_logger(__name__)
 
 
@@ -93,7 +93,7 @@ def container_running(image=None, name=None):
     logger.debug("found containers: {}".format(containers))
     return len(containers) > 0
 
-def run_container_with_docker(image, command, name=None, environment={}):
+def run_container_with_docker(image, command, name=None, environment={}, log_file='abaco.log'):
     """
     Run a container with docker mounted in it.
     Note: this function always mounts the abaco conf file so it should not be used by execute_actor().
@@ -119,6 +119,17 @@ def run_container_with_docker(image, command, name=None, environment={}):
         msg = "Did not find the abaco_conf_host_path in Config. Exception: {}".format(e)
         logger.error(msg)
         raise DockerError(msg)
+
+    # mount the logs file.
+    volumes.append('/var/log/abaco.log')
+    # first check to see if the logs directory config was set:
+    try:
+        logs_host_dir = Config.get('logs', 'host_dir')
+    except (configparser.NoSectionError, configparser.NoOptionError):
+        # if the directory is not configured, default it to abaco_conf_host_path
+        logs_host_dir = os.path.dirname(abaco_conf_host_path)
+    binds['{}/{}'.format(logs_host_dir, log_file)] = {'bind': '/var/log/abaco.log', 'rw': True}
+
     host_config = cli.create_host_config(binds=binds)
     logger.debug("binds: {}".format(binds))
 
@@ -142,17 +153,24 @@ def run_worker(image, ch_name, worker_id):
     Run an actor executor worker with a given channel and image.
     :return:
     """
-    logger.debug("top of run_worker()/")
+    logger.debug("top of run_worker()")
     command = 'python3 -u /actors/worker.py'
     logger.debug("docker_utils running worker. image:{}, command:{}, chan:{}".format(
         image, command, ch_name))
-    # if we get an error trying to run a worker, let it bubble up.
+
+    # determine what log file to use
+    if get_log_file_strategy() == 'split':
+        log_file = 'worker.log'
+    else:
+        log_file = 'abaco.log'
     container = run_container_with_docker(image=AE_IMAGE,
                                           command=command,
                                           environment={'ch_name': ch_name,
                                                        'image': image,
                                                        'worker_id': worker_id,
-                                                       '_abaco_secret': os.environ.get('_abaco_secret')})
+                                                       '_abaco_secret': os.environ.get('_abaco_secret')},
+                                          log_file=log_file)
+    # don't catch errors -- if we get an error trying to run a worker, let it bubble up.
     # TODO - determines worker structure; should be placed in a proper DAO class.
     logger.info("worker container running. worker_id: {}. container: {}".format(worker_id, container))
     return { 'image': image,

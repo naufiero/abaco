@@ -8,6 +8,24 @@ from config import Config
 LEVELS = ('CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG',)
 LOG_FILE = '/var/log/abaco.log'
 LEVEL = 'INFO'
+LOG_FILE_STRATEGIES = ('split', 'combined')
+LOG_FILE_STRATEGY_DEFAULT = 'combined'
+
+def get_log_file_strategy():
+    """
+    Returns the strategy for writing logs to files based on the config.
+    The string "combined" means the logs should be written to a single file, abaco.log, while the string
+    "split" means the logs should be split to different files, depending on the Abaco agent.
+    """
+    try:
+        strategy = Config.get('logs', 'files')
+    except (configparser.NoSectionError, configparser.NoOptionError):
+        # default to collecting all logs to a single file
+        strategy = LOG_FILE_STRATEGY_DEFAULT
+    if strategy.lower() not in LOG_FILE_STRATEGIES:
+        return LOG_FILE_STRATEGY_DEFAULT
+    return strategy.lower()
+
 
 def get_module_log_level(name):
     """Reads config file for a log level set for this module."""
