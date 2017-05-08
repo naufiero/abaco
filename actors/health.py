@@ -24,6 +24,9 @@ from worker import shutdown_worker
 
 AE_IMAGE = os.environ.get('AE_IMAGE', 'jstubbs/abaco_core')
 
+from logs import get_logger, get_log_file_strategy
+logger = get_logger(__name__)
+
 
 def get_actor_ids():
     """Returns the list of actor ids currently registered."""
@@ -31,9 +34,13 @@ def get_actor_ids():
 
 def check_workers(actor_id, ttl):
     """Check health of all workers for an actor."""
-    print("Checking health for actors: {}".format(actor_id))
-    workers = Worker.get_workers(actor_id)
-    print("workers: {}".format(workers))
+    logger.info("Checking health for actor: {}".format(actor_id))
+    try:
+        workers = Worker.get_workers(actor_id)
+    except Exception as e:
+        logger.error("Got exception trying to retrieve workers: {}".format(e))
+        return None
+    logger.debug("workers: {}".format(workers))
     for _, worker in workers.items():
         # if the worker has only been requested, it will not have a host_id.
         if 'host_id' not in worker:
@@ -43,62 +50,84 @@ def check_workers(actor_id, ttl):
         if not Config.get('spawner', 'host_id') == worker['host_id']:
             continue
         # first check if worker is responsive; if not, will need to manually kill
-        print("Checking health for worker: {}".format(worker))
+        logger.info("Checking health for worker: {}".format(worker))
         ch = WorkerChannel(name=worker['ch_name'])
         try:
-            print("Issuing status check to channel: {}".format(worker['ch_name']))
+            logger.debug("Issuing status check to channel: {}".format(worker['ch_name']))
             result = ch.put_sync('status', timeout=5)
         except channelpy.exceptions.ChannelTimeoutException:
-            print("Worker did not respond, removing container and deleting worker.")
+            logger.info("Worker did not respond, removing container and deleting worker.")
             try:
                 rm_container(worker['cid'])
             except DockerError:
                 pass
-            Worker.delete_worker(actor_id, worker['ch_name'])
+            try:
+                Worker.delete_worker(actor_id, worker['ch_name'])
+            except Exception as e:
+                logger.error("Got exception trying to delete worker: {}".format(e))
             continue
         if not result == 'ok':
-            print("Worker responded unexpectedly: {}, deleting worker.".format(result))
-            rm_container(worker['cid'])
-            Worker.delete_worker(actor_id, worker['ch_name'])
+            logger.error("Worker responded unexpectedly: {}, deleting worker.".format(result))
+            try:
+                rm_container(worker['cid'])
+                Worker.delete_worker(actor_id, worker['ch_name'])
+            except Exception as e:
+                logger.error("Got error removing/deleting worker: {}".format(e))
         else:
-            print("Worker ok.")
+            logger.info("Worker ok.")
         # now check if the worker has been idle beyond the ttl:
         if ttl < 0:
             # ttl < 0 means infinite life
-            print("Infinite ttl configured; leaving worker")
+            logger.info("Infinite ttl configured; leaving worker")
             return
         if worker['status'] == codes.READY and \
             worker['last_execution'] + ttl < time.time():
             # shutdown worker
-            print("Shutting down worker beyond ttl.")
+            logger.info("Shutting down worker beyond ttl.")
             shutdown_worker(worker['ch_name'])
         else:
-            print("Worker still has life.")
+            logger.debug("Worker still has life.")
 
 def manage_workers(actor_id):
     """Scale workers for an actor if based on message queue size and policy."""
-    print("Entering manage_workers for {}".format(actor_id))
+    logger.info("Entering manage_workers for {}".format(actor_id))
     try:
         actor = Actor.from_db(actors_store[actor_id])
     except KeyError:
-        print("Did not find actor; returning.")
+        logger.info("Did not find actor; returning.")
         return
     workers = Worker.get_workers(actor_id)
     #TODO - implement policy
 
 def main():
-    print("Running abaco health checks. Now: {}".format(time.time()))
-    ttl = Config.get('workers', 'worker_ttl')
+    logger.info("Running abaco health checks. Now: {}".format(time.time()))
+    try:
+        ttl = Config.get('workers', 'worker_ttl')
+    except Exception as e:
+        logger.error("Could not get worker_ttl config. Exception: {}".format(e))
     if not container_running(name='spawner*'):
-        print("No spawners running! Launching new spawner..")
+        logger.critical("No spawners running! Launching new spawner..")
         command = 'python3 -u /actors/spawner.py'
-        run_container_with_docker(AE_IMAGE, command, name='abaco_spawner_0', environment={'AE_IMAGE': AE_IMAGE})
+        # check logging strategy to determine log file name:
+        if get_log_file_strategy() == 'split':
+            log_file = 'spawner.log'
+        else:
+            log_file = 'abaco.log'
+        try:
+            run_container_with_docker(AE_IMAGE,
+                                      command,
+                                      name='abaco_spawner_0',
+                                      environment={'AE_IMAGE': AE_IMAGE},
+                                      log_file=log_file)
+        except Exception as e:
+            logger.critical("Could not restart spanwer. Exception: {}".format(e))
     try:
         ttl = int(ttl)
-    except Exception:
+    except Exception as e:
+        logger.error("Invalid ttl config: {}. Setting to -1.".format(e))
         ttl = -1
     ids = get_actor_ids()
-    print("Found {} actor(s). Now checking status.".format(len(ids)))
+    logger.info("Found {} actor(s). Now checking status.".format(len(ids)))
     for id in ids:
         check_workers(id, ttl)
         # manage_workers(id)

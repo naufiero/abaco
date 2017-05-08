@@ -13,6 +13,7 @@ reg:
         - "5000:5000"
     volumes:
         - ./local-dev.conf:/etc/abaco.conf
+        - ./abaco.log:/var/log/abaco.log
     environment:
         server: dev
         api: reg
@@ -21,6 +22,7 @@ mes:
     image: abaco/core$TAG
     volumes:
         - ./local-dev.conf:/etc/abaco.conf
+        - ./abaco.log:/var/log/abaco.log
     ports:
         - "5001:5000"
     environment:
@@ -31,6 +33,7 @@ agavemes:
     image: abaco/core$TAG
     volumes:
         - ./local-dev.conf:/etc/abaco.conf
+        - ./abaco.log:/var/log/abaco.log
     ports:
         - "5002:5000"
     environment:
@@ -41,6 +44,7 @@ admin:
     image: abaco/core$TAG
     volumes:
         - ./local-dev.conf:/etc/abaco.conf
+        - ./abaco.log:/var/log/abaco.log
     ports:
         - "5003:5000"
     environment:
@@ -53,6 +57,7 @@ spawner:
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
         - ./local-dev.conf:/etc/abaco.conf
+        - ./abaco.log:/var/log/abaco.log
     environment:
         abaco_conf_host_path: ${abaco_path}/local-dev.conf
         _abaco_secret: 123
@@ -63,6 +68,7 @@ clientg:
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
         - ./local-dev.conf:/etc/abaco.conf
+        - ./abaco.log:/var/log/abaco.log
     environment:
         abaco_conf_host_path: ${abaco_path}/local-dev.conf
         _abaco_secret: 123
@@ -75,3 +81,4 @@ health:
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
         - ./local-dev.conf:/etc/abaco.conf
+        - ./abaco.log:/var/log/abaco.log

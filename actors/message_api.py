@@ -19,10 +19,6 @@ def auth():
 def handle_all_errors(e):
     return handle_error(e)
 
-import logs
-app.logger.addHandler(logs.get_file_handler('message_api_logs'))
-
-
 # Resources
 api.add_resource(MessagesResource, '/actors/<string:actor_id>/messages')
 

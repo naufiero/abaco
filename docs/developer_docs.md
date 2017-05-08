@@ -85,11 +85,12 @@ to start up the stack can built from within the images/nginx directory. For exam
 **Starting the Development Stack**
 
 Once the images are built, start the development stack by first changing into the project root and
-exporting the abaco_path and TAG variables:
+exporting the abaco_path and TAG variables. You also need to create an abaco.conf file in the root:
 
     ```shell
     $ export abaco_path=$(pwd)
     $ export TAG=:I-12
+    $ touch abaco.conf
     ```
 This variable needs to contain the path to a directory with an abaco.conf file. It is used by Abaco containers to
 know where to find the config file. Note that the abaco.conf contains the default IP address of the Docker0 gateway for
@@ -111,7 +112,7 @@ the Abaco core functionality.
 The tests are packaged into their own Docker image for convenience. To run the tests, first build the tests image:
 
     ```shell
-    $ docker build -f -t abaco/testsuite$TAG .
+    $ docker build -f Dockerfile-test -t abaco/testsuite$TAG .
     ```
 
 To run the functional tests, execute the following:
