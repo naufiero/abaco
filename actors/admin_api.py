@@ -9,9 +9,6 @@ app = Flask(__name__)
 CORS(app)
 api = AgaveApi(app)
 
-import logs
-app.logger.addHandler(logs.get_file_handler('admin_api_logs'))
-
 # Authn/z
 @app.before_request
 def auth():
