@@ -3,3 +3,24 @@
 - name: ensure docker is running
   service: name=docker state=started
   sudo: yes
+
+- name: ensure logs directory present
+  file: path=/home/apim/logs state=directory
+  become: yes
+  become_user: apim
+  become_method: sudo
+
+  - name: ensure log files are present
+  file: path={{ item }} state=touch
+  become: yes
+  become_user: apim
+  become_method: sudo
+  with_items:
+      - /home/apim/logs/reg.log
+      - /home/apim/logs/admin.log
+      - /home/apim/logs/mes.log
+      - /home/apim/logs/agavemes.log
+      - /home/apim/logs/health.log
+      - /home/apim/logs/spawner.log
+      - /home/apim/logs/worker.log
+      - /home/apim/logs/abaco.log
