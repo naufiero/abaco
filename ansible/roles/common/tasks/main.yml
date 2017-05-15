@@ -1,8 +1,18 @@
 ---
 
+- include_vars: "{{ abaco_env }}/settings.yml"
+- include_vars: "{{ abaco_env }}/passwords.yml"
+
 - name: ensure docker is running
   service: name=docker state=started
   sudo: yes
+
+- name: ensure empty logs directory
+  file: path=/home/apim/logs/ state=absent
+  become: yes
+  become_user: apim
+  become_method: sudo
+  when: empty_logs_dir
 
 - name: ensure logs directory present
   file: path=/home/apim/logs state=directory
@@ -24,3 +34,23 @@
       - /home/apim/logs/spawner.log
       - /home/apim/logs/worker.log
       - /home/apim/logs/abaco.log
+
+- name: copy abaco.conf template
+  template: src=abaco.conf.j2 dest=/home/apim/abaco.conf
+  sudo: yes
+  sudo_user: "{{ linux_user }}"
+
+- name: Compile pull_images template
+  template: src=pull_images.sh.j2 dest=/home/apim/pull_images.sh
+  sudo: yes
+  sudo_user: "{{ linux_user }}"
+
+- name: set permissions on pull_images.sh
+  acl: permissions="rwx" name={{ base_dir }}/pull_images.sh state=present etype=user entity=apim
+  sudo: yes
+
+- name: Pull latest docker images
+  shell: sh pull_images.sh {{ abaco_tag }}  chdir=/home/apim
+  sudo: yes
+  sudo_user: "{{ linux_user }}"
+

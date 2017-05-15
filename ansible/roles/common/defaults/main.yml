@@ -1,0 +1,48 @@
+# -------
+# general
+# -------
+
+# base directory to install abaco scripts and compose files.
+base_dir: /home/apim
+
+# user on remote host
+linux_user: apim
+
+# environment to deploy; one of 'staging' or 'prod'
+abaco_env: prod
+
+# docker user for pulling images
+docker_user: abaco
+
+# will empty all log directories on all hosts
+empty_logs_dir: true
+
+# -------
+# spawner
+# -------
+
+spawner_host_id: 0
+spawner_host_ip: 172.17.0.1
+spawner_abaco_conf_host_path:
+
+
+# -------
+# workers
+# -------
+
+workers_init_count: 1
+workers_max_run_time: 14400
+workers_worker_ttl: 86400
+workers_generate_clients: False
+
+
+# ---
+# web
+# ---
+
+web_access_control: jwt
+web_tenant_name: dev_staging
+web_show_traceback: False
+web_log_ex: 86400
+web_case: camel
+

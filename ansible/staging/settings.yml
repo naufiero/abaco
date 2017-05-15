@@ -1,0 +1,8 @@
+
+abaco_tag: dev
+store_redis_host_ip: 10.10.10.11
+store_redis_port:
+store_mongo_host_ip:
+store_mongo_port:
+store_rabbit_host_ip:
+store_rabbit_port:
