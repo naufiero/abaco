@@ -142,7 +142,7 @@ def run_container_with_docker(image, command, name=None, environment={}, log_fil
                                          command=command)
         cli.start(container=container.get('Id'))
     except Exception as e:
-        msg = "Got exception trying to run container from image: {}. Exception: {}}".format(image, e)
+        msg = "Got exception trying to run container from image: {}. Exception: {}".format(image, e)
         logger.info(msg)
         raise DockerError(msg)
     logger.info("container started successfully: {}".format(container))
