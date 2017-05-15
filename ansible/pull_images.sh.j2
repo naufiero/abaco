@@ -6,8 +6,8 @@ if [ "$ARG" = "" ]; then
   ARG=latest
 fi
 
-docker pull {{ docker_user }}/abaco_core:$ARG
-docker pull {{ docker_user }}/abaco_nginx:$ARG
+docker pull {{ docker_user }}/core:$ARG
+docker pull {{ docker_user }}/nginx:$ARG
 docker pull rabbitmq:3.5.3-management
 docker pull redis
 docker pull mongo
