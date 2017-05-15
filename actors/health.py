@@ -7,7 +7,7 @@
 # 3. all actors with stateless=true have a number of workers proportional to the messages in the queue.
 
 # Execute from a container on a schedule as follows:
-# docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock jstubbs/abaco_core python3 -u /actors/health.py
+# docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock abaco/core python3 -u /actors/health.py
 
 import os
 import time
@@ -22,7 +22,7 @@ from channels import CommandChannel, WorkerChannel
 from stores import actors_store
 from worker import shutdown_worker
 
-AE_IMAGE = os.environ.get('AE_IMAGE', 'jstubbs/abaco_core')
+AE_IMAGE = os.environ.get('AE_IMAGE', 'abaco/core')
 
 from logs import get_logger, get_log_file_strategy
 logger = get_logger(__name__)
