@@ -1,0 +1,24 @@
+---
+
+redis:
+    image: redis
+    ports:
+        - "{{ store_redis_port }}:6379"
+    command: redis-server --appendonly yes
+    volumes:
+        - /home/apim/redis_data:/data
+
+mongo:
+    image: mongo
+    ports:
+        - "{{ store_mongo_port }}:27017"
+    volumes:
+        - /home/apim/mongo_data:/data/db
+
+rabbit:
+    image: rabbitmq:3.5.3-management
+    ports:
+        - "{{ store_rabbit_port }}:5672"
+        - "15972:15672"
+    environment:
+       RABBITMQ_NODENAME: abaco-rabbit

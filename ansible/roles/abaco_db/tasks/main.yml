@@ -1,23 +1,12 @@
 ---
 
-- name: copy abaco.conf file
-  copy: src={{ abaco_env }}/abaco.conf dest=/home/apim/abaco.conf
-  sudo: yes
-  sudo_user: "{{ linux_user }}"
+- include_vars: "{{ abaco_env }}/settings.yml"
+- include_vars: "{{ abaco_env }}/passwords.yml"
 
 - name: Compile docker_compose template
-  template: src={{ abaco_env }}/docker-compose-db.yml.j2 dest={{ base_dir }}/docker-compose-db.yml
+  template: src=docker-compose-db.yml.j2 dest={{ base_dir }}/docker-compose-db.yml
   sudo: yes
   sudo_user: "{{ linux_user }}"
-
-- name: Compile pull_images template
-  template: src=pull_images.sh.j2 dest=/home/apim/pull_images.sh
-  sudo: yes
-  sudo_user: "{{ linux_user }}"
-
-- name: set permissions on pull_images.sh
-  acl: permissions="rwx" name={{ base_dir }}/pull_images.sh state=present etype=user entity=apim
-  sudo: yes
 
 - name: ensure database containers are running via docker compose
   shell: docker-compose -f docker-compose-db.yml up -d & chdir={{ base_dir }}

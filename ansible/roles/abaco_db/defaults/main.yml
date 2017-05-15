@@ -3,8 +3,3 @@ base_dir: /home/apim
 
 # user on remote host
 linux_user: apim
-
-# environment to deploy; one of 'staging' or 'prod'
-abaco_env: prod
-
-docker_user: abaco
