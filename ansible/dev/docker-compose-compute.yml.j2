@@ -4,7 +4,7 @@ spawner:
     image: {{ docker_user }}/core:dev
     command: "python3 -u /actors/spawner.py"
     environment:
-        AE_IMAGE: "{{ docker_user }}/core:dev"
+        AE_IMAGE: "{{ docker_user }}/core"
         abaco_conf_host_path: ${abaco_path}/abaco.conf
         _abaco_secret: 123
 
