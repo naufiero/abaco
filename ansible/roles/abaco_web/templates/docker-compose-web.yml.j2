@@ -14,6 +14,7 @@ reg:
 # error handling is currently broken in gunicorn + flask + flask_restufl
 # see https://github.com/flask-restful/flask-restful/issues/542 and https://github.com/flask-restful/flask-restful/pull/544
 #        server: gunicorn
+        server: {{ web_server_type }}
         api: reg
     volumes:
         - ./abaco.conf:/etc/abaco.conf
@@ -25,6 +26,7 @@ mes:
         - "5001:5000"
     environment:
 #        server: gunicorn
+        server: {{ web_server_type }}
         api: mes
     volumes:
         - ./abaco.conf:/etc/abaco.conf
@@ -35,7 +37,7 @@ agavemes:
     ports:
         - "5002:5000"
     environment:
-        server: dev
+        server: {{ web_server_type }}
         api: agavemes
     volumes:
         - ./abaco.conf:/etc/abaco.conf
@@ -47,6 +49,7 @@ admin:
         - "5003:5000"
     environment:
 #        server: gunicorn
+        server: {{ web_server_type }}
         api: admin
     volumes:
         - ./abaco.conf:/etc/abaco.conf

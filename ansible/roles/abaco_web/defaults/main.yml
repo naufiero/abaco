@@ -3,3 +3,5 @@ base_dir: /home/apim
 
 # user on remote host
 linux_user: apim
+
+web_server_type: dev
