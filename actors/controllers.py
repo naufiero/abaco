@@ -3,17 +3,19 @@ import json
 from flask import g, request
 from flask_restful import Resource, Api, inputs
 
+from agaveflask.utils import RequestParser, ok
+
 from channels import ActorMsgChannel, CommandChannel
 from codes import SUBMITTED, PERMISSION_LEVELS
 from config import Config
 from errors import DAOError, ResourceError, PermissionsException, WorkerException
 from models import dict_to_camel, Actor, Execution, ExecutionsSummary, Worker, get_permissions, \
     add_permission
-from request_utils import RequestParser, ok
+
 from stores import actors_store, executions_store, logs_store, permissions_store
 from worker import shutdown_workers, shutdown_worker
 
-from logs import get_logger
+from agaveflask.logs import get_logger
 logger = get_logger(__name__)
 
 class ActorsResource(Resource):

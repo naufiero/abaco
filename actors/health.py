@@ -24,7 +24,7 @@ from worker import shutdown_worker
 
 AE_IMAGE = os.environ.get('AE_IMAGE', 'abaco/core')
 
-from logs import get_logger, get_log_file_strategy
+from agaveflask.logs import get_logger, get_log_file_strategy
 logger = get_logger(__name__)
 
 

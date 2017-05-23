@@ -11,11 +11,18 @@ from flask import g, request, abort
 from flask_restful import Resource
 import jwt
 
+from agaveflask.auth import authn_and_authz as agaveflask_az
+from agaveflask.logs import get_logger
+logger = get_logger(__name__)
+
+from agaveflask.utils import ok, RequestParser
+
 from config import Config
 from errors import PermissionsException
 from models import Actor, get_permissions
-from request_utils import ok, RequestParser
+
 from stores import actors_store, permissions_store
+
 
 
 jwt.verify_methods['SHA256WITHRSA'] = (
@@ -51,115 +58,8 @@ def authn_and_authz():
         auth.authn_and_authz()
 
     """
-    authentication()
-    authorization()
-
-
-def authentication():
-    """Entry point for authentication. Use as follows:
-
-    import auth
-
-    my_app = Flask(__name__)
-    @my_app.before_request
-    def authn_for_my_app():
-        auth.authentication()
-
-    """
-    # don't control access to OPTIONS verb
-    if request.method == 'OPTIONS':
-        return
-    access_control_type = Config.get('web', 'access_control')
-    if access_control_type == 'none':
-        g.user = 'anonymous'
-        g.token = 'N/A'
-        g.tenant = request.headers.get('tenant') or Config.get('web', 'tenant_name')
-        g.api_server = get_api_server(g.tenant)
-        return
-    if access_control_type == 'jwt':
-        return check_jwt(request)
-    abort(400, {'message': 'Invalid access_control'})
-
-
-def check_jwt(req):
-    tenant_name = None
-    jwt_header = None
-    jwt_header_name = None
-    for k, v in req.headers.items():
-        if k.startswith('X-Jwt-Assertion-'):
-            tenant_name = k.split('X-Jwt-Assertion-')[1]
-            jwt_header = v
-            jwt_header_name = k
-            break
-    else:
-        # never found a jwt; look for 'Assertion'.
-        try:
-            jwt_header = req.headers['Assertion']
-            tenant_name = 'dev_staging'
-        except KeyError:
-             msg = ''
-             for k,v in req.headers.items():
-                msg = msg + ' ' + str(k) + ': ' + str(v)
-             abort(400, {'message': 'JWT header missing. Headers: '+msg})
-    try:
-        decoded = jwt.decode(jwt_header, PUB_KEY)
-        g.jwt = jwt_header
-        g.jwt_header_name = jwt_header_name
-        g.tenant = tenant_name.upper()
-        g.api_server = get_api_server(tenant_name)
-        g.jwt_server = get_jwt_server()
-        g.user = decoded['http://wso2.org/claims/enduser'].split('@')[0]
-        g.token = get_token(req.headers)
-    except (jwt.DecodeError, KeyError):
-        abort(400, {'message': 'Invalid JWT.'})
-
-def get_api_server(tenant_name):
-    # todo - lookup tenant in tenants table
-    if tenant_name.upper() == 'AGAVE-PROD':
-        return 'https://public.agaveapi.co'
-    if tenant_name.upper() == 'ARAPORT-ORG':
-        return 'https://api.araport.org'
-    if tenant_name.upper() == 'DESIGNSAFE':
-        return 'https://agave.designsafe-ci.org'
-    if tenant_name.upper() == 'DEV-STAGING':
-        return 'https://dev.tenants.staging.agaveapi.co'
-    if tenant_name.upper() == 'IPLANTC-ORG':
-        return 'https://agave.iplantc.org'
-    if tenant_name.upper() == 'IREC':
-        return 'https://irec.tenants.prod.agaveapi.co'
-    if tenant_name.upper() == 'TACC-PROD':
-        return 'https://api.tacc.utexas.edu'
-    if tenant_name.upper() == 'VDJSERVER-ORG':
-        return 'https://vdj-agave-api.tacc.utexas.edu'
-    return 'http://172.17.0.1:8000'
-
-
-def get_tenants():
-    """Return a list of tenants"""
-    return ['AGAVE-PROD',
-            'ARAPORT-ORG',
-            'DESIGNSAFE',
-            'DEV-STAGING',
-            'IPLANTC-ORG',
-            'IREC',
-            'TACC-PROD',
-            'VDJSERVER-ORG']
-
-
-def get_jwt_server():
-    return 'http://api.prod.agaveapi.co'
-
-def get_token(headers):
-    """
-    :type headers: dict
-    :rtype: str|None
-    """
-    auth = headers.get('Authorization', '')
-    match = TOKEN_RE.match(auth)
-    if not match:
-        return None
-    else:
-        return match.group(1)
+    # we use the agaveflask authn_and_authz function, passing in our authorization callback.
+    agaveflask_az(authorization)
 
 def authorization():
     """Entry point for authorization. Use as follows:
@@ -174,7 +74,15 @@ def authorization():
     """
     if request.method == 'OPTIONS':
         # allow all users to make OPTIONS requests
-        return
+        return True
+
+    # the 'ALL' role is a role set by agaveflask in case the access_control_type is none
+    if 'ALL' in g.roles:
+      return True
+
+    # the 'abaco_admin' role is the admin role when JWT auth is configured:
+    if 'Internal/abaco_admin' in g.roles:
+      return True
 
     # all other checks are based on actor-id; if that is not present then let
     # request through to fail.
@@ -185,7 +93,15 @@ def authorization():
     if request.method == 'GET':
         has_pem = check_permissions(user=g.user, actor_id=actor_id, level='READ')
     else:
-        print(request.url_rule.rule)
+        logger.debug("URL rule in request: {}".format(request.url_rule.rule))
+        # first, only admins can create/update actors to be privileged, so check that:
+        if request.method == 'POST' or request.method == 'PUT':
+            data = request.get_json()
+            if not data:
+                data = request.form
+            if data.get('privileged'):
+                # if we're here, user isn't an admin so this isn't allowed:
+                raise PermissionsException("Not authorized")
         if request.method == 'POST':
             # creating a new actor requires no permissions
             if 'actors' == request.url_rule.rule or 'actors/' == request.url_rule.rule:
@@ -201,10 +117,13 @@ def authorization():
 
 def check_permissions(user, actor_id, level):
     """Check the permissions store for user and level"""
+    # get all permissions for this actor
     permissions = get_permissions(actor_id)
     for pem in permissions:
+        # if the actor has been shared with the WORLD_USER anyone can use it
         if user == WORLD_USER:
             return True
+        # otherwise, check if the permission belongs to this user and has the necessary level
         if pem['user'] == user:
             if pem['level'] >= level:
                 return True

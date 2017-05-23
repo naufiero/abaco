@@ -3,14 +3,16 @@ import json
 import time
 import uuid
 
+from agaveflask.utils import RequestParser
+
 from channels import CommandChannel
 from codes import REQUESTED, SUBMITTED
 from config import Config
 import errors
-from request_utils import RequestParser
+
 from stores import actors_store, clients_store, executions_store, logs_store, permissions_store, workers_store
 
-from logs import get_logger
+from agaveflask.logs import get_logger
 logger = get_logger(__name__)
 
 

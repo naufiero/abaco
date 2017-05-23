@@ -1,9 +1,9 @@
 ---
 
 nginx:
-    image: abaco/nginx$TAG
+    image: abaco/nginx
     volumes:
-        - ./local-dev.conf:/etc/abaco.conf
+        - ./local-dev.conf:/etc/service.conf
     ports:
         - "8000:80"
 
@@ -12,7 +12,7 @@ reg:
     ports:
         - "5000:5000"
     volumes:
-        - ./local-dev.conf:/etc/abaco.conf
+        - ./local-dev.conf:/etc/service.conf
         - ./abaco.log:/var/log/abaco.log
     environment:
         server: dev
@@ -21,7 +21,7 @@ reg:
 mes:
     image: abaco/core$TAG
     volumes:
-        - ./local-dev.conf:/etc/abaco.conf
+        - ./local-dev.conf:/etc/service.conf
         - ./abaco.log:/var/log/abaco.log
     ports:
         - "5001:5000"
@@ -32,7 +32,7 @@ mes:
 agavemes:
     image: abaco/core$TAG
     volumes:
-        - ./local-dev.conf:/etc/abaco.conf
+        - ./local-dev.conf:/etc/service.conf
         - ./abaco.log:/var/log/abaco.log
     ports:
         - "5002:5000"
@@ -43,7 +43,7 @@ agavemes:
 admin:
     image: abaco/core$TAG
     volumes:
-        - ./local-dev.conf:/etc/abaco.conf
+        - ./local-dev.conf:/etc/service.conf
         - ./abaco.log:/var/log/abaco.log
     ports:
         - "5003:5000"
@@ -56,7 +56,7 @@ spawner:
     command: "python3 -u /actors/spawner.py"
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
-        - ./local-dev.conf:/etc/abaco.conf
+        - ./local-dev.conf:/etc/service.conf
         - ./abaco.log:/var/log/abaco.log
     environment:
         abaco_conf_host_path: ${abaco_path}/local-dev.conf
@@ -67,7 +67,7 @@ clientg:
     command: "python3 -u /actors/clients.py"
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
-        - ./local-dev.conf:/etc/abaco.conf
+        - ./local-dev.conf:/etc/service.conf
         - ./abaco.log:/var/log/abaco.log
     environment:
         abaco_conf_host_path: ${abaco_path}/local-dev.conf
@@ -80,5 +80,5 @@ health:
     command: /actors/health_check.sh
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
-        - ./local-dev.conf:/etc/abaco.conf
+        - ./local-dev.conf:/etc/service.conf
         - ./abaco.log:/var/log/abaco.log

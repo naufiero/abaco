@@ -12,7 +12,7 @@ from errors import WorkerException
 from models import Actor, Execution, Worker
 from stores import actors_store, workers_store
 
-from logs import get_logger
+from agaveflask.logs import get_logger
 logger = get_logger(__name__)
 
 

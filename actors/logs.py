@@ -5,10 +5,20 @@ import configparser
 
 from config import Config
 
+# possible log levels
 LEVELS = ('CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG',)
+
+# default log file to be used when using the the combined strategy
 LOG_FILE = '/var/log/abaco.log'
+
+# default log level
 LEVEL = 'INFO'
+
+# log strategies that can be used. with combined, all logs go to one file; with split,
+# each abaco agent has its own log file.
 LOG_FILE_STRATEGIES = ('split', 'combined')
+
+# default log strategy
 LOG_FILE_STRATEGY_DEFAULT = 'combined'
 
 def get_log_file_strategy():
