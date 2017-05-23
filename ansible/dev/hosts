@@ -1,5 +1,5 @@
 [db]
-ab-dev-compute-js ansible_ssh_host=129.114.16.28 ansible_ssh_private_key_file=~/id_rsa.ssh/ab-staging ansible_ssh_user=root
+ab-dev-compute-js ansible_ssh_host=129.114.16.28 ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_user=root
 
 
 [compute]
