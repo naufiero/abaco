@@ -1,6 +1,6 @@
 """Read config files from:
-- /abaco.conf (added by user)
-- /etc/abaco.conf (an example is placed here by the Dockerfile)
+- /service.conf (added by user)
+- /etc/service.conf (an example is placed here by the Dockerfile)
 
 """
 

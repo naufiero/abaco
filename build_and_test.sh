@@ -29,7 +29,7 @@ docker-compose -f docker-compose-local.yml up -d
 printf "Stack launched. Sleeping while stack starts up..."
 sleep 5
 printf "\n\nStack should be ready. Starting test suite...\n"
-docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/abaco.conf -it --rm jstubbs/abaco_testsuite
+docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/service.conf -it --rm jstubbs/abaco_testsuite
 
 printf "\n\n********* Test suite complete, removing containers...\n"
 docker rm -f `docker ps -aq`

@@ -112,7 +112,7 @@ def main():
         if get_log_file_strategy() == 'split':
             log_file = 'spawner.log'
         else:
-            log_file = 'abaco.log'
+            log_file = 'service.log'
         try:
             run_container_with_docker(AE_IMAGE,
                                       command,
