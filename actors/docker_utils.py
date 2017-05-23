@@ -93,7 +93,7 @@ def container_running(image=None, name=None):
     logger.debug("found containers: {}".format(containers))
     return len(containers) > 0
 
-def run_container_with_docker(image, command, name=None, environment={}, log_file='abaco.log'):
+def run_container_with_docker(image, command, name=None, environment={}, log_file='service.log'):
     """
     Run a container with docker mounted in it.
     Note: this function always mounts the abaco conf file so it should not be used by execute_actor().
@@ -112,8 +112,8 @@ def run_container_with_docker(image, command, name=None, environment={}, log_fil
             abaco_conf_host_path = Config.get('spawner', 'abaco_conf_host_path')
         logger.debug("docker_utils using abaco_conf_host_path={}".format(abaco_conf_host_path))
         # mount config file at the root of the container as r/o
-        volumes.append('/abaco.conf')
-        binds[abaco_conf_host_path] = {'bind': '/abaco.conf', 'ro': True}
+        volumes.append('/service.conf')
+        binds[abaco_conf_host_path] = {'bind': '/service.conf', 'ro': True}
     except configparser.NoOptionError as e:
         # if we're here, it's bad. we don't have a config file. better to cut and run,
         msg = "Did not find the abaco_conf_host_path in Config. Exception: {}".format(e)
@@ -121,14 +121,14 @@ def run_container_with_docker(image, command, name=None, environment={}, log_fil
         raise DockerError(msg)
 
     # mount the logs file.
-    volumes.append('/var/log/abaco.log')
+    volumes.append('/var/log/service.log')
     # first check to see if the logs directory config was set:
     try:
         logs_host_dir = Config.get('logs', 'host_dir')
     except (configparser.NoSectionError, configparser.NoOptionError):
         # if the directory is not configured, default it to abaco_conf_host_path
         logs_host_dir = os.path.dirname(abaco_conf_host_path)
-    binds['{}/{}'.format(logs_host_dir, log_file)] = {'bind': '/var/log/abaco.log', 'rw': True}
+    binds['{}/{}'.format(logs_host_dir, log_file)] = {'bind': '/var/log/service.log', 'rw': True}
 
     host_config = cli.create_host_config(binds=binds)
     logger.debug("binds: {}".format(binds))

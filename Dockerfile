@@ -9,7 +9,7 @@ RUN apk add --update g++ -f /var/cache/apk/*
 RUN apk add --update python3-dev -f /var/cache/apk/*
 ADD actors/requirements.txt /requirements.txt
 RUN pip3 install -r /requirements.txt
-ADD abaco.conf /etc/abaco.conf
+
 RUN touch /var/log/abaco.log
 
 ADD actors /actors
