@@ -17,7 +17,7 @@ reg:
         server: {{ web_server_type }}
         api: reg
     volumes:
-        - ./abaco.conf:/etc/abaco.conf
+        - ./abaco.conf:/etc/service.conf
         - /home/apim/logs/reg.log:/var/log/abaco.log
 
 mes:
@@ -29,7 +29,7 @@ mes:
         server: {{ web_server_type }}
         api: mes
     volumes:
-        - ./abaco.conf:/etc/abaco.conf
+        - ./abaco.conf:/etc/service.conf
         - /home/apim/logs/mes.log:/var/log/abaco.log
 
 agavemes:
@@ -40,7 +40,7 @@ agavemes:
         server: {{ web_server_type }}
         api: agavemes
     volumes:
-        - ./abaco.conf:/etc/abaco.conf
+        - ./abaco.conf:/etc/service.conf
         - /home/apim/logs/agavemes.log:/var/log/abaco.log
 
 admin:
@@ -52,6 +52,6 @@ admin:
         server: {{ web_server_type }}
         api: admin
     volumes:
-        - ./abaco.conf:/etc/abaco.conf
+        - ./abaco.conf:/etc/service.conf
         - /home/apim/logs/admin.log:/var/log/abaco.log
 

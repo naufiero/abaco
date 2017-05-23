@@ -8,6 +8,9 @@ import docker
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 from requests.exceptions import ReadTimeout
 
+from agaveflask.logs import get_logger, get_log_file_strategy
+logger = get_logger(__name__)
+
 from config import Config
 from codes import BUSY
 from models import Worker
@@ -20,9 +23,6 @@ max_run_time = int(Config.get('workers', 'max_run_time'))
 dd = Config.get('docker', 'dd')
 host_id = Config.get('spawner', 'host_id')
 host_ip = Config.get('spawner', 'host_ip')
-
-from logs import get_logger, get_log_file_strategy
-logger = get_logger(__name__)
 
 
 class DockerError(Exception):

@@ -85,14 +85,14 @@ to start up the stack can built from within the images/nginx directory. For exam
 **Starting the Development Stack**
 
 Once the images are built, start the development stack by first changing into the project root and
-exporting the abaco_path and TAG variables. You also need to create an abaco.conf file in the root:
+exporting the abaco_path and TAG variables. You also need to create an abaco.log file in the root:
 
     ```shell
     $ export abaco_path=$(pwd)
     $ export TAG=:I-12
-    $ touch abaco.conf
+    $ touch abaco.log
     ```
-This variable needs to contain the path to a directory with an abaco.conf file. It is used by Abaco containers to
+The abaco_path variable needs to contain the path to a directory with an abaco.conf file. It is used by Abaco containers to
 know where to find the config file. Note that the abaco.conf contains the default IP address of the Docker0 gateway for
 Mongo and Redis. If your Docker0 gateway IP is different, you will need to updte the abaco.conf file.
 
@@ -101,6 +101,9 @@ Finally, start the Abaco containers with the following command:
     ```shell
     $ docker-compose -f dc-all.yml up -d
     ```
+Note that this will command will still run the default (production) versions of the auxiliary images, such as nginx
+and the databases.
+
 
 **Running the Tests**
 There are two kinds of tests in the Abaco test suite: unit tests and functional tests. Unit tests target a specific
@@ -118,13 +121,13 @@ The tests are packaged into their own Docker image for convenience. To run the t
 To run the functional tests, execute the following:
 
     ```shell
-    $ docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/abaco.conf -it --rm abaco/testsuite$TAG
+    $ docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/service.conf -it --rm abaco/testsuite$TAG
     ```
 
 Run the unit tests with a command similar to the following, changing the test module as the end as necessary:
 
     ```shell
-    $ docker run -e base_url=http://172.17.0.1:8000 -v $(pwd)/local-dev.conf:/etc/abaco.conf --entrypoint=py.test -it --rm abaco/testsuite$TAG /tests/test_store.py
+    $ docker run -e base_url=http://172.17.0.1:8000 -v $(pwd)/local-dev.conf:/etc/service.conf --entrypoint=py.test -it --rm abaco/testsuite$TAG /tests/test_store.py
     ```
 
 Dev, Staging and Master Branches and Environments
@@ -140,7 +143,7 @@ Actors and Communication via Channels
 -------------------------------------
 
 Abaco itself is largely architected using an Actor model. Actors communicate to each other by passing messages over
-a "channel". Channels are first class objects that enable communication across Python threads processes or hosts, and
+a "channel". Channels are first class objects that enable communication across Python threads, processes, or hosts, and
 the Channel objects themselves can be passed through the channels. This approach enables both pub-sub as well as
 direct request-reply patterns. We use the channelpy library (https://github.com/TACC/channelpy) as the basis for our
 channels.

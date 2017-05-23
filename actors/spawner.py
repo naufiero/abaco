@@ -11,7 +11,7 @@ from models import Actor, Worker
 from stores import workers_store
 from channels import ActorMsgChannel, ClientsChannel, CommandChannel, WorkerChannel
 
-from logs import get_logger
+from agaveflask.logs import get_logger
 logger = get_logger(__name__)
 
 

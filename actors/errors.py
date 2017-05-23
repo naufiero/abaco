@@ -1,31 +1,26 @@
 """All exceptions thrown by the Abaco system"""
 
-import logging
+from agaveflask.errors import BaseAgaveflaskError
 
-class BaseAbacoError(Exception):
-    def __init__(self, msg=None, code=400):
-        self.msg = msg
-        self.code = code
-
-class DAOError(BaseAbacoError):
+class DAOError(BaseAgaveflaskError):
     pass
 
 
-class ResourceError(BaseAbacoError):
+class ResourceError(BaseAgaveflaskError):
     pass
 
 
-class WorkerException(BaseAbacoError):
+class WorkerException(BaseAgaveflaskError):
     pass
 
 
-class ExecutionException(BaseAbacoError):
+class ExecutionException(BaseAgaveflaskError):
     pass
 
 
-class PermissionsException(BaseAbacoError):
+class PermissionsException(BaseAgaveflaskError):
     pass
 
 
-class ClientException(BaseAbacoError):
+class ClientException(BaseAgaveflaskError):
     pass

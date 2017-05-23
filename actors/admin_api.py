@@ -1,7 +1,8 @@
 from flask import Flask
 from flask_cors import CORS
 
-from request_utils import AgaveApi, handle_error
+from agaveflask.utils import AgaveApi, handle_error
+
 from auth import authn_and_authz
 from controllers import PermissionsResource, WorkersResource, WorkerResource
 

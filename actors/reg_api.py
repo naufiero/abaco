@@ -2,7 +2,8 @@
 from flask import Flask
 from flask_cors import CORS
 
-from request_utils import AgaveApi, handle_error
+from agaveflask.utils import AgaveApi, handle_error
+
 from controllers import ActorResource, ActorStateResource, ActorsResource, \
     ActorExecutionsResource, ActorExecutionResource, \
     ActorExecutionLogsResource

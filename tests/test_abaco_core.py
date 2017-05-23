@@ -8,7 +8,7 @@
 #  2. docker-compose -f docker-compose-local-db.yml up -d (from within the root directory)
 #  3. docker-compose -f docker-compose-local.yml up -d (from within the root directory)
 # Then, also from the root directory, execute:
-#     docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/abaco.conf -it --rm abaco/testsuite$TAG
+#     docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/service.conf -it --rm abaco/testsuite$TAG
 # Change the -e case=camel to -e case=snake depending on the functionality you want to test.
 
 #
@@ -30,6 +30,9 @@
 import ast
 import os
 import sys
+
+# these paths allow for importing modules from the actors package both in the docker container and native when the test
+# suite is launched from the command line.
 sys.path.append(os.path.split(os.getcwd())[0])
 sys.path.append('/actors')
 import time
@@ -49,7 +52,9 @@ case = os.environ.get('case', 'snake')
 
 @pytest.fixture(scope='session')
 def headers():
-    jwt = os.environ.get('jwt', open('/tests/jwt').read())
+    with open('/tests/jwt', 'r') as f:
+        jwt_default = f.read()
+    jwt = os.environ.get('jwt', jwt_default)
     if jwt:
         jwt_header = os.environ.get('jwt_header', 'X-Jwt-Assertion-AGAVE-PROD')
         headers = {jwt_header: jwt}
