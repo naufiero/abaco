@@ -130,9 +130,12 @@ def subscribe(tenant,
     t = threading.Thread(target=process_worker_ch, args=(tenant, worker_ch, actor_id, worker_id, actor_ch, ag))
     t.start()
     logger.info("Worker subscribing to actor channel.")
+    update_worker_status = True
     global keep_running
     while keep_running:
-        Worker.update_worker_status(actor_id, worker_id, READY)
+        if update_worker_status:
+            Worker.update_worker_status(actor_id, worker_id, READY)
+            update_worker_status = False
         try:
             msg = actor_ch.get(timeout=2)
         except channelpy.ChannelTimeoutException:
@@ -141,6 +144,7 @@ def subscribe(tenant,
             logger.info("Channel closed, worker exiting...")
             keep_running = False
             sys.exit()
+        update_worker_status = True
         logger.info("Received message {}. Starting actor container...".format(msg))
         # the msg object is a dictionary with an entry called message and an arbitrary
         # set of k:v pairs coming in from the query parameters.
