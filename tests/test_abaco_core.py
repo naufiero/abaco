@@ -52,7 +52,7 @@ case = os.environ.get('case', 'snake')
 
 @pytest.fixture(scope='session')
 def headers():
-    with open('/tests/jwt', 'r') as f:
+    with open('/tests/jwt-abaco_admin', 'r') as f:
         jwt_default = f.read()
     jwt = os.environ.get('jwt', jwt_default)
     if jwt:
@@ -529,16 +529,21 @@ def test_add_permissions(headers):
 # tenancy - tests for bleed over
 # ##############################
 
-def test_tenant_list_actors():
+def switch_tenant_in_header(headers):
+    jwt = headers.get('X-Jwt-Assertion-AGAVE-PROD')
+    return {'X-Jwt-Assertion-TACC-PROD': jwt}
+
+
+def test_tenant_list_actors(headers):
     # passing another tenant should result in 0 actors.
-    headers = {'tenant': 'abaco_test_suite_tenant'}
+    headers = switch_tenant_in_header(headers)
     url = '{}/{}'.format(base_url, '/actors')
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert len(result) == 0
 
-def test_tenant_register_actor():
-    headers = {'tenant': 'abaco_test_suite_tenant'}
+def test_tenant_register_actor(headers):
+    headers = switch_tenant_in_header(headers)
     url = '{}/{}'.format(base_url, '/actors')
     data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite_other_tenant'}
     rsp = requests.post(url, data=data, headers=headers)
@@ -548,8 +553,8 @@ def test_tenant_register_actor():
     assert result['name'] == 'abaco_test_suite_other_tenant'
     assert result['id'] is not None
 
-def test_tenant_actor_is_ready():
-    headers = {'tenant': 'abaco_test_suite_tenant'}
+def test_tenant_actor_is_ready(headers):
+    headers = switch_tenant_in_header(headers)
     count = 0
     actor_id = get_actor_id(headers, name='abaco_test_suite_other_tenant')
     while count < 10:
@@ -562,16 +567,16 @@ def test_tenant_actor_is_ready():
         count += 1
     assert False
 
-def test_tenant_list_registered_actors():
+def test_tenant_list_registered_actors(headers):
     # passing another tenant should result in 1 actor.
-    headers = {'tenant': 'abaco_test_suite_tenant'}
+    headers = switch_tenant_in_header(headers)
     url = '{}/{}'.format(base_url, '/actors')
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert len(result) == 1
 
-def test_tenant_list_actor():
-    headers = {'tenant': 'abaco_test_suite_tenant'}
+def test_tenant_list_actor(headers):
+    headers = switch_tenant_in_header(headers)
     actor_id = get_actor_id(headers, name='abaco_test_suite_other_tenant')
     url = '{}/actors/{}'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
@@ -581,24 +586,24 @@ def test_tenant_list_actor():
     assert result['name'] == 'abaco_test_suite_other_tenant'
     assert result['id'] is not None
 
-def test_tenant_list_executions():
-    headers = {'tenant': 'abaco_test_suite_tenant'}
+def test_tenant_list_executions(headers):
+    headers = switch_tenant_in_header(headers)
     actor_id = get_actor_id(headers, name='abaco_test_suite_other_tenant')
     url = '{}/actors/{}/executions'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert len(result.get('ids')) == 0
 
-def test_tenant_list_messages():
-    headers = {'tenant': 'abaco_test_suite_tenant'}
+def test_tenant_list_messages(headers):
+    headers = switch_tenant_in_header(headers)
     actor_id = get_actor_id(headers, name='abaco_test_suite_other_tenant')
     url = '{}/actors/{}/messages'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert result.get('messages') == 0
 
-def test_tenant_list_workers():
-    headers = {'tenant': 'abaco_test_suite_tenant'}
+def test_tenant_list_workers(headers):
+    headers = switch_tenant_in_header(headers)
     actor_id = get_actor_id(headers, name='abaco_test_suite_other_tenant')
     url = '{}/actors/{}/workers'.format(base_url, actor_id)
     rsp = requests.get(url, headers=headers)
@@ -627,8 +632,8 @@ def test_remove_final_actors(headers):
         rsp = requests.delete(url, headers=headers)
         result = basic_response_checks(rsp)
 
-def test_tenant_remove_final_actors():
-    headers = {'tenant': 'abaco_test_suite_tenant'}
+def test_tenant_remove_final_actors(headers):
+    headers = switch_tenant_in_header(headers)
     url = '{}/actors'.format(base_url)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
