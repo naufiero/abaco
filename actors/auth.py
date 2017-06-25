@@ -73,6 +73,7 @@ def authorization():
         auth.authorization()
 
     """
+    g.admin = False
     if request.method == 'OPTIONS':
         # allow all users to make OPTIONS requests
         logger.info("Allowing request because of OPTIONS method.")
@@ -80,11 +81,13 @@ def authorization():
 
     # the 'ALL' role is a role set by agaveflask in case the access_control_type is none
     if codes.ALL_ROLE in g.roles:
+        g.admin = True
         logger.info("Allowing request because of ALL role.")
         return True
 
     # the admin role when JWT auth is configured:
     if codes.ADMIN_ROLE in g.roles:
+        g.admin = True
         logger.info("Allowing request because of ADMIN_ROLE.")
         return True
 
@@ -111,7 +114,9 @@ def authorization():
     logger.debug("db_id: {}".format(db_id))
     if request.method == 'GET':
         # GET requests require READ access
-        has_pem = check_permissions(user=g.user, actor_id=db_id, level='READ')
+        has_pem = check_permissions(user=g.user, actor_id=db_id, level=codes.READ)
+    elif request.method == 'DELETE':
+        has_pem = check_permissions(user=g.user, actor_id=db_id, level=codes.UPDATE)
     else:
         logger.debug("URL rule in request: {}".format(request.url_rule.rule))
         # first, only admins can create/update actors to be privileged, so check that:
@@ -123,10 +128,10 @@ def authorization():
         if request.method == 'POST':
             # POST to the messages endpoint requires EXECUTE
             if 'messages' in request.url_rule.rule:
-                has_pem = check_permissions(user=g.user, actor_id=db_id, level='EXECUTE')
+                has_pem = check_permissions(user=g.user, actor_id=db_id, level=codes.EXECUTE)
             # otherwise, we require UPDATE
             else:
-                has_pem = check_permissions(user=g.user, actor_id=db_id, level='UPDATE')
+                has_pem = check_permissions(user=g.user, actor_id=db_id, level=codes.UPDATE)
     if not has_pem:
         logger.info("NOT allowing request.")
         raise PermissionsException("Not authorized -- you do not have access to this actor.")
@@ -134,6 +139,9 @@ def authorization():
 def check_privileged():
     """Check if request is trying to make an actor privileged."""
     logger.debug("top of check_privileged")
+    # admins have access to all actors:
+    if g.admin:
+        return True
     data = request.get_json()
     if not data:
         data = request.form
