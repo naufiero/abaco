@@ -18,7 +18,7 @@ reg:
         api: reg
     volumes:
         - ./abaco.conf:/etc/service.conf
-        - /home/apim/logs/reg.log:/var/log/abaco.log
+        - /home/apim/logs/reg.log:/var/log/service.log
 
 mes:
     image: {{ docker_user }}/core:{{ abaco_tag }}
@@ -30,7 +30,7 @@ mes:
         api: mes
     volumes:
         - ./abaco.conf:/etc/service.conf
-        - /home/apim/logs/mes.log:/var/log/abaco.log
+        - /home/apim/logs/mes.log:/var/log/service.log
 
 agavemes:
     image: {{ docker_user }}/core:{{ abaco_tag }}
@@ -41,7 +41,7 @@ agavemes:
         api: agavemes
     volumes:
         - ./abaco.conf:/etc/service.conf
-        - /home/apim/logs/agavemes.log:/var/log/abaco.log
+        - /home/apim/logs/agavemes.log:/var/log/service.log
 
 admin:
     image: {{ docker_user }}/core:{{ abaco_tag }}
@@ -53,5 +53,5 @@ admin:
         api: admin
     volumes:
         - ./abaco.conf:/etc/service.conf
-        - /home/apim/logs/admin.log:/var/log/abaco.log
+        - /home/apim/logs/admin.log:/var/log/service.log
 
