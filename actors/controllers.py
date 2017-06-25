@@ -5,8 +5,9 @@ from flask_restful import Resource, Api, inputs
 
 from agaveflask.utils import RequestParser, ok
 
+from auth import check_permissions
 from channels import ActorMsgChannel, CommandChannel
-from codes import SUBMITTED, PERMISSION_LEVELS
+from codes import SUBMITTED, PERMISSION_LEVELS, READ
 from config import Config
 from errors import DAOError, ResourceError, PermissionsException, WorkerException
 from models import dict_to_camel, Actor, Execution, ExecutionsSummary, Worker, get_permissions, \
@@ -25,7 +26,9 @@ class ActorsResource(Resource):
         actors = []
         for k, v in actors_store.items():
             if v['tenant'] == g.tenant:
-                actors.append(Actor.from_db(v).display())
+                actor = Actor.from_db(v)
+                if check_permissions(g.user, actor.db_id, READ):
+                    actors.append(actor.display())
         logger.info("actors retrieved.")
         return ok(result=actors, msg="Actors retrieved successfully.")
 
