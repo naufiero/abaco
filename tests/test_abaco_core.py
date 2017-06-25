@@ -525,6 +525,77 @@ def test_add_permissions(headers):
     assert len(result) == 2
 
 
+# #########################
+# role based access control
+# #########################
+# The above tests were done with an admin user. In the following tests, we check RBAC with users with different Abaco
+# roles. The following defines the role types we check. These strings need to much the sufixes on the jwt files in this
+# tests directory.
+ROLE_TYPES = ['limited', 'privileged', 'user']
+
+def get_role_headers(role_type):
+    """
+    Return headers with a JWT representing a user with a specific Abaco role. Each role type is represented by a
+    *different* user. The valid role_type values are listed above.
+     """
+    with open('/tests/jwt-abaco_{}'.format(role_type), 'r') as f:
+        jwt = f.read()
+    jwt_header = os.environ.get('jwt_header', 'X-Jwt-Assertion-AGAVE-PROD')
+    return {jwt_header: jwt}
+
+def test_other_users_can_create_basic_actor():
+    for r_type in ROLE_TYPES:
+        headers = get_role_headers(r_type)
+        url = '{}/{}'.format(base_url, '/actors')
+        data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite_{}'.format(r_type)}
+        rsp = requests.post(url, data=data, headers=headers)
+        result = basic_response_checks(rsp)
+
+def test_other_users_actor_list():
+    for r_type in ROLE_TYPES:
+        headers = get_role_headers(r_type)
+        url = '{}/{}'.format(base_url, '/actors')
+        rsp = requests.get(url, headers=headers)
+        result = basic_response_checks(rsp)
+        # this list should only include the actors for this user.
+        assert len(result) == 1
+
+def test_other_users_get_actor():
+    for r_type in ROLE_TYPES:
+        headers = get_role_headers(r_type)
+        actor_id = get_actor_id(headers, 'abaco_test_suite_{}'.format(r_type))
+        url = '{}/actors/{}'.format(base_url, actor_id)
+        rsp = requests.get(url, headers=headers)
+        basic_response_checks(rsp)
+
+def test_other_users_can_delete_basic_actor():
+    for r_type in ROLE_TYPES:
+        headers = get_role_headers(r_type)
+        actor_id = get_actor_id(headers, 'abaco_test_suite_{}'.format(r_type))
+        url = '{}/actors/{}'.format(base_url, actor_id)
+        rsp = requests.delete(url, headers=headers)
+        basic_response_checks(rsp)
+
+# limited role:
+def test_limited_user_cannot_create_priv_actor():
+    headers = get_role_headers('limited')
+    url = '{}/{}'.format(base_url, '/actors')
+    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite', 'privileged': True}
+    rsp = requests.post(url, data=data, headers=headers)
+    assert rsp.status_code not in range(1-399)
+
+# privileged role:
+def test_priv_user_can_create_priv_actor():
+    headers = get_role_headers('privileged')
+    url = '{}/{}'.format(base_url, '/actors')
+    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite_priv_delete', 'privileged': True}
+    rsp = requests.post(url, data=data, headers=headers)
+    result = basic_response_checks(rsp)
+    actor_id = result.get('id')
+    url = '{}/{}/{}'.format(base_url, '/actors', actor_id)
+    rsp = requests.delete(url, headers=headers)
+    basic_response_checks(rsp)
+
 # ##############################
 # tenancy - tests for bleed over
 # ##############################
