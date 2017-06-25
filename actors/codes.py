@@ -8,7 +8,11 @@ ERROR = 'ERROR'
 BUSY = 'BUSY'
 
 # order of permissions implies level; i.e. NONE < READ < EXECUTE < UPDATE
-PERMISSION_LEVELS = ('NONE', 'READ', 'EXECUTE', 'UPDATE')
+NONE = 'NONE'
+READ = 'READ'
+EXECUTE = 'EXECUTE'
+UPDATE = 'UPDATE'
+PERMISSION_LEVELS = (NONE, READ, EXECUTE, UPDATE)
 
 # role set by agaveflask in case the access_control_type is none
 ALL_ROLE = 'ALL'
