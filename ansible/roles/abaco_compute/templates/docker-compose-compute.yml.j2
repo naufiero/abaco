@@ -11,7 +11,7 @@ spawner:
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
         - ./abaco.conf:/etc/service.conf
-        - /home/apim/logs/spawner.log:/var/log/abaco.log
+        - /home/apim/logs/spawner.log:/var/log/service.log
 
 health:
     image: {{ docker_user }}/core:{{ abaco_tag }}
@@ -21,4 +21,4 @@ health:
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
         - ./abaco.conf:/etc/service.conf
-        - /home/apim/logs/health.log:/var/log/abaco.log
+        - /home/apim/logs/health.log:/var/log/service.log
