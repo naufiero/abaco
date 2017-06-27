@@ -2,7 +2,7 @@ import json
 
 from flask import g, request
 from flask_restful import Resource, Api, inputs
-
+from werkzeug.exceptions import BadRequest
 from agaveflask.utils import RequestParser, ok
 
 from auth import check_permissions
@@ -34,7 +34,13 @@ class ActorsResource(Resource):
 
     def validate_post(self):
         parser = Actor.request_parser()
-        return parser.parse_args()
+        try:
+            return parser.parse_args()
+        except BadRequest as e:
+            msg = 'Unable to process the JSON description.'
+            if hasattr(e, 'data'):
+                msg = e.data.get('message')
+            raise DAOError("Invalid actor description: {}".format(msg))
 
     def post(self):
         logger.info("top of POST to register a new actor.")
@@ -128,7 +134,13 @@ class ActorResource(Resource):
         # remove since name is only required for POST, not PUT
         parser.remove_argument('name')
         # this update overrides all required and optional attributes
-        actor.update(parser.parse_args())
+        try:
+            actor.update(parser.parse_args())
+        except BadRequest as e:
+            msg = 'Unable to process the JSON description.'
+            if hasattr(e, 'data'):
+                msg = e.data.get('message')
+            raise DAOError("Invalid actor description: {}".format(msg))
         return actor
 
 
@@ -166,7 +178,13 @@ class ActorStateResource(Resource):
     def validate_post(self):
         parser = RequestParser()
         parser.add_argument('state', type=str, required=True, help="Set the state for this actor.")
-        args = parser.parse_args()
+        try:
+            args = parser.parse_args()
+        except BadRequest as e:
+            msg = 'Unable to process the JSON description.'
+            if hasattr(e, 'data'):
+                msg = e.data.get('message')
+            raise DAOError("Invalid actor state description: {}".format(msg))
         return args
 
 
@@ -211,7 +229,14 @@ class ActorExecutionsResource(Resource):
         # Accounting for memory is quite hard -- probably easier to cap all containers at a fixed amount or perhaps have
         # a graduated list of cap sized (e.g. small, medium and large).
         # parser.add_argument('mem', type=str, required=True, help="Memory usage, , of the execution.")
-        args = parser.parse_args()
+        try:
+            args = parser.parse_args()
+        except BadRequest as e:
+            msg = 'Unable to process the JSON description.'
+            if hasattr(e, 'data'):
+                msg = e.data.get('message')
+            raise DAOError("Invalid actor execution description: {}".format(msg))
+
         for k,v in args.items():
             try:
                 int(v)
@@ -416,7 +441,13 @@ class WorkersResource(Resource):
     def validate_post(self):
         parser = RequestParser()
         parser.add_argument('num', type=int, help="Number of workers to start (default is 1).")
-        args = parser.parse_args()
+        try:
+            args = parser.parse_args()
+        except BadRequest as e:
+            msg = 'Unable to process the JSON description.'
+            if hasattr(e, 'data'):
+                msg = e.data.get('message')
+            raise DAOError("Invalid POST: {}".format(msg))
         return args
 
     def post(self, actor_id):
@@ -515,7 +546,14 @@ class PermissionsResource(Resource):
         parser.add_argument('user', type=str, required=True, help="User owning the permission.")
         parser.add_argument('level', type=str, required=True,
                             help="Level of the permission: {}".format(PERMISSION_LEVELS))
-        args = parser.parse_args()
+        try:
+            args = parser.parse_args()
+        except BadRequest as e:
+            msg = 'Unable to process the JSON description.'
+            if hasattr(e, 'data'):
+                msg = e.data.get('message')
+            raise DAOError("Invalid permissions description: {}".format(msg))
+
         if not args['level'] in PERMISSION_LEVELS:
             raise ResourceError("Invalid permission level: {}. \
             The valid values are {}".format(args['level'], PERMISSION_LEVELS))
