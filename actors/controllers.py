@@ -435,7 +435,8 @@ class WorkersResource(Resource):
         result = []
         for id, worker in workers.items():
             worker.update({'id': id})
-            result.append(worker)
+            w = Worker(**worker)
+            result.append(w.display())
         return ok(result=result, msg="Workers retrieved successfully.")
 
     def validate_post(self):
@@ -509,7 +510,7 @@ class WorkerResource(Resource):
         except WorkerException as e:
             logger.debug("Did not find worker: {}. actor: {}.".format(worker_id, actor_id))
             raise ResourceError(e.msg, 404)
-        return ok(result=worker, msg="Worker retrieved successfully.")
+        return ok(result=worker.display(), msg="Worker retrieved successfully.")
 
     def delete(self, actor_id, worker_id):
         logger.debug("top of DELETE /actors/{}/workers/{}.".format(actor_id, worker_id))
