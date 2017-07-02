@@ -1,4 +1,5 @@
 from copy import deepcopy
+import datetime
 import json
 import time
 import uuid
@@ -31,6 +32,26 @@ def dict_to_camel(d):
     for k,v in d.items():
         d2[under_to_camel(k)] = v
     return d2
+
+def get_current_utc_time():
+    """Return string representation of current time in UTC."""
+    utcnow = datetime.datetime.utcnow()
+    return str(utcnow.timestamp())
+
+def display_time(t):
+    """ Convert a string representation of a UTC timestamp to a display string."""
+    if not t:
+        return "None"
+    try:
+        time_f = float(t)
+        dt = datetime.datetime.fromtimestamp(time_f)
+    except ValueError as e:
+        logger.error("Invalid time data. Could not cast {} to float. Exception: {}".format(t, e))
+        raise errors.DAOError("Error retrieving time data.")
+    except TypeError as e:
+        logger.error("Invalid time data. Could not convert float to datetime. t: {}. Exception: {}".format(t, e))
+        raise errors.DAOError("Error retrieving time data.")
+    return str(dt)
 
 
 class DbDict(dict):
@@ -150,6 +171,8 @@ class Actor(AbacoDAO):
         ('status_message', 'optional', 'status_message', str, 'Explanation of status.', ''),
         ('executions', 'optional', 'executions', dict, 'Executions for this actor.', {}),
         ('state', 'optional', 'state', dict, "Current state for this actor.", {}),
+        ('create_time', 'derived', 'create_time', str, "Time (UTC) that this actor was created.", {}),
+        ('last_update_time', 'derived', 'last_update_time', str, "Time (UTC) that this actor was last updated.", {}),
 
         ('tenant', 'provided', 'tenant', str, 'The tenant that this actor belongs to.', None),
         ('api_server', 'provided', 'api_server', str, 'The base URL for the tenant that this actor belongs to.', None),
@@ -175,10 +198,18 @@ class Actor(AbacoDAO):
         except KeyError:
             logger.debug("name or tenant missing from actor dict: {}.".format(d))
             raise errors.DAOError("Required field name or tenant missing")
+        # id fields:
         self.id = actor_id
         self.db_id = db_id
+
+        # time fields
+        time_str = get_current_utc_time()
+        self.create_time = time_str
+        self.last_update_time = time_str
         if name == 'id':
             return actor_id
+        elif name == 'create_time' or name == 'last_update_time':
+            return time_str
         else:
             return db_id
 
@@ -195,6 +226,10 @@ class Actor(AbacoDAO):
         self.pop('executions')
         self.pop('tenant')
         self.pop('api_server')
+        c_time_str = self.pop('create_time')
+        up_time_str = self.pop('last_update_time')
+        self['create_time'] = display_time(c_time_str)
+        self['last_update_time'] = display_time(up_time_str)
         return self.case()
 
     def get_hypermedia(self):
@@ -261,6 +296,8 @@ class Execution(AbacoDAO):
         ('actor_id', 'required', 'actor_id', str, 'The human readable id for the actor associated with this execution.', None),
         ('executor', 'required', 'executor', str, 'The user who triggered this execution.', None),
         ('worker_id', 'optional', 'worker_id', str, 'The worker who supervised this execution.', None),
+        ('message_received_time', 'derived', 'message_received_time', str, 'Time (UTC) the message was received.', None),
+        ('start_time', 'optional', 'start_time', str, 'Time (UTC) the execution started.', None),
         ('runtime', 'required', 'runtime', str, 'Runtime, in milliseconds, of the execution.', None),
         ('cpu', 'required', 'cpu', str, 'CPU usage, in user jiffies, of the execution.', None),
         ('io', 'required', 'io', str,
@@ -279,7 +316,12 @@ class Execution(AbacoDAO):
                 return d[name]
         except KeyError:
             pass
-        return self.get_uuid()
+        self.id = self.get_uuid()
+        self.message_received_time = get_current_utc_time()
+        if name == 'id':
+            return self.id
+        else:
+            return self.message_received_time
 
     @classmethod
     def add_execution(cls, actor_id, ex):
@@ -325,7 +367,7 @@ class Execution(AbacoDAO):
             raise errors.ExecutionException("Execution {} not found.".format(execution_id))
 
     @classmethod
-    def finalize_execution(cls, actor_id, execution_id, status, stats, final_state, exit_code):
+    def finalize_execution(cls, actor_id, execution_id, status, stats, final_state, exit_code, start_time):
         """
         Update an execution status and stats after the execution is complete or killed.
          `actor_id` should be the dbid of the actor.
@@ -334,6 +376,7 @@ class Execution(AbacoDAO):
          `stats` parameter should be a dictionary with io, cpu, and runtime.
          `final_state` parameter should be the `State` object returned from the docker inspect command.
          `exit_code` parameter should be the exit code of the container.
+         `start_time` should be the start time (UTC string) of the execution. 
          """
         params_str = "actor: {}. ex: {}. status: {}. final_state: {}. exit_code: {}. stats: {}".format(
             actor_id, execution_id, status, final_state, exit_code, stats)
@@ -354,6 +397,7 @@ class Execution(AbacoDAO):
             executions_store.update_subfield(actor_id, execution_id, 'runtime', stats['runtime'])
             executions_store.update_subfield(actor_id, execution_id, 'final_state', final_state)
             executions_store.update_subfield(actor_id, execution_id, 'exit_code', exit_code)
+            executions_store.update_subfield(actor_id, execution_id, 'start_time', start_time)
         except KeyError:
             logger.error("Could not finalize execution. execution not found. Params: {}".format(params_str))
             raise errors.ExecutionException("Execution {} not found.".format(execution_id))
@@ -394,6 +438,10 @@ class Execution(AbacoDAO):
         """Return a display version of the execution."""
         self.update(self.get_hypermedia())
         tenant = self.pop('tenant')
+        start_time_str = self.pop('start_time')
+        received_time_str = self.pop('message_received_time')
+        self['start_time'] = display_time(start_time_str)
+        self['message_received_time'] = display_time(received_time_str)
         self.actor_id = Actor.get_display_id(tenant, self.actor_id)
         return self.case()
 
@@ -485,7 +533,9 @@ class Worker(AbacoDAO):
         ('status', 'required', 'status', str, 'Status of the worker.', None),
         ('host_id', 'required', 'host_id', str, 'id of the host where worker is running.', None),
         ('host_ip', 'required', 'host_ip', str, 'ip of the host where worker is running.', None),
-        ('last_execution', 'required', 'last_execution', str, 'Last time the worker executed an actor container.', None),
+        ('last_execution_time', 'required', 'last_execution_time', str, 'Last time the worker executed an actor container.', None),
+        ('last_health_check_time', 'required', 'last_health_check_time', str, 'Last time the worker had a health check.',
+         None),
         ]
 
     @classmethod
@@ -579,10 +629,17 @@ class Worker(AbacoDAO):
     def update_worker_execution_time(cls, actor_id, worker_id):
         """Pass db_id as `actor_id` parameter."""
         logger.debug("top of update_worker_execution_time().")
-        now = time.time()
-        workers_store.update_subfield(actor_id, worker_id, 'last_execution', now)
-        workers_store.update_subfield(actor_id, worker_id, 'last_update', now)
+        now = get_current_utc_time()
+        workers_store.update_subfield(actor_id, worker_id, 'last_execution_time', now)
         logger.info("worker execution time updated. worker_id: {}".format(worker_id))
+
+    @classmethod
+    def update_worker_health_time(cls, actor_id, worker_id):
+        """Pass db_id as `actor_id` parameter."""
+        logger.debug("top of update_worker_health_time().")
+        now = get_current_utc_time()
+        workers_store.update_subfield(actor_id, worker_id, 'last_health_check_time', now)
+        logger.info("worker last_health_check_time updated. worker_id: {}".format(worker_id))
 
     @classmethod
     def update_worker_status(cls, actor_id, worker_id, status):
@@ -597,6 +654,13 @@ class Worker(AbacoDAO):
         """
         return '058'
 
+    def display(self):
+        """Return a representation fit for display."""
+        last_execution_time_str = self.pop('last_execution_time')
+        last_health_check_time_str = self.pop('last_health_check_time')
+        self['last_execution_time'] = display_time(last_execution_time_str)
+        self['last_health_check_time'] = display_time(last_health_check_time_str)
+        return self.case()
 
 class Client(AbacoDAO):
     """
