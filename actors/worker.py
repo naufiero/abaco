@@ -189,15 +189,15 @@ def subscribe(tenant,
             logger.info("Agave client `ag` is None -- not passing access token.")
         logger.info("Passing update environment: {}".format(environment))
         try:
-            stats, logs, final_state, exit_code = execute_actor(actor_id, worker_id, worker_ch, image,
-                                                                message, environment, privileged)
+            stats, logs, final_state, exit_code, start_time = execute_actor(actor_id, worker_id, worker_ch, image,
+                                                                            message, environment, privileged)
         except DockerStartContainerError as e:
             logger.error("Got DockerStartContainerError: {}".format(str(e)))
             Actor.set_status(actor_id, ERROR)
             continue
         # Add the completed stats to the execution
         logger.info("Actor container finished successfully. Got stats object:{}".format(str(stats)))
-        Execution.finalize_execution(actor_id, execution_id, COMPLETE, stats, final_state, exit_code)
+        Execution.finalize_execution(actor_id, execution_id, COMPLETE, stats, final_state, exit_code, start_time)
         logger.info("Added execution: {}".format(execution_id))
 
         # Add the logs to the execution

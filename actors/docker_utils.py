@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 from config import Config
 from codes import BUSY
-from models import Worker
+from models import Worker, get_current_utc_time
 
 TAG = os.environ.get('TAG') or Config.get('general', 'TAG') or ''
 AE_IMAGE = '{}{}'.format(os.environ.get('AE_IMAGE', 'abaco/core'), TAG)
@@ -182,7 +182,8 @@ def run_worker(image, ch_name, worker_id):
              'status': BUSY,
              'host_id': host_id,
              'host_ip': host_ip,
-             'last_execution': 0}
+             'last_execution_time': 0,
+             'last_health_check_time': get_current_utc_time() }
 
 def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=False):
     """
@@ -221,6 +222,7 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
 
     # create and start the container
     container = cli.create_container(image=image, environment=d, volumes=volumes, host_config=host_config)
+    start_time = get_current_utc_time()
     try:
         cli.start(container=container.get('Id'))
     except Exception as e:
@@ -320,4 +322,4 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
     except Exception as e:
         logger.error("Exception trying to remove actor: {}".format(e))
     result['runtime'] = int(stop - start)
-    return result, logs, container_state, exit_code
+    return result, logs, container_state, exit_code, start_time

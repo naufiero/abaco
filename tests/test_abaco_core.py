@@ -137,7 +137,7 @@ def test_register_actor(headers):
     result = basic_response_checks(rsp)
     assert 'description' in result
     assert 'owner' in result
-    # assert result['owner'] == 'jstubbs'
+    assert result['owner'] == 'testuser'
     assert result['image'] == 'jstubbs/abaco_test'
     assert result['name'] == 'abaco_test_suite'
     assert result['id'] is not None
@@ -149,7 +149,7 @@ def test_register_stateless_actor(headers):
     result = basic_response_checks(rsp)
     assert 'description' in result
     assert 'owner' in result
-    # assert result['owner'] == 'jstubbs'
+    assert result['owner'] == 'testuser'
     assert result['image'] == 'jstubbs/abaco_test'
     assert result['name'] == 'abaco_test_suite_statelesss'
     assert result['id'] is not None
@@ -171,6 +171,8 @@ def test_list_actor(headers):
     result = basic_response_checks(rsp)
     assert 'description' in result
     assert 'owner' in result
+    assert 'create_time' or 'createTime' in result
+    assert 'last_update_time' or 'lastUpdateTime' in result
     assert result['image'] == 'jstubbs/abaco_test'
     assert result['name'] == 'abaco_test_suite'
     assert result['id'] is not None
@@ -273,11 +275,15 @@ def check_execution_details(result, actor_id, exc_id):
         assert 'worker_id' in result
         assert 'exit_code' in result
         assert 'final_state' in result
+        assert 'message_received_time' in result
+        assert 'start_time' in result
     else:
         assert result.get('actorId') == actor_id
         assert 'workerId' in result
         assert 'exitCode' in result
         assert 'finalState' in result
+        assert 'messageReceivedTime' in result
+        assert 'startTime' in result
 
     assert result.get('id') == exc_id
     # note: it is possible for io to be 0 in which case an `assert result['io']` will fail.
@@ -423,6 +429,22 @@ def test_update_actor(headers):
 # admin API
 # ################
 
+def check_worker_fields(worker):
+    assert worker.get('image') == 'jstubbs/abaco_test'
+    assert worker.get('status') == 'READY'
+    assert worker.get('location')
+    assert worker.get('cid')
+    assert worker.get('tenant')
+    if case == 'snake':
+        assert worker.get('ch_name')
+        assert 'last_execution_time' in worker
+        assert 'last_health_check_time' in worker
+    else:
+        assert worker.get('chName')
+        assert 'lastExecutionTime' in worker
+        assert 'lastHealthCheckTime' in worker
+
+
 def test_list_workers(headers):
     actor_id = get_actor_id(headers)
     url = '{}/actors/{}/workers'.format(base_url, actor_id)
@@ -432,13 +454,7 @@ def test_list_workers(headers):
     assert len(result) > 0
     # get the first worker
     worker = result[0]
-    assert worker.get('image') == 'jstubbs/abaco_test'
-    assert worker.get('status') == 'READY'
-    assert worker.get('location')
-    assert worker.get('cid')
-    assert worker.get('last_execution')
-    assert worker.get('ch_name')
-    assert worker.get('tenant')
+    check_worker_fields(worker)
 
 def test_cors_list_workers(headers):
     actor_id = get_actor_id(headers)
@@ -683,11 +699,7 @@ def test_tenant_list_workers(headers):
     assert len(result) > 0
     # get the first worker
     worker = result[0]
-    assert worker.get('image') == 'jstubbs/abaco_test'
-    assert worker.get('status') == 'READY'
-    assert worker.get('location')
-    assert worker.get('cid')
-    assert worker.get('ch_name')
+    check_worker_fields(worker)
 
 
 # ##############
