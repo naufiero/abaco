@@ -52,6 +52,7 @@ def check_workers(actor_id, ttl):
         # first check if worker is responsive; if not, will need to manually kill
         logger.info("Checking health for worker: {}".format(worker))
         ch = WorkerChannel(name=worker['ch_name'])
+        worker_id = worker.get('id')
         try:
             logger.debug("Issuing status check to channel: {}".format(worker['ch_name']))
             result = ch.put_sync('status', timeout=5)
@@ -62,7 +63,7 @@ def check_workers(actor_id, ttl):
             except DockerError:
                 pass
             try:
-                Worker.delete_worker(actor_id, worker['ch_name'])
+                Worker.delete_worker(actor_id, worker_id)
             except Exception as e:
                 logger.error("Got exception trying to delete worker: {}".format(e))
             continue
@@ -70,10 +71,12 @@ def check_workers(actor_id, ttl):
             logger.error("Worker responded unexpectedly: {}, deleting worker.".format(result))
             try:
                 rm_container(worker['cid'])
-                Worker.delete_worker(actor_id, worker['ch_name'])
+                Worker.delete_worker(actor_id, worker_id)
             except Exception as e:
                 logger.error("Got error removing/deleting worker: {}".format(e))
         else:
+            # worker is healthy so update last health check:
+            Worker.update_worker_health_time(actor_id, worker_id)
             logger.info("Worker ok.")
         # now check if the worker has been idle beyond the ttl:
         if ttl < 0:
