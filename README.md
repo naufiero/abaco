@@ -297,12 +297,8 @@ some of the more advanced features.
     processes (or actors!) on a single host, the system can be easily
     deployed and scaled up across any number of hosts. See the `ansible`
     directory for scripts used to deploy abaco in production-like
-    environments. For more information on the abaco architecture see
+    environments. For more information on the Abaco architecture see
     (<https://github.com/TACC/abaco/blob/master/docs/architecture.rst>).
-    UPDATE: with the announcement of Docker 1.12 and embedded
-    orchestration, parts of this section will be updated to make
-    deploying on a swarm cluster seamless and automatic from the compose
-    file.
 -   **Configurable**: Many aspects of the Abaco system are configurable
     via the abaco.conf file. The example contained in this repository is
     self-documenting.
@@ -311,6 +307,23 @@ some of the more advanced features.
     system. The tenants can be configured in the `abaco.conf` file and
     read out of the request through either a JWT or a special tenant
     header.
+-   **Basic Permissions System**: When configured to run with JWT authentication,
+    Abaco parses the JWT for the user's identity. Actors are "owned" by the user who
+    registers them, and initially actors are private to their owner. Users can share
+    actors with other user by making a POST to the actor's permissions endpoint. Three
+    permissions are availale: READ, EXECUTE and UPDATE, and currently, higher permission
+    levels imply lower ones. Actors can be made public by granting a permission to the
+    ABACO_WORLD user.
+-   **Role Based Access Control**: When configured to run with JWT authentication, Abaco
+    parses the JWT for the user's occupied roles. Four specific roles are recognized: admin,
+    privileged, user, and limited. Users with the admin role have full access to all actors,
+    can create or update actors to be "privileged", and can add or remove workers for any actor.
+    Users with the privileged role essentially have admin rights to the actors they own or
+    have update permission on. Users with the user role have basic access to Abaco: they can
+    create and execute actors, but they cannot create privileged actors and they cannot modify
+    the workers associated with their actors. Finally, the limited role is a place holder for
+    future work. We plan to enable users with the limited role to make a (configurable) limited
+    number of executions to actors that are shared with them.
 -   **Integration with the Agave (<http://agaveapi.co/>)
     science-as-a-service API platform**: Abaco can be used as an "event
     processor" in conjunction with the Agave API platform. When deployed
