@@ -1,0 +1,90 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+	<head>
+	    <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+	    <meta http-equiv="cache-control" content="no-cache">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+	    <title>Abaco Dashboard</title>
+        <script src="//code.jquery.com/jquery-1.12.4.js"></script>
+        <script src="//cdn.datatables.net/1.10.15/js/jquery.dataTables.min.js"></script>
+
+        <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.15/css/jquery.dataTables.min.css">
+
+        <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+        <script>
+            $(document).ready(function(){
+                $('#actorsTable').DataTable();
+            });
+        </script>
+	</head>
+
+	<body>
+		<div class="container-fluid" id="content">
+            <h1> Abaco Dashboard </h1>
+            <form method="post" action="/admin/dashboard">
+                Abaco Instance (base URL): <input type="text" class="form-control" name="base_url" value="{{ base_url }}">
+                <br>
+                JWT Header Name: <input type="text" class="form-control" name="jwt_header" value="{{ jwt_header }}">
+                <br>
+                JWT: <input type="text" class="form-control" name="jwt" value="{{ jwt }}">
+                <br>
+                <input type="submit" class="btn btn-primary" value="Go">
+            </form>
+
+            {% if error %}
+            <div style="color:#FF0000" id="error"> There was an error: {{ error }} </div>
+            {% endif %}
+
+
+            {% if actors %}
+            <div id="actors">
+                <h2> Actors </h2>
+                <div> URL: {{ url }}</div>
+                <table id="actorsTable" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Tenant</th>
+                            <th>Actor ID</th>
+                            <th>Actor Name</th>
+                            <th>Image</th>
+                            <th>Owner</th>
+                            <th>Actor Status</th>
+                            <th>Pending Messages</th>
+                            <th>Total Executions</th>
+                            <th>Total Runtime</th>
+                            <th>Create Time</th>
+                            <th>Last Update Time</th>
+                            <th>Worker ID</th>
+                            <th>Last Execution Time</th>
+                            <th>Last Health Check</th>
+                            <th>Worker Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for actor in actors %}
+                        <tr>
+                            <td>{{ actor.tenant }}</td>
+                            <td>{{ actor.id }}</td>
+                            <td>{{ actor.name }}</td>
+                            <td>{{ actor.image }}</td>
+                            <td>{{ actor.owner }}</td>
+                            <td>{{ actor.status }}</td>
+                            <td>{{ actor.messages }}</td>
+                            <td>{{ actor.executions }}</td>
+                            <td>{{ actor.runtime }}</td>
+                            <td>{{ actor.createTime }}</td>
+                            <td>{{ actor.lastUpdateTime }}</td>
+                            <td>{{ actor.worker.id }}</td>
+                            <td>{{ actor.worker.lastExecutionTime }}</td>
+                            <td>{{ actor.worker.lastHealthCheckTime }}</td>
+                            <td>{{ actor.worker.status }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+		</div>
+	</body>
+
+</html>
