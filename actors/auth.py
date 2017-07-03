@@ -40,7 +40,7 @@ PUB_KEY = get_pub_key()
 
 TOKEN_RE = re.compile('Bearer (.+)')
 
-WORLD_USER = 'world'
+WORLD_USER = 'ABACO_WORLD'
 
 def get_pub_key():
     pub_key = Config.get('web', 'apim_public_key')
