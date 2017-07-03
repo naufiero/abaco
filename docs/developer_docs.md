@@ -20,12 +20,7 @@ root and the compose file will use the local-dev.conf file there (see the Abaco 
 The abaco.conf file in the project root should be self documenting and contain all possible options. Here we want
 to highlight some of the bigger, more important config options
 
-1) The database used: Current options are Mongo 3 and Redis. The store.py module provides the interface and
-implementation for each so that another database could be added relatively easily. Redis provides better
-performance and more complete transaction semantics but the entire dataset must live in memory or else
-we will have to implement sharding in our application. Mongo3 spools to disk meaning it doesn't have the spacial
-shortcomings, however, as of 3.4, it does not provide complete transaction semantics. See "Database Considerations"
-below.
+1) Logging: Abaco has two kinds of logging configuration. First is the log strategy to use, which can be either 'combined' so that all logs go into one file or 'split' so that each process logs to a separate file. Second, logging can be configured by level ('CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'). Log level can be set for the entire Abaco instance all at once (e.g. level = WARN) or for specific modules (e.g level.spawner = DEBUG).
 
 2) Whether to generate clients: The Abaco system can be configured to dynamically generate an OAuth client as well as
 a set of access tokens whenever it starts a worker. In this situation, the worker will maintain a valid access token
@@ -70,37 +65,37 @@ preceded by a colon (:) character in it.
 
 For example,
 
-    ```shell
-    $ export TAG=:I-12
-    $ docker build -t abaco/core$TAG .
-    ```
+```shell
+$ export TAG=:I-12
+$ docker build -t abaco/core$TAG .
+```
 Auxiliary images can be built from the Dockerfiles within the images folder. In particular, the abaco/nginx image required
 to start up the stack can built from within the images/nginx directory. For example
 
-    ```shell
-    $ cd images/nginx
-    $ docker build -t abaco/nginx$TAG .
-    ```
+```shell
+$ cd images/nginx
+$ docker build -t abaco/nginx$TAG .
+```
 
 **Starting the Development Stack**
 
 Once the images are built, start the development stack by first changing into the project root and
 exporting the abaco_path and TAG variables. You also need to create an abaco.log file in the root:
 
-    ```shell
-    $ export abaco_path=$(pwd)
-    $ export TAG=:I-12
-    $ touch abaco.log
-    ```
+```shell
+$ export abaco_path=$(pwd)
+$ export TAG=:I-12
+$ touch abaco.log
+```
 The abaco_path variable needs to contain the path to a directory with an abaco.conf file. It is used by Abaco containers to
 know where to find the config file. Note that the abaco.conf contains the default IP address of the Docker0 gateway for
 Mongo and Redis. If your Docker0 gateway IP is different, you will need to updte the abaco.conf file.
 
 Finally, start the Abaco containers with the following command:
 
-    ```shell
-    $ docker-compose -f dc-all.yml up -d
-    ```
+```shell
+$ docker-compose -f dc-all.yml up -d
+```
 Note that this will command will still run the default (production) versions of the auxiliary images, such as nginx
 and the databases.
 
@@ -114,21 +109,21 @@ the Abaco core functionality.
 
 The tests are packaged into their own Docker image for convenience. To run the tests, first build the tests image:
 
-    ```shell
-    $ docker build -f Dockerfile-test -t abaco/testsuite$TAG .
-    ```
+```shell
+$ docker build -f Dockerfile-test -t abaco/testsuite$TAG .
+```
 
 To run the functional tests, execute the following:
 
-    ```shell
-    $ docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/service.conf -it --rm abaco/testsuite$TAG
-    ```
+```shell
+$ docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v $(pwd)/local-dev.conf:/etc/service.conf -it --rm abaco/testsuite$TAG
+```
 
 Run the unit tests with a command similar to the following, changing the test module as the end as necessary:
 
-    ```shell
-    $ docker run -e base_url=http://172.17.0.1:8000 -v $(pwd)/local-dev.conf:/etc/service.conf --entrypoint=py.test -it --rm abaco/testsuite$TAG /tests/test_store.py
-    ```
+```shell
+$ docker run -e base_url=http://172.17.0.1:8000 -v $(pwd)/local-dev.conf:/etc/service.conf --entrypoint=py.test -it --rm abaco/testsuite$TAG /tests/test_store.py
+```
 
 Dev, Staging and Master Branches and Environments
 -------------------------------------------------
@@ -158,7 +153,7 @@ We divide up the state persisted in the Abaco system into "stores" defined in th
 these stores represent an independent collection of data (though there are relations) and thus can be
 stored in different databases.
 
-We currently use both Redis and MongoDB fi=or different stores. We use Redis for current application state
+We currently use both Redis and MongoDB for different stores. We use Redis for current application state
 (e.g. actors_store and workers_store) where transaction semantics are needed and the size of the
 dataset will be relatively small. We use Mongo for the permissions, accounting and logging data (permissions_store,
 executions_store and logs_store). Naturally, the log data (actual raw logs from the container executions) presents a
