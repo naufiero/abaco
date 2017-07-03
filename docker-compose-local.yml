@@ -1,7 +1,7 @@
 ---
 
 nginx:
-    image: abaco/nginx
+    image: abaco/nginx$TAG
     volumes:
         - ./local-dev.conf:/etc/service.conf
     ports:
