@@ -19,6 +19,25 @@ from worker import shutdown_workers, shutdown_worker
 from agaveflask.logs import get_logger
 logger = get_logger(__name__)
 
+class AdminActorsResource(Resource):
+    def get(self):
+        logger.debug("top of GET /admin/actors")
+        actors = []
+        for k, v in actors_store.items():
+            actor = Actor.from_db(v)
+            actor.workers = Worker.get_workers(actor.db_id)
+            for id, worker in actor.workers.items():
+                actor.worker = worker
+                break
+            actor.messages = len(ActorMsgChannel(actor_id=actor.db_id)._queue._queue)
+            summary = ExecutionsSummary(db_id=actor.db_id)
+            actor.executions = summary.total_executions
+            actor.runtime = summary.total_runtime
+            actors.append(actor)
+        logger.info("actors retrieved.")
+        return ok(result=actors, msg="Actors retrieved successfully.")
+
+
 class ActorsResource(Resource):
 
     def get(self):
