@@ -1,10 +1,11 @@
-from flask import Flask
+from flask import Flask, render_template
 from flask_cors import CORS
 
 from agaveflask.utils import AgaveApi, handle_error
 
 from auth import authn_and_authz
-from controllers import PermissionsResource, WorkersResource, WorkerResource
+from controllers import AdminActorsResource, PermissionsResource, WorkersResource, WorkerResource
+from dashboard import dashboard
 
 app = Flask(__name__)
 CORS(app)
@@ -24,6 +25,14 @@ def handle_all_errors(e):
 api.add_resource(WorkersResource, '/actors/<string:actor_id>/workers')
 api.add_resource(PermissionsResource, '/actors/<string:actor_id>/permissions')
 api.add_resource(WorkerResource, '/actors/<string:actor_id>/workers/<string:worker_id>')
+api.add_resource(AdminActorsResource, '/admin/actors')
+
+# web app
+@app.route('/admin/dashboard', methods=['POST', 'GET'])
+def admin_dashboard():
+    return dashboard()
+
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug=True)
+    # must be threaded to support the dashboard which can in some cases, make requests to the admin API.
+    app.run(host='0.0.0.0', debug=True, threaded=True)
