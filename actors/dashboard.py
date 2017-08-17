@@ -11,7 +11,18 @@ from models import dict_to_camel, display_time
 
 def dashboard():
     # default to using the local instance
-    jwt = g.jwt
+    try:
+        jwt = g.jwt
+    except AttributeError:
+        error = "JWT mising. context: {}".format(dir(g))
+        return render_template('dashboard.html',
+                               actors=[],
+                               jwt="",
+                               jwt_header="",
+                               base_url="",
+                               url="",
+                               error=error)
+
     jwt_header = g.jwt_header_name
     base_url = 'http://172.17.0.1:8000'
     url = "{}/admin/actors".format(base_url)
@@ -76,9 +87,18 @@ def dashboard():
                 for actor in actors_data:
                     a = dict_to_camel(actor)
                     worker = a.get('worker')
-                    a['worker'] = dict_to_camel(worker)
-                    a['worker']['lastHealthCheckTime'] = display_time(a['worker'].get('lastHealthCheckTime'))
-                    a['worker']['lastExecutionTime'] = display_time(a['worker'].get('lastExecutionTime'))
+                    if worker:
+                        try:
+                            a['worker'] = dict_to_camel(worker)
+                            a['worker']['lastHealthCheckTime'] = display_time(a['worker'].get('lastHealthCheckTime'))
+                            a['worker']['lastExecutionTime'] = display_time(a['worker'].get('lastExecutionTime'))
+                        except KeyError as e:
+                            logger.error("Error pulling worker data from admin api. Exception: {}".format(e))
+                    else:
+                        a['worker'] = {'lastHealthCheckTime': '',
+                                       'lastExecutionTime': '',
+                                       'id': '',
+                                       'status': ''}
                     logger.info("Adding actor data after converting to camel: {}".format(a))
                     a['createTime'] = display_time(a.get('createTime'))
                     a['lastUpdateTime'] = display_time(a.get('lastUpdateTime'))
