@@ -184,3 +184,14 @@ def get_db_id():
     actor_id = path_split[2]
     logger.debug("actor_id: {}".format(actor_id))
     return Actor.get_dbid(g.tenant, actor_id)
+
+def get_tenants():
+    """Return a list of tenants"""
+    return ['AGAVE-PROD',
+            'ARAPORT-ORG',
+            'DESIGNSAFE',
+            'DEV-STAGING',
+            'IPLANTC-ORG',
+            'IREC',
+            'TACC-PROD',
+            'VDJSERVER-ORG']
