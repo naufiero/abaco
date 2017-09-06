@@ -6,8 +6,10 @@ import os
 import time
 import rabbitpy
 
+from agaveflask.auth import get_api_server
+
 from agave import Agave
-from auth import get_api_server, get_tenants
+from auth import get_tenants
 from channels import ClientsChannel
 from models import Actor, Client, Worker
 from errors import ClientException, WorkerException
