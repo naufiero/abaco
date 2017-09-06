@@ -4,6 +4,8 @@ import time
 
 import rabbitpy
 
+from channelpy.exceptions import ChannelTimeoutException
+
 from codes import ERROR
 from config import Config
 from docker_utils import DockerError, run_worker
@@ -113,13 +115,19 @@ class Spawner(object):
             if generate_clients == 'true':
                 logger.info("Getting client for worker {}".format(idx))
                 client_ch = ClientsChannel()
-                client_msg = client_ch.request_client(tenant=tenant,
-                                                      actor_id=actor_id,
-                                                      # new_workers is a dictionary of dictionaries; list(d) creates a
-                                                      # list of keys for a dictionary d. hence, the idx^th entry
-                                                      # of list(ner_workers) should be the key.
-                                                      worker_id=new_workers[list(new_workers)[idx]]['id'],
-                                                      secret=self.secret)
+                try:
+                    client_msg = client_ch.request_client(tenant=tenant,
+                                                          actor_id=actor_id,
+                                                          # new_workers is a dictionary of dictionaries; list(d) creates a
+                                                          # list of keys for a dictionary d. hence, the idx^th entry
+                                                          # of list(ner_workers) should be the key.
+                                                          worker_id=new_workers[list(new_workers)[idx]]['id'],
+                                                          secret=self.secret)
+                except ChannelTimeoutException as e:
+                    logger.error("Got a ChannelTimeoutException trying to generate a client: {}".format(e))
+                    # put actor in an error state and return
+                    self.error_out_actor(actor_id, [], e.message)
+                    return
                 # we need to ignore errors when generating clients because it's possible it is not set up for a specific
                 # tenant. we log it instead.
                 if client_msg.get('status') == 'error':
@@ -172,13 +180,7 @@ class Spawner(object):
         except SpawnerException as e:
             logger.info("Caught SpawnerException:{}".format(str(e)))
             # in case of an error, put the actor in error state and kill all workers
-            Actor.set_status(actor_id, ERROR, status_message=e.message)
-            for worker in workers:
-                try:
-                    self.kill_worker(worker)
-                except DockerError as e:
-                    logger.info("Received DockerError trying to kill worker: {}. Exception: {}".format(worker, e))
-                    logger.info("Spawner will continue on since this is exception processing.")
+            self.error_out_actor(actor_id, workers, e.message)
             raise SpawnerException(message=e.message)
         return channels, anon_channels, workers
 
@@ -206,6 +208,17 @@ class Spawner(object):
             msg = "Got an error status from worker: {}. Raising an exception.".format(str(result))
             logger.error("Spawner received an invalid message from worker. Message: ".format(result))
             raise SpawnerException(msg)
+
+    def error_out_actor(self, actor_id, workers, message):
+        """In case of an error, put the actor in error state and kill all workers"""
+        self.error_out_actor(actor_id, message)
+        Actor.set_status(actor_id, ERROR, status_message=e.message)
+        for worker in workers:
+            try:
+                self.kill_worker(worker)
+            except DockerError as e:
+                logger.info("Received DockerError trying to kill worker: {}. Exception: {}".format(worker, e))
+                logger.info("Spawner will continue on since this is exception processing.")
 
     def kill_worker(self, worker):
         pass
