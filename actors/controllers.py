@@ -126,9 +126,10 @@ class ActorResource(Resource):
         args = self.validate_put(actor)
         logger.debug("PUT args validated successfully.")
         args['tenant'] = g.tenant
-        update_image = False
-        if args['image'] == previous_image:
-            logger.debug("new image is the same. not updating actor.")
+        # user can force an update by setting the force param:
+        update_image = args.get('force')
+        if not update_image and args['image'] == previous_image:
+            logger.debug("new image is the same and force was false. not updating actor.")
             args['status'] = actor.status
         else:
             update_image = True
@@ -139,7 +140,7 @@ class ActorResource(Resource):
         actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
         logger.info("updated actor {} stored in db.".format(actor_id))
-        worker_ids = Worker.request_worker(actor.db_id)
+        worker_ids = [Worker.request_worker(actor.db_id)]
         if update_image:
             ch = CommandChannel()
             ch.put_cmd(actor_id=actor.db_id, worker_ids=worker_ids, image=actor.image, tenant=args['tenant'])
@@ -152,6 +153,7 @@ class ActorResource(Resource):
         parser = Actor.request_parser()
         # remove since name is only required for POST, not PUT
         parser.remove_argument('name')
+        parser.add_argument('force', type=bool, required=False, help="Whether to force an update of the actor image", default=False)
         # this update overrides all required and optional attributes
         try:
             actor.update(parser.parse_args())
