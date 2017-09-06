@@ -529,7 +529,11 @@ class WorkerResource(Resource):
         except WorkerException as e:
             logger.debug("Did not find worker: {}. actor: {}.".format(worker_id, actor_id))
             raise ResourceError(e.msg, 404)
-        return ok(result=worker.display(), msg="Worker retrieved successfully.")
+        # worker is an honest python dictionary with a single key, the id of the worker. need to
+        # convert it to a Worker object
+        worker.update({'id': worker_id})
+        w = Worker(**worker)
+        return ok(result=w.display(), msg="Worker retrieved successfully.")
 
     def delete(self, actor_id, worker_id):
         logger.debug("top of DELETE /actors/{}/workers/{}.".format(actor_id, worker_id))
