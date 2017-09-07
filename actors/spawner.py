@@ -126,7 +126,7 @@ class Spawner(object):
                 except ChannelTimeoutException as e:
                     logger.error("Got a ChannelTimeoutException trying to generate a client: {}".format(e))
                     # put actor in an error state and return
-                    self.error_out_actor(actor_id, [], e.message)
+                    self.error_out_actor(actor_id, [], str(e))
                     return
                 # we need to ignore errors when generating clients because it's possible it is not set up for a specific
                 # tenant. we log it instead.
