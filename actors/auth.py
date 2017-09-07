@@ -189,6 +189,7 @@ def get_tenants():
     return ['AGAVE-PROD',
             'ARAPORT-ORG',
             'DESIGNSAFE',
+            'DEV-DEVELOP',
             'DEV-STAGING',
             'IPLANTC-ORG',
             'IREC',
