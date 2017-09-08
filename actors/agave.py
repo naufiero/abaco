@@ -142,7 +142,8 @@ class AgaveClientsService(object):
         try:
             rsp = requests.post(url='{}/clients/v2'.format(self.parent.api_server),
                                 auth=auth,
-                                data={'clientName': body.get('clientName')})
+                                data={'clientName': body.get('clientName')},
+                                verify=self.parent.verify)
             result = rsp.json().get('result')
             self.parent.set_client(result['consumerKey'], result['consumerSecret'])
             return result

@@ -9,7 +9,7 @@ import rabbitpy
 from agaveflask.auth import get_api_server
 
 from agave import Agave
-from auth import get_tenants
+from auth import get_tenants, get_tenant_verify
 from channels import ClientsChannel
 from models import Actor, Client, Worker
 from errors import ClientException, WorkerException
@@ -40,13 +40,18 @@ class ClientGenerator(object):
         password = self.credentials[tenant.upper()]['password']
         if username == '' or password == '':
             msg = 'Client service credentials not defined for tenant {}'.format(tenant)
-            logger.error((msg))
+            logger.error(msg)
             raise ClientException(msg)
         api_server = get_api_server(tenant)
+        verify = get_tenant_verify(tenant)
         # generate an Agave client set up for admin_password representing the actor owner:
         logger.info("Attempting to generate an agave client.")
         return api_server,\
-               Agave(api_server=api_server, username=username, password=password, token_username=actor_owner)
+               Agave(api_server=api_server,
+                     username=username,
+                     password=password,
+                     token_username=actor_owner,
+                     verify=verify)
 
 
     def run(self):
@@ -78,9 +83,8 @@ class ClientGenerator(object):
                 api_server, key, secret, access_token, refresh_token = self.generate_client(cmd, owner)
             except ClientException as e:
                 logger.error("Error generating client: {}".format(e))
-                ch = ClientsChannel(name=anon_ch)
-                ch.put({'status': 'error',
-                        'message': e.msg})
+                anon_ch.put({'status': 'error',
+                             'message': str(e.msg)})
                 return None
             logger.debug("Client generated.")
             cl = Client(**{'tenant': cmd['tenant'],

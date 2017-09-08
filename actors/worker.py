@@ -5,6 +5,7 @@ import threading
 import channelpy
 from agave import Agave
 
+from auth import get_tenant_verify
 from channels import ActorMsgChannel, ClientsChannel, CommandChannel,WorkerChannel
 from codes import ERROR, READY, BUSY, COMPLETE
 from docker_utils import DockerError, DockerStartContainerError, execute_actor, pull_image
@@ -119,11 +120,13 @@ def subscribe(tenant,
     ag = None
     if api_server and client_id and client_secret and access_token and refresh_token:
         logger.info("Creating agave client.")
+        verify = get_tenant_verify(tenant)
         ag = Agave(api_server=api_server,
                    token=access_token,
                    refresh_token=refresh_token,
                    api_key=client_id,
-                   api_secret=client_secret)
+                   api_secret=client_secret,
+                   verify=verify)
     else:
         logger.info("Not creating agave client.")
     logger.info("Starting the process worker channel thread.")

@@ -184,6 +184,15 @@ def get_db_id():
     logger.debug("actor_id: {}".format(actor_id))
     return Actor.get_dbid(g.tenant, actor_id)
 
+def get_tenant_verify(tenant):
+    """Return whether to turn on SSL verification."""
+    # sandboxes and the develop instance have a self-signed certs
+    if 'SANDBOX' in tenant.upper():
+        return False
+    if tenant.upper() == 'DEV-DEVELOP':
+        return False
+    return True
+
 def get_tenants():
     """Return a list of tenants"""
     return ['AGAVE-PROD',

@@ -211,8 +211,7 @@ class Spawner(object):
 
     def error_out_actor(self, actor_id, workers, message):
         """In case of an error, put the actor in error state and kill all workers"""
-        self.error_out_actor(actor_id, message)
-        Actor.set_status(actor_id, ERROR, status_message=e.message)
+        Actor.set_status(actor_id, ERROR, status_message=message)
         for worker in workers:
             try:
                 self.kill_worker(worker)
