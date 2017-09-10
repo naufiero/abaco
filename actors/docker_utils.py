@@ -185,7 +185,7 @@ def run_worker(image, ch_name, worker_id):
              'last_execution_time': 0,
              'last_health_check_time': get_current_utc_time() }
 
-def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=False, mounts=[]):
+def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=False, mounts=[], leave_container=False):
     """
     Creates and runs an actor container and supervises the execution, collecting statistics about resource consumption
     from the Docker daemon.
@@ -229,6 +229,7 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
     host_config = cli.create_host_config(binds=binds, privileged=privileged)
 
     # create and start the container
+    logger.debug("Final container environment: {}".format(d))
     container = cli.create_container(image=image, environment=d, volumes=volumes, host_config=host_config)
     start_time = get_current_utc_time()
     try:
@@ -324,10 +325,11 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
     logs = cli.logs(container.get('Id'))
 
     # remove container, ignore errors
-    try:
-        cli.remove_container(container=container)
-        logger.info("Container removed.")
-    except Exception as e:
-        logger.error("Exception trying to remove actor: {}".format(e))
+    if not leave_container:
+        try:
+            cli.remove_container(container=container)
+            logger.info("Container removed.")
+        except Exception as e:
+            logger.error("Exception trying to remove actor: {}".format(e))
     result['runtime'] = int(stop - start)
     return result, logs, container_state, exit_code, start_time
