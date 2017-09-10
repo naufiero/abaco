@@ -29,7 +29,7 @@ def get_context():
     """Returns a context dictionary with message and metadata about the message."""
     context = AttrDict({
         'raw_message': os.environ.get('MSG'),
-        'content_type': os.environ.get('_abaco_Content-Type'),
+        'content_type': os.environ.get('_abaco_Content_Type'),
         'execution_id': os.environ.get('_abaco_execution_id'),
         'username': os.environ.get('_abaco_username'),
         'state': os.environ.get('_abaco_actor_state'),

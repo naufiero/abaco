@@ -3,6 +3,7 @@ import sys
 import threading
 
 import channelpy
+import configparser
 from agave import Agave
 
 from auth import get_tenant_verify
@@ -109,7 +110,10 @@ def get_global_mounts():
     Returns a list of dictionaries containing host_path, container_path and mode. 
     """
     result = []
-    mount_strs = Config.get("workers", "global_mounts")
+    try:
+        mount_strs = Config.get("workers", "global_mounts")
+    except configparser.NoOptionError:
+        mount_strs = None
     if not mount_strs:
         return result
     mounts = mount_strs.split(",")
@@ -145,6 +149,10 @@ def subscribe(tenant,
     logger.debug("Top of subscribe().")
     actor_ch = ActorMsgChannel(actor_id)
     global_mounts = get_global_mounts()
+    try:
+        leave_containers = Config.get('workers', 'leave_containers')
+    except configparser.NoOptionError:
+        leave_containers = False
     ag = None
     if api_server and client_id and client_secret and access_token and refresh_token:
         logger.info("Creating agave client.")
@@ -227,7 +235,8 @@ def subscribe(tenant,
                                                                             message,
                                                                             environment,
                                                                             privileged,
-                                                                            global_mounts)
+                                                                            global_mounts,
+                                                                            leave_containers)
         except DockerStartContainerError as e:
             logger.error("Got DockerStartContainerError: {}".format(str(e)))
             Actor.set_status(actor_id, ERROR)

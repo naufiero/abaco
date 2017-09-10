@@ -359,7 +359,7 @@ class MessagesResource(Resource):
             if json_data:
                 logger.debug("message was JSON data.")
                 args['message'] = json_data
-                args['_abaco_Content-Type'] = 'application/json'
+                args['_abaco_Content_Type'] = 'application/json'
             else:
                 logger.debug("message was NOT JSON data.")
                 # try to get data for mime types not recognized by flask. flask creates a python string for these
@@ -368,11 +368,11 @@ class MessagesResource(Resource):
                 except TypeError:
                     logger.debug("message POST body could not be serialized. args: {}".format(args))
                     raise DAOError('message POST body could not be serialized. Pass JSON data or use the message attribute.')
-                args['_abaco_Content-Type'] = 'str'
+                args['_abaco_Content_Type'] = 'str'
         else:
             # the special message object is a string
-            logger.debug("POST body has a message field. Setting _abaco_Content-type to 'str'.")
-            args['_abaco_Content-Type'] = 'str'
+            logger.debug("POST body has a message field. Setting _abaco_Content_type to 'str'.")
+            args['_abaco_Content_Type'] = 'str'
         return args
 
     def post(self, actor_id):
@@ -421,7 +421,7 @@ class MessagesResource(Resource):
                                              'executor': g.user})
         logger.info("Execution {} added for actor {}".format(exc, actor_id))
         d['_abaco_execution_id'] = exc
-        d['_abaco_Content-Type'] = args.get('_abaco_Content-Type', '')
+        d['_abaco_Content_Type'] = args.get('_abaco_Content_Type', '')
         logger.debug("Final message dictionary: {}".format(d))
         ch = ActorMsgChannel(actor_id=dbid)
         ch.put_msg(message=args['message'], d=d)
