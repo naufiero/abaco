@@ -1,4 +1,5 @@
 from functools import partial
+import os
 
 import configparser
 from pymongo import errors
@@ -16,8 +17,26 @@ workers_store = redis_config_store(db='2')
 
 
 # Mongo is used for accounting, permissions and logging data for its scalability.
+mongo_user = None
+mongo_password = None
+try:
+    mongo_user = Config.get('store', 'mongo_user')
+except configparser.NoOptionError:
+    pass
+
+mongo_password = os.environ.get('mongo_password', None)
+if not mongo_password:
+    # check in the config file:
+    try:
+        mongo_password = Config.get('store', 'mongo_password')
+    except configparser.NoOptionError:
+        pass
+
 mongo_config_store = partial(
-    MongoStore, Config.get('store', 'mongo_host'), Config.getint('store', 'mongo_port'))
+    MongoStore, Config.get('store', 'mongo_host'),
+    Config.getint('store', 'mongo_port'),
+    user=mongo_user,
+    password=mongo_password)
 
 logs_store = mongo_config_store(db='1')
 # create an expiry index for the log store if we want logs to expire
