@@ -4,6 +4,8 @@ mongo:
     image: mongo
     ports:
         - "27017:27017"
+#    uncomment to add auth
+#    command: --auth
 
 rabbit:
     image: rabbitmq:3.5.3-management
