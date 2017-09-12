@@ -3,11 +3,13 @@ import sys
 import threading
 
 import channelpy
+import configparser
 from agave import Agave
 
 from auth import get_tenant_verify
 from channels import ActorMsgChannel, ClientsChannel, CommandChannel,WorkerChannel
 from codes import ERROR, READY, BUSY, COMPLETE
+from config import Config
 from docker_utils import DockerError, DockerStartContainerError, execute_actor, pull_image
 from errors import WorkerException
 from models import Actor, Execution, Worker
@@ -101,6 +103,35 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
             logger.info("Worker is now exiting.")
             sys.exit()
 
+
+def get_global_mounts():
+    """
+    Read and parse the global_mounts config. 
+    Returns a list of dictionaries containing host_path, container_path and mode. 
+    """
+    result = []
+    try:
+        mount_strs = Config.get("workers", "global_mounts")
+    except configparser.NoOptionError:
+        mount_strs = None
+    if not mount_strs:
+        return result
+    mounts = mount_strs.split(",")
+    for m in mounts:
+        parts = m.split(":")
+        if not len(parts) == 3:
+            # we will "swallow" invalid global_mounts config since this is not something the user can fix;
+            # however, we log an error:
+            logger.error("Invalid global_mounts config. "
+                         "Each config must be two paths and a format separated by a colon: {}".format(m))
+        else:
+            result.append({'host_path': parts[0],
+                           'container_path': parts[1],
+                           'mode': parts[2]})
+    logger.info("Returning global mounts: {}".format(result))
+    return result
+
+
 def subscribe(tenant,
               actor_id,
               worker_id,
@@ -117,6 +148,11 @@ def subscribe(tenant,
     """
     logger.debug("Top of subscribe().")
     actor_ch = ActorMsgChannel(actor_id)
+    global_mounts = get_global_mounts()
+    try:
+        leave_containers = Config.get('workers', 'leave_containers')
+    except configparser.NoOptionError:
+        leave_containers = False
     ag = None
     if api_server and client_id and client_secret and access_token and refresh_token:
         logger.info("Creating agave client.")
@@ -192,8 +228,15 @@ def subscribe(tenant,
             logger.info("Agave client `ag` is None -- not passing access token.")
         logger.info("Passing update environment: {}".format(environment))
         try:
-            stats, logs, final_state, exit_code, start_time = execute_actor(actor_id, worker_id, worker_ch, image,
-                                                                            message, environment, privileged)
+            stats, logs, final_state, exit_code, start_time = execute_actor(actor_id,
+                                                                            worker_id,
+                                                                            worker_ch,
+                                                                            image,
+                                                                            message,
+                                                                            environment,
+                                                                            privileged,
+                                                                            global_mounts,
+                                                                            leave_containers)
         except DockerStartContainerError as e:
             logger.error("Got DockerStartContainerError: {}".format(str(e)))
             Actor.set_status(actor_id, ERROR)

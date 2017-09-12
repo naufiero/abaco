@@ -368,7 +368,7 @@ def test_list_execution_logs(headers):
     assert '_abaco_actor_state' in result['logs']
     assert '_abaco_username' in result['logs']
     assert '_abaco_execution_id' in result['logs']
-    assert '_abaco_Content-Type' in result['logs']
+    assert '_abaco_Content_Type' in result['logs']
 
 
 def test_execute_actor_json(headers):

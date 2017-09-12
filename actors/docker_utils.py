@@ -185,7 +185,7 @@ def run_worker(image, ch_name, worker_id):
              'last_execution_time': 0,
              'last_health_check_time': get_current_utc_time() }
 
-def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=False):
+def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=False, mounts=[], leave_container=False):
     """
     Creates and runs an actor container and supervises the execution, collecting statistics about resource consumption
     from the Docker daemon.
@@ -198,6 +198,8 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
     :param d: dictionary representing the environment to instantiate within the actor container.
     :param privileged: whether this actor is "privileged"; i.e., its container should run in privileged mode with the
     docker daemon mounted.
+    :param mounts: list of dictionaries representing the mounts to add; each dictionary mount should have 3 keys:
+    host_path, container_path and format (which should have value 'ro' or 'rw').
     :return: result (dict), logs (str) - `result`: statistics about resource consumption; `logs`: output from docker logs.
     """
     logger.debug("top of execute_actor()")
@@ -218,9 +220,16 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
                     'bind': '/var/run/docker.sock',
                     'ro': False }}
         volumes = ['/var/run/docker.sock']
+
+    # add a bind key and dictionary as well as a volume for each mount
+    for m in mounts:
+        binds[m.get('host_path')] = {'bind': m.get('container_path'),
+                                     'ro': m.get('format') == 'ro'}
+        volumes.append(m.get('host_path'))
     host_config = cli.create_host_config(binds=binds, privileged=privileged)
 
     # create and start the container
+    logger.debug("Final container environment: {}".format(d))
     container = cli.create_container(image=image, environment=d, volumes=volumes, host_config=host_config)
     start_time = get_current_utc_time()
     try:
@@ -316,10 +325,11 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
     logs = cli.logs(container.get('Id'))
 
     # remove container, ignore errors
-    try:
-        cli.remove_container(container=container)
-        logger.info("Container removed.")
-    except Exception as e:
-        logger.error("Exception trying to remove actor: {}".format(e))
+    if not leave_container:
+        try:
+            cli.remove_container(container=container)
+            logger.info("Container removed.")
+        except Exception as e:
+            logger.error("Exception trying to remove actor: {}".format(e))
     result['runtime'] = int(stop - start)
     return result, logs, container_state, exit_code, start_time
