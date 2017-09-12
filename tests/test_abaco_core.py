@@ -56,7 +56,7 @@ def headers():
         jwt_default = f.read()
     jwt = os.environ.get('jwt', jwt_default)
     if jwt:
-        jwt_header = os.environ.get('jwt_header', 'X-Jwt-Assertion-AGAVE-PROD')
+        jwt_header = os.environ.get('jwt_header', 'X-Jwt-Assertion-DEV-DEVELOP')
         headers = {jwt_header: jwt}
     else:
         token = os.environ.get('token', '')
@@ -617,7 +617,7 @@ def test_priv_user_can_create_priv_actor():
 # ##############################
 
 def switch_tenant_in_header(headers):
-    jwt = headers.get('X-Jwt-Assertion-AGAVE-PROD')
+    jwt = headers.get('X-Jwt-Assertion-DEV-DEVELOP')
     return {'X-Jwt-Assertion-TACC-PROD': jwt}
 
 
