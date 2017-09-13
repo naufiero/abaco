@@ -6,7 +6,7 @@ on Agave.
 
 
 ### Base Image ###
-The `abacosamples/base` image provides the following convenience utilities for writing (Python2) actor functions:
+The `abacosamples/base-ubu` image provides the following convenience utilities for writing (Python2) actor functions:
   * `get_context()` - returns a Python dictionary with the following fields:
     * `raw_message` - the original message, either string or JSON depending on the Contetnt-Type.
     * `content_type` - derived from the original message request.
