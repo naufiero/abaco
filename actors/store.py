@@ -2,6 +2,7 @@
 import collections
 from datetime import datetime
 import json
+import os
 import urllib.parse
 
 import configparser
@@ -94,7 +95,15 @@ class AbstractTransactionalStore(AbstractStore):
 class RedisStore(AbstractStore):
 
     def __init__(self, host, port, db=0):
-        self._db = redis.StrictRedis(host=host, port=port, db=db)
+        redis_password = os.environ.get("redis_password", None)
+        if not redis_password:
+            # check in the config file:
+            try:
+                redis_password = Config.get('store', 'redis_password')
+            except configparser.NoOptionError:
+                pass
+
+        self._db = redis.StrictRedis(host=host, port=port, db=db, password=redis_password)
         try:
             self.ex = int(Config.get('web', 'log_ex'))
         except ValueError:
