@@ -16,6 +16,8 @@ reg:
 #        server: gunicorn
         server: {{ web_server_type }}
         api: reg
+        mongo_password:
+        redis_password:
     volumes:
         - ./abaco.conf:/etc/service.conf
         - /home/apim/logs/reg.log:/var/log/service.log
@@ -28,6 +30,8 @@ mes:
 #        server: gunicorn
         server: {{ web_server_type }}
         api: mes
+        mongo_password:
+        redis_password:
     volumes:
         - ./abaco.conf:/etc/service.conf
         - /home/apim/logs/mes.log:/var/log/service.log
@@ -39,6 +43,8 @@ agavemes:
     environment:
         server: {{ web_server_type }}
         api: agavemes
+        mongo_password:
+        redis_password:
     volumes:
         - ./abaco.conf:/etc/service.conf
         - /home/apim/logs/agavemes.log:/var/log/service.log
@@ -51,6 +57,8 @@ admin:
 #        server: gunicorn
         server: {{ web_server_type }}
         api: admin
+        mongo_password:
+        redis_password:
     volumes:
         - ./abaco.conf:/etc/service.conf
         - /home/apim/logs/admin.log:/var/log/service.log
