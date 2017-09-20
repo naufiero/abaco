@@ -7,7 +7,8 @@ spawner:
         AE_IMAGE: "{{ docker_user }}/core"
         abaco_conf_host_path: ${abaco_path}/abaco.conf
         _abaco_secret: 123
-
+        mongo_password:
+        redis_password:
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
         - ./abaco.conf:/etc/service.conf
@@ -18,7 +19,26 @@ health:
     command: /actors/health_check.sh
     environment:
         AE_IMAGE: "{{ docker_user }}/core"
+        mongo_password:
+        redis_password:
     volumes:
         - /var/run/docker.sock:/var/run/docker.sock
         - ./abaco.conf:/etc/service.conf
         - /home/apim/logs/health.log:/var/log/service.log
+
+clientg:
+    image: {{ docker_user }}/core:{{ abaco_tag }}
+    command: "python3 -u /actors/clients.py"
+    volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - ./abaco.conf:/etc/service.conf
+        - /home/apim/logs/clientg.log:/var/log/service.log
+    environment:
+        abaco_conf_host_path: ${abaco_path}/local-dev.conf
+        _abaco_secret: 123
+        mongo_password:
+        redis_password:
+        _abaco_AGAVE-PROD_username: {{ _abaco_AGAVE-PROD_username }}
+        _abaco_AGAVE-PROD_password: {{ _abaco_AGAVE-PROD_password }}
+        _abaco_DEV_DEVELOP_username: {{ _abaco_DEV_DEVELOP_username }}
+        _abaco_DEV_DEVELOP_password: {{ _abaco_DEV_DEVELOP_password }}
