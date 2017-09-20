@@ -17,6 +17,8 @@ reg:
     environment:
         server: dev
         api: reg
+        mongo_password:
+        redis_password:
 
 mes:
     image: abaco/core$TAG
@@ -28,6 +30,8 @@ mes:
     environment:
         server: dev
         api: mes
+        mongo_password:
+        redis_password:
 
 agavemes:
     image: abaco/core$TAG
@@ -39,6 +43,8 @@ agavemes:
     environment:
         server: dev
         api: agavemes
+        mongo_password:
+        redis_password:
 
 admin:
     image: abaco/core$TAG
@@ -50,6 +56,8 @@ admin:
     environment:
         server: dev
         api: admin
+        mongo_password:
+        redis_password:
 
 spawner:
     image: abaco/core$TAG
@@ -61,6 +69,8 @@ spawner:
     environment:
         abaco_conf_host_path: ${abaco_path}/local-dev.conf
         _abaco_secret: 123
+        mongo_password:
+        redis_password:
 
 clientg:
     image: abaco/core$TAG
@@ -72,11 +82,14 @@ clientg:
     environment:
         abaco_conf_host_path: ${abaco_path}/local-dev.conf
         _abaco_secret: 123
+        mongo_password:
+        redis_password:
+
+        # add the following pair of credentials for each tenant wanting client generation
         _abaco_AGAVE-PROD_username: abaco_service
         _abaco_AGAVE-PROD_password: changeme
         _abaco_DEV-DEVELOP_username: testotheruser
         _abaco_DEV-DEVELOP_password: testotheruser
-
 
 health:
     image: abaco/core$TAG
@@ -85,3 +98,6 @@ health:
         - /var/run/docker.sock:/var/run/docker.sock
         - ./local-dev.conf:/etc/service.conf
         - ./abaco.log:/var/log/service.log
+    environment:
+        mongo_password:
+        redis_password:

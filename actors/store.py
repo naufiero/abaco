@@ -2,6 +2,8 @@
 import collections
 from datetime import datetime
 import json
+import os
+import urllib.parse
 
 import configparser
 import redis
@@ -9,6 +11,8 @@ from pymongo import MongoClient
 
 from config import Config
 
+from agaveflask.logs import get_logger
+logger = get_logger(__name__)
 
 def _do_get(getter, key):
     obj = getter(key)
@@ -91,7 +95,15 @@ class AbstractTransactionalStore(AbstractStore):
 class RedisStore(AbstractStore):
 
     def __init__(self, host, port, db=0):
-        self._db = redis.StrictRedis(host=host, port=port, db=db)
+        redis_password = os.environ.get("redis_password", None)
+        if not redis_password:
+            # check in the config file:
+            try:
+                redis_password = Config.get('store', 'redis_password')
+            except configparser.NoOptionError:
+                pass
+
+        self._db = redis.StrictRedis(host=host, port=port, db=db, password=redis_password)
         try:
             self.ex = int(Config.get('web', 'log_ex'))
         except ValueError:
@@ -208,7 +220,7 @@ class RedisStore(AbstractStore):
 
 class MongoStore(AbstractStore):
 
-    def __init__(self, host, port, database='abaco', db='0'):
+    def __init__(self, host, port, database='abaco', db='0', user=None, password=None):
         """
         Creates an abaco `store` which maps to a single mongo
         collection within some database.
@@ -221,6 +233,11 @@ class MongoStore(AbstractStore):
         :return:
         """
         mongo_uri = 'mongodb://{}:{}'.format(host, port)
+        if user and password:
+            logger.info("Using mongo user {} and passowrd: ***".format(user))
+            u = urllib.parse.quote_plus(user)
+            p = urllib.parse.quote_plus(password)
+            mongo_uri = 'mongodb://{}:{}@{}:{}'.format(u, p, host, port)
         self._mongo_client = MongoClient(mongo_uri)
         self._mongo_database = self._mongo_client[database]
         self._db = self._mongo_database[db]
