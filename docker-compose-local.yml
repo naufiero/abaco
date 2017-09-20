@@ -74,6 +74,9 @@ clientg:
         _abaco_secret: 123
         _abaco_AGAVE-PROD_username: abaco_service
         _abaco_AGAVE-PROD_password: changeme
+        _abaco_DEV-DEVELOP_username: testotheruser
+        _abaco_DEV-DEVELOP_password: testotheruser
+
 
 health:
     image: abaco/core$TAG
