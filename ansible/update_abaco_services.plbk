@@ -1,0 +1,18 @@
+# Update the abaco services. Assumes deploy_abaco.plbk has already been run. Does not modify the databases
+#
+# Example invocation:
+# $ ansible-playbook -i prod/hosts update_abaco_services.plbk
+#
+
+
+# deploy spawner and health check containers
+- hosts: compute
+  roles:
+      - common
+      - abaco_compute
+
+# deploy apis
+- hosts: web
+  roles:
+      - common
+      - abaco_web
