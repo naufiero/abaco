@@ -6,7 +6,7 @@ spawner:
     environment:
         AE_IMAGE: "{{ docker_user }}/core"
         abaco_conf_host_path: ${abaco_path}/abaco.conf
-        _abaco_secret: 123
+        _abaco_secret: {{ abaco_secret }}
         mongo_password:
         redis_password:
     volumes:
@@ -35,10 +35,18 @@ clientg:
         - /home/apim/logs/clientg.log:/var/log/service.log
     environment:
         abaco_conf_host_path: ${abaco_path}/local-dev.conf
-        _abaco_secret: 123
+        _abaco_secret: {{ abaco_secret }}
         mongo_password:
         redis_password:
-        _abaco_AGAVE-PROD_username: {{ _abaco_AGAVE-PROD_username }}
-        _abaco_AGAVE-PROD_password: {{ _abaco_AGAVE-PROD_password }}
-        _abaco_DEV_DEVELOP_username: {{ _abaco_DEV_DEVELOP_username }}
-        _abaco_DEV_DEVELOP_password: {{ _abaco_DEV_DEVELOP_password }}
+{% if abaco_env == 'dev' %}
+        _abaco_DEV-DEVELOP_username: testotheruser
+        _abaco_DEV-DEVELOP_password: testotheruser
+{% endif %}
+{% if abaco_env == 'prod' %}
+        _abaco_AGAVE-PROD_username: {{ clientg_username }}
+        _abaco_AGAVE-PROD_password: {{ clientg_password }}
+{% endif %}
+{% if abaco_env == 'sd2e' %}
+        _abaco_SD2E_username: {{ clientg_username }}
+        _abaco_SD2E_password: {{ clientg_password }}
+{% endif %}
