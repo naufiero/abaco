@@ -165,7 +165,7 @@ class Actor(AbacoDAO):
 
     PARAMS = [
         # param_name, required/optional/provided/derived, attr_name, type, help, default
-        ('name', 'required', 'name', str, 'User defined name for this actor.', None),
+        ('name', 'optional', 'name', str, 'User defined name for this actor.', None),
         ('image', 'required', 'image', str, 'Reference to image on docker hub for this actor.', None),
 
         ('stateless', 'optional', 'stateless', bool, 'Whether the actor stores private state.', False),
