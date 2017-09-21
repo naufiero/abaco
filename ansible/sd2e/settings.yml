@@ -1,0 +1,23 @@
+
+abaco_tag: dev
+
+store_redis_host_ip: 129.114.60.211
+store_redis_port: 6379
+
+store_mongo_host_ip: 129.114.97.153
+store_mongo_port: 27017
+store_mongo_user: abaco
+
+store_rabbit_host_ip: 129.114.60.211
+store_rabbit_port: 5672
+
+workers_generate_clients: True
+
+global_mounts:
+
+# TODO -----
+# error handling is currently broken in gunicorn + flask + flask_restufl
+# see https://github.com/flask-restful/flask-restful/issues/542 and https://github.com/flask-restful/flask-restful/pull/544
+
+# web_server_type: gunicorn
+# -----------
