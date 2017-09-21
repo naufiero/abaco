@@ -6,7 +6,7 @@ import timeit
 
 import docker
 from requests.packages.urllib3.exceptions import ReadTimeoutError
-from requests.exceptions import ReadTimeout
+from requests.exceptions import ReadTimeout, ConnectionError
 
 from agaveflask.logs import get_logger, get_log_file_strategy
 logger = get_logger(__name__)
@@ -295,7 +295,7 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
                 cli.wait(container=container.get('Id'), timeout=1)
                 logger.info("container finished: {}".format(timeit.default_timer()))
                 running = False
-            except ReadTimeout:
+            except (ReadTimeout, ConnectionError):
                 logger.debug("cli.wait just timed out: {}".format(timeit.default_timer()))
                 # the wait timed out so check if we are beyond the max_run_time
                 runtime = timeit.default_timer() - start
