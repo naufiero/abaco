@@ -1,20 +1,22 @@
 [db]
-ab-dev-compute-js ansible_ssh_host=129.114.16.28 ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_user=root
-
+# ab-dev-compute-js ansible_ssh_host=129.114.16.28 ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_user=root
+abaco-dev-2-js-iu ansible_ssh_host=149.165.168.92 ansible_ssh_private_key_file=~/.ssh/cic-iu.pem ansible_ssh_user=centos
 
 [compute]
-ab-dev-compute-js ansible_ssh_host=129.114.16.28 ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_user=root spawner_host_ip=172.17.0.1 spawner_host_id=0
-
+# ab-dev-compute-js ansible_ssh_host=129.114.16.28 ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_user=root spawner_host_ip=172.17.0.1 spawner_host_id=0
+abaco-dev-2-js-iu ansible_ssh_host=149.165.168.92 ansible_ssh_private_key_file=~/.ssh/cic-iu.pem ansible_ssh_user=centos
 
 [web]
-ab-dev-web-js ansible_ssh_host=129.114.19.77 ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_user=root
-
+# ab-dev-web-js ansible_ssh_host=129.114.19.77 ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_user=root
+abaco-dev-1-js-iu ansible_ssh_host=149.165.168.230 ansible_ssh_private_key_file=~/.ssh/cic-iu.pem ansible_ssh_user=centos
 
 # all hosts are docker_hosts
 [docker_hosts]
-ab-dev-compute-js ansible_ssh_host=129.114.16.28 ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_user=root
-ab-dev-web-js ansible_ssh_host=129.114.19.77 ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_user=root
+#ab-dev-compute-js ansible_ssh_host=129.114.16.28 ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_user=root
+#ab-dev-web-js ansible_ssh_host=129.114.19.77 ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_user=root
 
+abaco-dev-1-js-iu ansible_ssh_host=149.165.168.230 ansible_ssh_private_key_file=~/.ssh/cic-iu.pem ansible_ssh_user=centos
+abaco-dev-2-js-iu ansible_ssh_host=149.165.168.92 ansible_ssh_private_key_file=~/.ssh/cic-iu.pem ansible_ssh_user=centos
 
 [db:vars]
     abaco_env=dev
