@@ -11,15 +11,16 @@ host_dir: /home/apim/logs
 
 
 [store]
-# url for the redis instance
+# redis
 redis_host: {{ store_redis_host_ip }}
-
-# port for the redis instance
 redis_port: {{ store_redis_port }}
+redis_password: {{ store_redis_password }}
 
+# mongo
 mongo_host: {{ store_mongo_host_ip }}
-
 mongo_port: {{ store_mongo_port }}
+mongo_user: {{ store_mongo_user }}
+mongo_password: {{ store_mongo_password }}
 
 
 [rabbit]
