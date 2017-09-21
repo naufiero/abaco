@@ -34,6 +34,7 @@
       - /home/apim/logs/spawner.log
       - /home/apim/logs/worker.log
       - /home/apim/logs/abaco.log
+      - /home/apim/logs/clientg.log
 
 - name: copy abaco.conf template
   template: src=abaco.conf.j2 dest=/home/apim/abaco.conf
