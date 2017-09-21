@@ -4,6 +4,8 @@ import json
 import time
 import uuid
 
+from hashids import Hashids
+
 from agaveflask.utils import RequestParser
 
 from channels import CommandChannel
@@ -16,6 +18,8 @@ from stores import actors_store, clients_store, executions_store, logs_store, pe
 from agaveflask.logs import get_logger
 logger = get_logger(__name__)
 
+
+HASH_SALT = 'eJa5wZlEX4eWU'
 
 def under_to_camel(value):
     def camel_case():
@@ -132,7 +136,8 @@ class AbacoDAO(DbDict):
 
     def get_uuid(self):
         """Generate a random uuid."""
-        return '{}-{}'.format(str(uuid.uuid1()), self.get_uuid_code())
+        hashids = Hashids(salt=HASH_SALT)
+        return hashids.encode(uuid.uuid1().int>>64)
 
     def get_derived_value(self, name, d):
         """Compute a derived value for the attribute `name` from the dictionary d of attributes provided."""
@@ -541,7 +546,8 @@ class Worker(AbacoDAO):
     @classmethod
     def get_uuid(cls):
         """Generate a random uuid."""
-        return '{}-{}'.format(str(uuid.uuid1()), '060')
+        hashids = Hashids(salt=HASH_SALT)
+        return hashids.encode(uuid.uuid1().int>>64)
 
 
     @classmethod
