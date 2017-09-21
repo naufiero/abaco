@@ -1,5 +1,5 @@
 # A basic Docker image for testing Abaco.
-# Image: jstubbs/abaco_test
+# Image: abacosamples/test
 
 from busybox
 add test.sh /test.sh
