@@ -202,5 +202,7 @@ def get_tenants():
             'DEV-STAGING',
             'IPLANTC-ORG',
             'IREC',
+            'SD2E',
+            'SGCI',
             'TACC-PROD',
             'VDJSERVER-ORG']
