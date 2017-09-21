@@ -1,4 +1,5 @@
-## Base ##
+## Image: abacosamples/base-ubu ##
 
-This is the base image for the samples. Add your own Python script to this base to quickly create actors powered
-by agavepy.
+This is the base image for the rest of the samples and provides convenience utilities for writing (Python2) actor
+functions. Add your own Python script to this base to quickly create actors utilizing agavepy.
+
