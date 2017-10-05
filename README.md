@@ -50,39 +50,46 @@ Quickstart
     > }
     > ```
 
-    To define an actor, pass a name and an image available on the public Docker Hub.
+    To define an actor, post an image available on the public Docker Hub. You can also optionally pass a name attribute.
 
     ```shell
-    $ curl -X POST --data "image=jstubbs/abaco_test&name=foo" "localhost:8000/actors"
+    $ curl -X POST --data "image=abacosamples/test" "localhost:8000/actors"
     ```
 
     Abaco responds in JSON. You should see something like this:
 
     ```json
     {
-        "msg": "Actor created successfully.",
-        "result": {
-            "default_environment": {},
-            "description": "",
-            "id": "e68ebbb7-4986-46ee-9332-a1f5cfc6a533",
-            "image": "jstubbs/abaco_test",
-            "name": "foo",
-            "privileged": false,
-            "stateless": false,
-            "status": "SUBMITTED",
-            "tenant": "dev_staging"
+      "message": "Actor created successfully.",
+      "result": {
+        "_links": {
+          "executions": "https://dev.tenants.develop.agaveapi.co/actors/v2/yP0PDpZWG38Bg/executions",
+          "owner": "https://dev.tenants.develop.agaveapi.co/profiles/v2/testshareuser",
+          "self": "https://dev.tenants.develop.agaveapi.co/actors/v2/yP0PDpZWG38Bg"
         },
-        "status": "success",
-        "version": "0.01"
-    }
-    ```
+        "createTime": "2017-09-21 22:22:52.482495",
+        "defaultEnvironment": {},
+        "description": "",
+        "id": "yP0PDpZWG38Bg",
+        "image": "abacosamples/test",
+        "lastUpdateTime": "2017-09-21 22:22:52.482495",
+        "owner": "testshareuser",
+        "privileged": false,
+        "state": {},
+        "stateless": false,
+        "status": "SUBMITTED",
+        "statusMessage": ""
+      },
+      "status": "success",
+      "version": ":dev"
+    }    ```
 
-    Abaco assigned a uuid to the actor (in this case `e68ebbb7-4986-46ee-9332-a1f5cfc6a533`) and associated it with the image jstubbs/abaco\_test which it began pulling from the public Docker hub.
+    Abaco assigned an id to the actor (in this case `yP0PDpZWG38Bg`) and associated it with the image abacosamples/test which it began pulling from the public Docker hub.
 
 3.  Notice that Abaco returned a status of `SUBMITTED` for the actor; behind the scenes, Abaco is starting a worker container to handle messages passed to this actor. The worker must initialize itself (download the image, etc) before the actor is ready. You can retrieve the details about an actor (including the status) by making a `GET` request to a specific actor using its uuid like so:
 
     ```shell
-    $ curl localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533
+    $ curl localhost:8000/actors/yP0PDpZWG38Bg
     ```
 
     When the actor's worker is initialized, you will see a response like
@@ -90,111 +97,161 @@ Quickstart
 
     ```json
     {
-        "msg": "Actor retrieved successfully.",
-        "result": {
-            "default_environment": {},
-            "description": "",
-            "id": "e68ebbb7-4986-46ee-9332-a1f5cfc6a533",
-            "image": "jstubbs/abaco_test",
-            "name": "test",
-            "privileged": false,
-            "stateless": false,
-            "status": "READY",
-            "tenant": "dev_staging"
+      "message": "Actor retrieved successfully.",
+      "result": {
+        "_links": {
+          "executions": "https://dev.tenants.develop.agaveapi.co/actors/v2/yP0PDpZWG38Bg/executions",
+          "owner": "https://dev.tenants.develop.agaveapi.co/profiles/v2/testshareuser",
+          "self": "https://dev.tenants.develop.agaveapi.co/actors/v2/yP0PDpZWG38Bg"
         },
-        "status": "success",
-        "version": "0.01"
-    }
+        "createTime": "2017-09-21 22:29:40.549968",
+        "defaultEnvironment": {},
+        "description": "",
+        "id": "yP0PDpZWG38Bg",
+        "image": "abacosamples/test",
+        "lastUpdateTime": "2017-09-21 22:29:40.549968",
+        "owner": "testshareuser",
+        "privileged": false,
+        "state": {},
+        "stateless": false,
+        "status": "READY",
+        "statusMessage": ""
+      },
+      "status": "success",
+      "version": ":dev"
+    }    
     ```
 
-    A status of "READY" indicates that actor is capable of processing messages by launching containers from the image.
+    A status of "READY" indicates that actor is capable of processing messages by launching containers from the image. Note that any messages sent before the actor is ready will still be queued up.
 
 4.  We're now ready to execute our actor. To do so, make a `POST` request to the messages collection for the actor and pass a message string as the payload.
 
     ```bash
-    $ curl -X POST --data "message=execute yourself"  localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533/messages
+    $ curl -X POST --data "message=test execution"  localhost:8000/actors/yP0PDpZWG38Bg/messages
     ```
 
-    abaco executes the image registered for `e68ebbb7-4986-46ee-9332-a1f5cfc6a533`, in this case, jstubbs/abaco\_test, and passes in the string `"execute yourself"` as an environmental variable (`$MSG`). abaco will use the default command included in the image when executing the container. The response will look like this:
+    abaco executes the image registered for `yP0PDpZWG38Bg`, in this case, jstubbs/abaco\_test, and passes in the string `"test execution"` as an environmental variable (`$MSG`). abaco will use the default command included in the image when executing the container. The response will look like this:
 
     ```json
     {
-        "msg": "The request was successful",
-        "result": {
-            "execution_id": "27326d48-7f00-4a45-a2f7-76fff8d685e6",
-            "msg": "execute yourself"
+      "message": "The request was successful",
+      "result": {
+        "_links": {
+          "messages": "https://dev.tenants.develop.agaveapi.co/actors/v2/yP0PDpZWG38Bg/messages",
+          "owner": "https://dev.tenants.develop.agaveapi.co/profiles/v2/testshareuser",
+          "self": "https://dev.tenants.develop.agaveapi.co/actors/v2/yP0PDpZWG38Bg/executions/JN0Boakk0VzKX"
         },
-        "status": "success",
-        "version": "0.01"
+        "executionId": "JN0Boakk0VzKX",
+        "msg": "test execution"
+      },
+      "status": "success",
+      "version": ":dev"
     }
     ```
 
-    Note that the execution id (in this case, `27326d48-7f00-4a45-a2f7-76fff8d685e6`) is returned in the response. This execution id can be used to retrieve information about the execution.
+    Note that the execution id (in this case, `JN0Boakk0VzKX`) is returned in the response. This execution id can be used to retrieve information about the execution.
 
 5.  An actor's executions can be retrieved using the `executions` sub-collection.
 
     ```shell
-    $ curl localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533/executions
+    $ curl localhost:8000/actors/yP0PDpZWG38Bg/executions
     ```
 
     The response will include summary statistics of all executions for the actor as well as the id's of each execution. As expected, we see the execution id returned from the previous step.
 
     ```json
     {
-        "msg": "Actor executions retrieved successfully.",
-        "result": {
-            "ids": [
-                "27326d48-7f00-4a45-a2f7-76fff8d685e6"
-            ],
-            "total_cpu": 144132228,
-            "total_executions": 1,
-            "total_io": 438,
-            "total_runtime": 2
+      "message": "Actor executions retrieved successfully.",
+      "result": {
+        "_links": {
+          "owner": "https://dev.tenants.develop.agaveapi.co/profiles/v2/testshareuser",
+          "self": "https://dev.tenants.develop.agaveapi.co/actors/v2/yP0PDpZWG38Bg/executions"
         },
-        "status": "success",
-        "version": "0.01"
+        "actorId": "yP0PDpZWG38Bg",
+        "apiServer": "https://dev.tenants.develop.agaveapi.co",
+        "ids": [
+          "JN0Boakk0VzKX"
+        ],
+        "owner": "testshareuser",
+        "totalCpu": 50299836,
+        "totalExecutions": 1,
+        "totalIo": 1498,
+        "totalRuntime": 2
+      },
+      "status": "success",
+      "version": ":dev"
     }
     ```
 
-    The `abaco_test` image simply echo's the environment and does a sleep for 5 seconds. We can query the executions collection with the execution id at any to get status information about the execution. When the execution finishes, its status will be returned as "COMPLETE" and details about the execution including runtime, cpu, and io usage will be available. For example:
+    The `abacosamples/test` image simply echo's the environment and does a sleep for 2 seconds. We can query the executions collection with the execution id at any to get status information about the execution. When the execution finishes, its status will be returned as "COMPLETE" and details about the execution including runtime, cpu, and io usage will be available. For example:
 
     > ```shell
-    > $ curl localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533/executions/27326d48-7f00-4a45-a2f7-76fff8d685e6
+    > $ curl localhost:8000/actors/yP0PDpZWG38Bg/executions/JN0Boakk0VzKX
     > ```
 
     The response will look something like:
 
     > ```json
-    > {
-    >     "msg": "Actor execution retrieved successfully.",
-    >     "result": {
-    >         "actor_id": "e68ebbb7-4986-46ee-9332-a1f5cfc6a533",
-    >         "cpu": 144132228,
-    >         "executor": "anonymous",
-    >         "id": "27326d48-7f00-4a45-a2f7-76fff8d685e6",
-    >         "io": 438,
-    >         "runtime": 2,
-    >         "status": "COMPLETE"
-    >     },
-    >     "status": "success",
-    >     "version": "0.01"
-    > }
+    {
+      "message": "Actor execution retrieved successfully.",
+      "result": {
+        "_links": {
+          "logs": "https://dev.tenants.develop.agaveapi.co/actors/v2/DEV-DEVELOP_yP0PDpZWG38Bg/executions/JN0Boakk0VzKX/logs",
+          "owner": "https://dev.tenants.develop.agaveapi.co/profiles/v2/testshareuser",
+          "self": "https://dev.tenants.develop.agaveapi.co/actors/v2/DEV-DEVELOP_yP0PDpZWG38Bg/executions/JN0Boakk0VzKX"
+        },
+        "actorId": "yP0PDpZWG38Bg",
+        "apiServer": "https://dev.tenants.develop.agaveapi.co",
+        "cpu": 50299836,
+        "executor": "testshareuser",
+        "exitCode": 0,
+        "finalState": {
+          "Dead": false,
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "2017-09-21T22:35:16.921702662Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 0,
+          "Restarting": false,
+          "Running": false,
+          "StartedAt": "2017-09-21T22:35:14.852960209Z",
+          "Status": "exited"
+        },
+        "id": "JN0Boakk0VzKX",
+        "io": 1498,
+        "messageReceivedTime": "2017-09-21 22:35:14.374600",
+        "runtime": 2,
+        "startTime": "2017-09-21 22:35:14.637897",
+        "status": "COMPLETE",
+        "workerId": "vrbr8PeWLXYEQ"
+      },
+      "status": "success",
+      "version": ":dev"
+    }
     > ```
 
 6.  You can also retrieve the logs (as in docker logs) for any execution:
 
     ```shell
-    $ curl localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533/executions/27326d48-7f00-4a45-a2f7-76fff8d685e6/logs
+    $ curl localhost:8000/actors/yP0PDpZWG38Bg/executions/JN0Boakk0VzKX/logs
     ```
 
     Response:
 
     ```json
     {
-        "msg": "Logs retrieved successfully.",
-        "result": "Contents of MSG: execute yourself\nEnvironment:\nHOSTNAME=f64b9adb8239\nSHLVL=1\nHOME=/root\n_abaco_api_server=https://dev.tenants.staging.agaveapi.co\nMSG=execute yourself\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nPWD=/\n_abaco_username=anonymous\n",
-        "status": "success",
-        "version": "0.01"
+      "message": "Logs retrieved successfully.",
+      "result": {
+        "_links": {
+          "execution": "https://dev.tenants.develop.agaveapi.co/actors/v2/yP0PDpZWG38Bg/executions/JN0Boakk0VzKX",
+          "owner": "https://dev.tenants.develop.agaveapi.co/profiles/v2/testshareuser",
+          "self": "https://dev.tenants.develop.agaveapi.co/actors/v2/yP0PDpZWG38Bg/executions/JN0Boakk0VzKX/logs"
+        },
+        "logs": "Contents of MSG: test execution\nEnvironment:\nHOSTNAME=48cb805f9af5\nSHLVL=1\nHOME=/root\n_abaco_actor_id=yP0PDpZWG38Bg\n_abaco_access_token=\n_abaco_api_server=https://dev.tenants.develop.agaveapi.co\n_abaco_actor_dbid=DEV-DEVELOP_yP0PDpZWG38Bg\nMSG=test execution\n_abaco_execution_id=JN0Boakk0VzKX\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n_abaco_Content_Type=str\nPWD=/\n_abaco_jwt_header_name=X-Jwt-Assertion-Dev-Develop\n_abaco_username=testshareuser\n_abaco_actor_state={}\nContents of root file system: \n_abaco_data1\n_abaco_data2\nbin\ndata1\ndata2\ndev\netc\nhome\nproc\nroot\nsys\ntest.sh\ntmp\nusr\nvar\nChecking for contents of mounts:\nMount exsits. Contents:\n"
+      },
+      "status": "success",
+      "version": ":dev"
     }
     ```
 
@@ -206,19 +263,19 @@ Additional Features
 The quick start introduced the basic features of abaco. Here we list
 some of the more advanced features.
 
--   **Admin API**: In abaco, messages sent to an actor for execution are
+-   **Admin API**: In Abaco, messages sent to an actor for execution are
     queued and processed by the actor's "workers". Workers are processes
     that have access to the docker daemon and the actor's image, and
     workers take care of launching the actor containers, reading the
     docker stats api for the execution, storing logs for the execution,
-    etc. abaco has a separate administration api which can be used to
+    etc. Abaco has a separate administration api which can be used to
     manage the workers for an actor. This API is available via the
     `workers` collection for any given actor: for example, to retrieve
     the workers for our actor from the quickstart we would make a GET
     request like so:
 
     ```shell
-    $ curl localhost:8000/actors/e68ebbb7-4986-46ee-9332-a1f5cfc6a533/workers
+    $ curl localhost:8000/actors/yP0PDpZWG38Bg/workers
     ```
 
     The response contains the list of all workers and supporting
@@ -227,22 +284,24 @@ some of the more advanced features.
 
     ```json
     {
-        "msg": "Workers retrieved successfully.",
-        "result": {
-            "656fdef81bef4a0aa564f4880c1e8380": {
-                "ch_name": "656fdef81bef4a0aa564f4880c1e8380",
-                "cid": "1e7625aa897f6409498d7a455b1a51482dceca0d16dc2521f34add16b4ba4f7f",
-                "host_id": "0",
-                "host_ip": "172.17.0.1",
-                "image": "jstubbs/abaco_test",
-                "last_execution": 0,
-                "location": "unix://var/run/docker.sock",
-                "status": "READY",
-                "tenant": "dev_staging"
-            }
-        },
-        "status": "success",
-        "version": "0.01"
+      "message": "Workers retrieved successfully.",
+      "result": [
+        {
+          "chName": "bd8fc7f5e14743a48cb3835886d64d44",
+          "cid": "094456dfa8b5f711be89deffba0b514ec047ccd907b60f4a88a5b951bf12d17f",
+          "hostId": "0",
+          "hostIp": "172.17.0.1",
+          "id": "vrbr8PeWLXYEQ",
+          "image": "abacosamples/test",
+          "lastExecutionTime": "2017-09-21 22:35:17.156459",
+          "lastHealthCheckTime": "2017-09-21 22:46:27.741725",
+          "location": "unix://var/run/docker.sock",
+          "status": "READY",
+          "tenant": "DEV-DEVELOP"
+        }
+      ],
+      "status": "success",
+      "version": ":dev"
     }
     ```
 
@@ -267,7 +326,7 @@ some of the more advanced features.
 -   **Custom container environments**: When making a POST request to the
     actor's messages collection to execute an actor container, users can
     supply additional environment variables and values as query
-    parameters. abaco will update the actor's default environment with
+    parameters. Abaco will update the actor's default environment with
     these query parameter variables and values, with the latter
     overriding the former.
 -   **Stateless actors**: By default, actors are assumed to be statefull
