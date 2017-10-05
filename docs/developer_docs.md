@@ -161,14 +161,26 @@ challenge in space, and was one of the primary reasons for adding support for Mo
 method to store the logs for a fixed period of time.
 
 
-Client Generation
------------------
+Spawners Starting Workers and Client Generation
+-----------------------------------------------
 
-The Abaco system uses a separate backend process (or "actor") for managing OAuth clients. Each worker gets a new
+As mentioned in the architecture document, Abaco uses Spawners and Workers to facilitate execution of the actor Docker
+containers. These processes communicate via channels.
+
+Additionally, the Abaco system uses a Clientg process for managing OAuth clients. Each worker gets a new
 OAuth client when it is started, and its client is deleted whenever the worker is destroyed. This way, the actor
-containers can be started with a fresh OAuth access token. Currently, the clients modules leverages the agave.py module,
-a Python 3-compatible Agave SDK for managing clients.
+containers can be started with a fresh OAuth access token. Currently, the clients.py modules leverages the agave.py
+module, a Python 3-compatible Agave SDK for managing clients.
 
+The following algorithm is used to start workers with client generation happening when configured accordingly:
+
+1. Spawner receives a message on the Command channel to start one or more new workers.
+2. Spawner starts the worker containers using the configured docker daemon (for now, the local unix socket). It passes the image to use and waits for a message indicating the workers were able to pull the image and start up successfully.
+3. If the actor already had workers and Spawner was instructed to stop the existing workers, it sends messages to them at this point to shut down.
+4. Spawner checks the `generate_clients` config within the `workers` stanza to see if client generation is enabled.
+5. Spawner sends a message to the clientg agent via the `ClientsChannel` requesting a new client.
+6. Clientg responds to Spawner with a message containing the client key and secret, access token, and refresh token if client generation was successful.
+7. Once all workers have responded healthy and all clients have been generated, Spawner sends a final message to each worker instructing them to subscribe to the actor mailbox channel. This message will contain the client credentials and tokens if those were generated.
 
 Dependence on Docker Version
 ----------------------------
@@ -177,3 +189,21 @@ Various functions within Abaco are implemented by making calls to the docker dae
 These calls are implemented in the docker_utils.py module. Different versions of the docker-py client library as
 well as the Docker daemon itself present different APIs, and this can impact performance and correctness within
 Abaco. As a result, strict attention to Docker and docker-py versions is necessary.
+
+
+Remote Deployment
+-----------------
+
+Using the following commands, a new Abaco instance can be installed on Centos7 VMs running, for instance, in JetStream.
+
+Install dependencies on the hosts (e.g., Docker, docker-compose, etc):
+
+```shell
+$ docker run --rm -v ~/.ssh/cic-iu.pem:/root/.ssh/cic-iu.pem -v $(pwd)/ansible/dev/hosts:/deploy/hosts agaveapi/deployer -i /deploy/hosts /deploy/docker_host.plbk -e update_docker_version=True -e update_docker_compose_version=True -e docker_version=1.12.6-1.el7.centos
+```
+
+Deploy Abaco:
+
+```shell
+$ docker run --rm -v ~/.ssh/cic-iu.pem:/root/.ssh/cic-iu.pem -v $(pwd)/ansible:/deploy agaveapi/deployer -i /deploy/dev/hosts /deploy/deploy_abaco.plbk
+```
