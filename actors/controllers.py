@@ -123,6 +123,7 @@ class ActorResource(Resource):
             raise ResourceError(
                 "No actor found with id: {}.".format(actor_id), 404)
         previous_image = actor.image
+        previous_status = actor.status
         args = self.validate_put(actor)
         logger.debug("PUT args validated successfully.")
         args['tenant'] = g.tenant
@@ -130,7 +131,8 @@ class ActorResource(Resource):
         update_image = args.get('force')
         if not update_image and args['image'] == previous_image:
             logger.debug("new image is the same and force was false. not updating actor.")
-            args['status'] = actor.status
+            logger.debug("Setting status to the actor's previoud status which is: {}".format(previous_status))
+            args['status'] = previous_status
         else:
             update_image = True
             args['status'] = SUBMITTED
@@ -140,8 +142,8 @@ class ActorResource(Resource):
         actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
         logger.info("updated actor {} stored in db.".format(actor_id))
-        worker_ids = [Worker.request_worker(actor.db_id)]
         if update_image:
+            worker_ids = [Worker.request_worker(actor.db_id)]
             ch = CommandChannel()
             ch.put_cmd(actor_id=actor.db_id, worker_ids=worker_ids, image=actor.image, tenant=args['tenant'])
             logger.debug("put new command on command channel to update actor.")
