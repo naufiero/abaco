@@ -128,6 +128,7 @@ class Spawner(object):
                     # put actor in an error state and return
                     self.error_out_actor(actor_id, [], str(e))
                     return
+                client_ch.close()
                 # we need to ignore errors when generating clients because it's possible it is not set up for a specific
                 # tenant. we log it instead.
                 if client_msg.get('status') == 'error':
@@ -160,6 +161,7 @@ class Spawner(object):
                              'tenant': tenant,
                              'client': 'no'})
                 logger.debug("Sent OK message over anonymous worker channel.")
+            channel.close()
 
         logger.info("Done processing command.")
 
