@@ -25,7 +25,7 @@ def handle_all_errors(e):
 api.add_resource(WorkersResource, '/actors/<string:actor_id>/workers')
 api.add_resource(PermissionsResource, '/actors/<string:actor_id>/permissions')
 api.add_resource(WorkerResource, '/actors/<string:actor_id>/workers/<string:worker_id>')
-api.add_resource(AdminActorsResource, '/admin/actors')
+api.add_resource(AdminActorsResource, '/actors/admin')
 
 # web app
 @app.route('/admin/dashboard', methods=['POST', 'GET'])
