@@ -161,8 +161,17 @@ class Spawner(object):
                              'tenant': tenant,
                              'client': 'no'})
                 logger.debug("Sent OK message over anonymous worker channel.")
-            channel.close()
+            # delete the anonymous channel event queue. this is an issue with the
+            # channelpy library.
+            channel._queue._event_queue.delete()
 
+        for ch in new_channels:
+            try:
+                # the new_channels are the actual worker channels so do not want to delete
+                # them; instead, only want to close our local connection
+                ch.close()
+            except Exception as e:
+                logger.error("Got exception trying to close worker channel: {}".format(e))
         logger.info("Done processing command.")
 
     def start_workers(self, actor_id, worker_ids, image, tenant, num_workers):
