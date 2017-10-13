@@ -67,6 +67,10 @@ def check_workers(actor_id, ttl):
             except Exception as e:
                 logger.error("Got exception trying to delete worker: {}".format(e))
             continue
+        try:
+            ch.close()
+        except Exception:
+            logger.error("Got an error trying to close the worker channel. Exception: {}".format(e))
         if not result == 'ok':
             logger.error("Worker responded unexpectedly: {}, deleting worker.".format(result))
             try:

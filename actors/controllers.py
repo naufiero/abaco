@@ -29,7 +29,9 @@ class AdminActorsResource(Resource):
             for id, worker in actor.workers.items():
                 actor.worker = worker
                 break
-            actor.messages = len(ActorMsgChannel(actor_id=actor.db_id)._queue._queue)
+            ch = ActorMsgChannel(actor_id=actor.db_id)
+            actor.messages = len(ch._queue._queue)
+            ch.close()
             summary = ExecutionsSummary(db_id=actor.db_id)
             actor.executions = summary.total_executions
             actor.runtime = summary.total_runtime
@@ -146,6 +148,7 @@ class ActorResource(Resource):
             worker_ids = [Worker.request_worker(actor.db_id)]
             ch = CommandChannel()
             ch.put_cmd(actor_id=actor.db_id, worker_ids=worker_ids, image=actor.image, tenant=args['tenant'])
+            ch.close()
             logger.debug("put new command on command channel to update actor.")
         return ok(result=actor.display(),
                   msg="Actor updated successfully.")
@@ -344,7 +347,9 @@ class MessagesResource(Resource):
             logger.debug("did not find actor: {}.".format(actor_id))
             raise ResourceError(
                 "No actor found with id: {}.".format(actor_id), 404)
-        result={'messages': len(ActorMsgChannel(actor_id=id)._queue._queue)}
+        ch = ActorMsgChannel(actor_id=id)
+        result={'messages': len(ch._queue._queue)}
+        ch.close()
         logger.debug("messages found for actor: {}.".format(actor_id))
         result.update(get_hypermedia(actor))
         return ok(result)
@@ -427,6 +432,7 @@ class MessagesResource(Resource):
         logger.debug("Final message dictionary: {}".format(d))
         ch = ActorMsgChannel(actor_id=dbid)
         ch.put_msg(message=args['message'], d=d)
+        ch.close()
         logger.debug("Message added to actor inbox. id: {}.".format(actor_id))
         # make sure at least one worker is available
         actor = Actor.from_db(actors_store[dbid])
@@ -513,6 +519,7 @@ class WorkersResource(Resource):
                        tenant=g.tenant,
                        num=num_to_add,
                        stop_existing=False)
+            ch.close()
             logger.info("Message put on command channel for new worker ids: {}".format(worker_ids))
             return ok(result=None, msg="Scheduled {} new worker(s) to start. There were only".format(num_to_add))
         else:

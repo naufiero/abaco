@@ -91,6 +91,7 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
                     logger.info("Delete request completed successfully.")
                 else:
                     logger.error("Error deleting client. Message: {}".format(msg['message']))
+                clients_ch.close()
             else:
                 logger.info("Did not receive client. Not issuing delete. Exiting.")
             try:
@@ -99,6 +100,7 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
                 logger.info("Got WorkerException from delete_worker(). Exception: {}".format(e))
             keep_running = False
             actor_ch.close()
+            worker_ch.close()
             logger.info("Closing actor channel for actor: {}".format(actor_id))
             logger.info("Worker is now exiting.")
             sys.exit()
