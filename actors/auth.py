@@ -97,8 +97,22 @@ def authorization():
         raise PermissionsException("Not authorized -- missing required role.")
     else:
         logger.debug("User has an abaco role.")
-    logger.debug("URL rule: {}".format(request.url_rule.rule or 'actors/'))
+        if hasattr(request, 'url_rule'):
+            logger.debug("reques.url_rule: {}".format(request.url_rule))
+            if hasattr(request.url_rule, 'rule'):
+                logger.debug("url_rule.rule: {}".format(request.url_rule.rule))
+            else:
+                logger.info("url_rule has no rule.")
+        else:
+            logger.info("Request has no url_rule")
     logger.debug("request.path: {}".format(request.path))
+    # the admin API requires the admin role:
+    if 'admin' in request.path or '/actors/admin' in request.url_rule.rule or '/actors/admin/' in request.url_rule.rule:
+        if g.admin:
+            return True
+        else:
+            raise PermissionError("Abaco Admin role required.")
+
     # there are special rules on the root collection:
     if '/actors' == request.url_rule.rule or '/actors/' == request.url_rule.rule:
         logger.debug("Checking permissions on root collection.")
