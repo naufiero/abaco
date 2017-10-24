@@ -72,6 +72,8 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
                 logger.debug("received health check. returning 'ok'.")
                 ch = msg['reply_to']
                 ch.put('ok')
+                # clean up the event queue on this anonymous channel. this should be fixed in channelpy.
+                ch._queue._event_queue
         elif msg == 'stop':
             logger.info("Received stop message, stopping worker...")
             # first, delete an associated client
