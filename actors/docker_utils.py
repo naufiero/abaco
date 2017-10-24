@@ -215,6 +215,7 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
 
     # if container is privileged, mount the docker daemon so that additional
     # containers can be started.
+    logger.debug("privileged: {}".format(privileged))
     if privileged:
         binds = {'/var/run/docker.sock':{
                     'bind': '/var/run/docker.sock',
@@ -230,6 +231,7 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
 
     # create and start the container
     logger.debug("Final container environment: {}".format(d))
+    logger.debug("Final binds: {} and host_config: {} for the container.".format(binds, host_config))
     container = cli.create_container(image=image, environment=d, volumes=volumes, host_config=host_config)
     start_time = get_current_utc_time()
     try:
