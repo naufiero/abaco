@@ -89,7 +89,7 @@ def check_workers(actor_id, ttl):
             return
         # we don't shut down workers that are currently running:
         if not worker['status'] == codes.BUSY:
-            last_execution = worker.get('last_execution', 0)
+            last_execution = int(float(worker.get('last_execution_time', 0)))
             if last_execution + ttl < time.time():
                 # shutdown worker
                 logger.info("Shutting down worker beyond ttl.")
@@ -146,7 +146,6 @@ def main():
     for id in ids:
         check_workers(id, ttl)
         # manage_workers(id)
-
 
 if __name__ == '__main__':
     main()
