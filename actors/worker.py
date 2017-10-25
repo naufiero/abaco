@@ -202,7 +202,7 @@ def subscribe(tenant,
 
         # privileged dictates whether the actor container runs in privileged mode and if docker daemon is mounted.
         privileged = False
-        if actor['privileged'] == 'TRUE':
+        if type(actor['privileged']) == bool and actor['privileged']:
             privileged = True
         logger.debug("privileged: {}".format(privileged))
 
