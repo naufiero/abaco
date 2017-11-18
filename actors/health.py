@@ -87,13 +87,21 @@ def check_workers(actor_id, ttl):
             # ttl < 0 means infinite life
             logger.info("Infinite ttl configured; leaving worker")
             return
-        if worker['status'] == codes.READY and \
-            worker['last_execution'] + ttl < time.time():
+        # we don't shut down workers that are currently running:
+        if not worker['status'] == codes.BUSY:
+            last_execution = int(float(worker.get('last_execution_time', 0)))
+            if last_execution + ttl < time.time():
+                # shutdown worker
+                logger.info("Shutting down worker beyond ttl.")
+                shutdown_worker(worker['ch_name'])
+            else:
+                logger.info("Still time left for this worker.")
+        elif worker['status'] == codes.ERROR:
             # shutdown worker
-            logger.info("Shutting down worker beyond ttl.")
+            logger.info("Shutting down worker in error status.")
             shutdown_worker(worker['ch_name'])
         else:
-            logger.debug("Worker still has life.")
+            logger.debug("Worker not in READY status, will postpone.")
 
 def manage_workers(actor_id):
     """Scale workers for an actor if based on message queue size and policy."""
@@ -138,7 +146,6 @@ def main():
     for id in ids:
         check_workers(id, ttl)
         # manage_workers(id)
-
 
 if __name__ == '__main__':
     main()
