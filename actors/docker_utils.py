@@ -185,7 +185,16 @@ def run_worker(image, ch_name, worker_id):
              'last_execution_time': 0,
              'last_health_check_time': get_current_utc_time() }
 
-def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=False, mounts=[], leave_container=False):
+def execute_actor(actor_id,
+                  worker_id,
+                  worker_ch,
+                  image,
+                  msg,
+                  user=None,
+                  d={},
+                  privileged=False,
+                  mounts=[],
+                  leave_container=False):
     """
     Creates and runs an actor container and supervises the execution, collecting statistics about resource consumption
     from the Docker daemon.
@@ -195,6 +204,7 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
     :param worker_ch: NO LONGER USED.
     :param image: the actor's image; worker must have already downloaded this image to the local docker registry.
     :param msg: the message being passed to the actor.
+    :param user: string in the form {uid}:{gid} representing the uid and gid to run the command as.
     :param d: dictionary representing the environment to instantiate within the actor container.
     :param privileged: whether this actor is "privileged"; i.e., its container should run in privileged mode with the
     docker daemon mounted.
@@ -232,7 +242,11 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
     # create and start the container
     logger.debug("Final container environment: {}".format(d))
     logger.debug("Final binds: {} and host_config: {} for the container.".format(binds, host_config))
-    container = cli.create_container(image=image, environment=d, volumes=volumes, host_config=host_config)
+    container = cli.create_container(image=image,
+                                     environment=d,
+                                     user=user,
+                                     volumes=volumes,
+                                     host_config=host_config)
     start_time = get_current_utc_time()
     try:
         cli.start(container=container.get('Id'))
