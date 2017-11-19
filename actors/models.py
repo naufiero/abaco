@@ -101,7 +101,11 @@ class AbacoDAO(DbDict):
             if source == 'derived':
                 continue
             required = source == 'required'
-            parser.add_argument(name, type=typ, required=required, help=help, default=default)
+            if Config.get('web', 'case') == 'camel':
+                param_name = under_to_camel(name)
+            else:
+                param_name = name
+            parser.add_argument(param_name, type=typ, required=required, help=help, default=default)
         return parser
 
     @classmethod
@@ -112,26 +116,36 @@ class AbacoDAO(DbDict):
     def __init__(self, **kwargs):
         """Construct a DAO from **kwargs. Client can also create from a dictionary, d, using AbacoDAO(**d)"""
         for name, source, attr, typ, help, default in self.PARAMS:
+            pname = name
+            # When using camel case, it is possible a given argument will come in in camel
+            # case, for instance when creating an object directly from parameters passed in
+            # a POST request.
+            if name not in kwargs and Config.get('web', 'case') == 'camel':
+                # derived attributes always create the attribute with underscores:
+                if source == 'derived':
+                    pname = name
+                else:
+                    pname = under_to_camel(name)
             if source == 'required':
                 try:
-                    value = kwargs[name]
+                    value = kwargs[pname]
                 except KeyError:
-                    logger.debug("required missing field: {}. ".format(name))
-                    raise errors.DAOError("Required field {} missing.".format(name))
+                    logger.debug("required missing field: {}. ".format(pname))
+                    raise errors.DAOError("Required field {} missing.".format(pname))
             elif source == 'optional':
-                value = kwargs.get(name, default)
+                value = kwargs.get(pname, default)
             elif source == 'provided':
                 try:
-                    value = kwargs[name]
+                    value = kwargs[pname]
                 except KeyError:
-                    logger.debug("provided field missing: {}.".format(name))
-                    raise errors.DAOError("Required field {} missing.".format(name))
+                    logger.debug("provided field missing: {}.".format(pname))
+                    raise errors.DAOError("Required field {} missing.".format(pname))
             else:
                 # derived value - check to see if already computed
-                if hasattr(self, name):
-                    value = getattr(self, name)
+                if hasattr(self, pname):
+                    value = getattr(self, pname)
                 else:
-                    value = self.get_derived_value(name, kwargs)
+                    value = self.get_derived_value(pname, kwargs)
             setattr(self, attr, value)
 
     def get_uuid(self):
@@ -171,6 +185,7 @@ class Actor(AbacoDAO):
         ('stateless', 'optional', 'stateless', bool, 'Whether the actor stores private state.', False),
         ('description', 'optional', 'description', str,  'Description of this actor', ''),
         ('privileged', 'optional', 'privileged', bool, 'Whether this actor runs in privileged mode.', False),
+        ('use_container_uid', 'optional', 'use_container_uid', bool, 'Whether this actor runs as the UID set in the container image.', False),
         ('default_environment', 'optional', 'default_environment', dict, 'Default environmental variables and values.', {}),
         ('status', 'optional', 'status', str, 'Current status of the actor.', SUBMITTED),
         ('status_message', 'optional', 'status_message', str, 'Explanation of status.', ''),
@@ -182,6 +197,8 @@ class Actor(AbacoDAO):
         ('tenant', 'provided', 'tenant', str, 'The tenant that this actor belongs to.', None),
         ('api_server', 'provided', 'api_server', str, 'The base URL for the tenant that this actor belongs to.', None),
         ('owner', 'provided', 'owner', str, 'The user who created this actor.', None),
+        ('uid', 'optional', 'uid', str, 'The uid to run the container as. Only used if user_container_uid is false.', None),
+        ('gid', 'optional', 'gid', str, 'The gid to run the container as. Only used if user_container_uid is false.', None),
 
         ('db_id', 'derived', 'db_id', str, 'Primary key in the database for this actor.', None),
         ('id', 'derived', 'id', str, 'Human readable id for this actor.', None),
