@@ -210,6 +210,9 @@ def subscribe(tenant,
         environment = actor['default_environment']
         logger.debug("Actor default environment: {}".format(environment))
 
+        # construct the user field from the actor's uid and gid:
+        user = get_container_user(actor)
+        logger.debug("Final user valiue: {}".format(user))
         # overlay the default_environment registered for the actor with the msg
         # dictionary
         environment.update(msg)
@@ -237,6 +240,7 @@ def subscribe(tenant,
                                                                             worker_ch,
                                                                             image,
                                                                             message,
+                                                                            user,
                                                                             environment,
                                                                             privileged,
                                                                             global_mounts,
@@ -257,6 +261,24 @@ def subscribe(tenant,
         # Update the worker's last updated and last execution fields:
         Worker.update_worker_execution_time(actor_id, worker_id)
         logger.info("worker time stamps updated.")
+
+def get_container_user(actor):
+    logger.debug("top of get_container_user")
+    if actor.get('use_container_uid'):
+        logger.info("actor set to use_container_uid. Returning None for user")
+        return None
+    uid = actor.get('uid')
+    gid = actor.get('gid')
+    logger.debug("The uid: {} and gid:{} from the actor.".format(uid, gid))
+    if not uid:
+        if Config.get('workers', 'use_tas_uid') and not actor.get('use_container_uid'):
+            logger.warn('Warning - legacy actor running as image UID without use_container_uid!')
+        user = None
+    elif not gid:
+        user = uid
+    else:
+        user = '{}:{}'.format(uid, gid)
+    return user
 
 def main(worker_ch_name, worker_id, image):
     """

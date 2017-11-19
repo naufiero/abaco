@@ -10,6 +10,7 @@ from Crypto.Hash import SHA256
 from flask import g, request, abort
 from flask_restful import Resource
 import jwt
+import requests
 
 from agaveflask.auth import authn_and_authz as agaveflask_az
 from agaveflask.logs import get_logger
@@ -98,7 +99,7 @@ def authorization():
     else:
         logger.debug("User has an abaco role.")
         if hasattr(request, 'url_rule'):
-            logger.debug("reques.url_rule: {}".format(request.url_rule))
+            logger.debug("request.url_rule: {}".format(request.url_rule))
             if hasattr(request.url_rule, 'rule'):
                 logger.debug("url_rule.rule: {}".format(request.url_rule.rule))
             else:
@@ -166,9 +167,20 @@ def check_privileged():
             raise PermissionsException("Not authorized -- only admins and privileged users can make privileged actors.")
         else:
             logger.debug("user allowed to set privileged.")
-            return True
+
+    # when using the UID associated with the user in TAS, admins can still register actors
+    # to use the UID built in the container using the use_container_uid flag:
+    if Config.get('workers', 'use_tas_uid'):
+        if data.get('use_container_uid') or data.get('useContainerUid'):
+            logger.debug("User is trying to use_container_uid")
+            # if we're here, user isn't an admin so must have privileged role:
+            if not codes.PRIVILEGED_ROLE in g.roles:
+                logger.info("User does not have privileged role.")
+                raise PermissionsException("Not authorized -- only admins and privileged users can use container uid.")
+            else:
+                logger.debug("user allowed to use container uid.")
     else:
-        logger.debug("not trying to set privileged.")
+        logger.debug("not trying to use privileged options.")
         return True
 
 def check_permissions(user, actor_id, level):
@@ -220,3 +232,53 @@ def get_tenants():
             'SGCI',
             'TACC-PROD',
             'VDJSERVER-ORG']
+
+
+# TAS configuration:
+# base URL for TAS API.
+TAS_URL_BASE = os.environ.get('TAS_URL_BASE', 'https://tas.tacc.utexas.edu/api/v1')
+TAS_ROLE_ACCT = os.environ.get('TAS_ROLE_ACCT', 'tas-jetstream')
+TAS_ROLE_PASS = os.environ.get('TAS_ROLE_PASS')
+
+
+def get_tas_data(username):
+    """Get the TACC uid, gid and homedir for this user from the TAS API."""
+    logger.debug("Top of get_tas_data for username: {}".format(username))
+    if not TAS_ROLE_ACCT:
+        logger.error("No TAS_ROLE_ACCT configured. Aborting.")
+        return
+    if not TAS_ROLE_PASS:
+        logger.error("No TAS_ROLE_PASS configured. Aborting.")
+        return
+    url = '{}/users/username/{}'.format(TAS_URL_BASE, username)
+    headers = {'Content-type': 'application/json',
+               'Accept': 'application/json'
+               }
+    try:
+        rsp = requests.get(url,
+                           headers=headers,
+                           auth=requests.auth.HTTPBasicAuth(TAS_ROLE_ACCT, TAS_ROLE_PASS))
+    except Exception as e:
+        logger.error("Got an exception from TAS API. "
+                       "Exception: {}. url: {}. TAS_ROLE_ACCT: {}".format(e, url, TAS_ROLE_ACCT))
+        return
+    try:
+        data = rsp.json()
+    except Exception as e:
+        logger.error("Did not get JSON from TAS API. rsp: {}"
+                       "Exception: {}. url: {}. TAS_ROLE_ACCT: {}".format(rsp, e, url, TAS_ROLE_ACCT))
+        return
+    try:
+        tas_uid = data['result']['uid']
+        tas_homedir = data['result']['homeDirectory']
+    except Exception as e:
+        logger.error("Did not get attributes from TAS API. rsp: {}"
+                       "Exception: {}. url: {}. TAS_ROLE_ACCT: {}".format(rsp, e, url, TAS_ROLE_ACCT))
+        return
+    # if the instance has a configured TAS_GID to use we will use that; otherwise,
+    # we fall back on using the user's uid as the gid, which is (almost) always safe)
+    tas_gid = os.environ.get('TAS_GID', tas_uid)
+    logger.info("Setting the following TAS data: uid:{} gid:{} homedir:{}".format(tas_uid,
+                                                                                  tas_gid,
+                                                                                  tas_homedir))
+    return tas_uid, tas_gid, tas_homedir
