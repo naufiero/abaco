@@ -23,6 +23,7 @@ import codes
 from errors import PermissionsException
 from models import Actor, get_permissions
 
+from errors import ResourceError
 from stores import actors_store, permissions_store
 
 
@@ -104,8 +105,11 @@ def authorization():
                 logger.debug("url_rule.rule: {}".format(request.url_rule.rule))
             else:
                 logger.info("url_rule has no rule.")
+                raise ResourceError("Invalid request: the API endpoint does not exist or the provided HTTP method is not allowed.", 405)
         else:
             logger.info("Request has no url_rule")
+            raise ResourceError(
+                "Invalid request: the API endpoint does not exist or the provided HTTP method is not allowed.", 405)
     logger.debug("request.path: {}".format(request.path))
     # the admin API requires the admin role:
     if 'admin' in request.path or '/actors/admin' in request.url_rule.rule or '/actors/admin/' in request.url_rule.rule:
