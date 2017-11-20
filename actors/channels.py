@@ -1,4 +1,10 @@
+import time
+
 from channelpy import Channel, RabbitConnection
+from channelpy.chan import checking_events
+from channelpy.exceptions import ChannelClosedException, ChannelTimeoutException
+import cloudpickle
+
 
 from config import Config
 
@@ -72,6 +78,30 @@ class ActorMsgChannel(Channel):
         super().__init__(name='actor_msg_{}'.format(actor_id),
                          connection_type=RabbitConnection,
                          uri=self.uri)
+
+    @checking_events
+    def put(self, value):
+        """Override the channelpy.Channel.put so that we can pass binary."""
+        if self._queue is None:
+            raise ChannelClosedException()
+        self._queue.put(cloudpickle.dumps(value))
+
+    @staticmethod
+    def _process(msg):
+        return cloudpickle.loads(msg)
+
+    @checking_events
+    def get(self, timeout=float('inf')):
+        start = time.time()
+        while True:
+            if self._queue is None:
+                raise ChannelClosedException()
+            msg = self._queue.get()
+            if msg is not None:
+                return self._process(msg)
+            if time.time() - start > timeout:
+                raise ChannelTimeoutException()
+            time.sleep(self.POLL_FREQUENCY)
 
     def put_msg(self, message, d={}, **kwargs):
         """Pass a message to an actor's inbox, thereby invoking it. `message` is the request
