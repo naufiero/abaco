@@ -376,6 +376,22 @@ class MessagesResource(Resource):
         # if a special 'message' object isn't passed, use entire POST payload as message
         if not args.get('message'):
             logger.debug("POST body did not have a message field.")
+            # first check for binary data:
+            if request.headers.get('Content-Type') == 'application/octet-stream':
+                # ensure not sending too much data
+                length = request.headers.get('Content-Length')
+                if not length:
+                    raise ResourceError("Content Length required for application/octet-stream.")
+                try:
+                    int(length)
+                except Exception:
+                    raise ResourceError("Content Length must be an integer.")
+                if int(length) > int(Config.get('web', 'max_content_length')):
+                    raise ResourceError("Message exceeds max content length of: {}".format(Config.get('web', 'max_content_length')))
+                logger.debug("using get_data, setting content type to application/octet-stream.")
+                args['message'] = request.get_data()
+                args['_abaco_Content_Type'] = 'application/octet-stream'
+                return args
             json_data = request.get_json()
             if json_data:
                 logger.debug("message was JSON data.")
@@ -452,7 +468,10 @@ class MessagesResource(Resource):
         actor = Actor.from_db(actors_store[dbid])
         actor.ensure_one_worker()
         logger.debug("ensure_one_actor() called. id: {}.".format(actor_id))
-        result={'execution_id': exc, 'msg': args['message']}
+        if args.get('_abaco_Content_Type') == 'application/octet-stream':
+            result = {'execution_id': exc, 'msg': 'binary - omitted'}
+        else:
+            result={'execution_id': exc, 'msg': args['message']}
         result.update(get_hypermedia(actor, exc))
         case = Config.get('web', 'case')
         if not case == 'camel':

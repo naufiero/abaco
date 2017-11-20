@@ -20,29 +20,21 @@ nginx:
     extends:
         file: docker-compose-local.yml
         service: nginx
-    volumes:
-        - ./all.conf:/etc/service.conf
 
 reg:
     extends:
         file: docker-compose-local.yml
         service: reg
-    volumes:
-        - ./all.conf:/etc/service.conf
 
 mes:
     extends:
         file: docker-compose-local.yml
         service: mes
-    volumes:
-        - ./all.conf:/etc/service.conf
 
 admin:
     extends:
         file: docker-compose-local.yml
         service: admin
-    volumes:
-        - ./all.conf:/etc/service.conf
 
 # uncomment to run the client generation
 #gclient:
@@ -56,12 +48,8 @@ spawner:
     extends:
         file: docker-compose-local.yml
         service: spawner
-    volumes:
-        - ./all.conf:/etc/service.conf
 
 health:
     extends:
         file: docker-compose-local.yml
         service: health
-    volumes:
-        - ./all.conf:/etc/service.conf
