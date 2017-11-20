@@ -5,7 +5,7 @@ nginx:
     volumes:
         - ./local-dev.conf:/etc/service.conf
     ports:
-        - "8001:80"
+        - "8000:80"
 
 reg:
     image: abaco/core$TAG
