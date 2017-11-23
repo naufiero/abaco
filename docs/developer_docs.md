@@ -112,10 +112,10 @@ $ export TAS_ROLE_PASS=the_password
 Finally, start the Abaco containers with the following command:
 
 ```shell
-$ docker-compose -f dc-all.yml up -d
+$ docker-compose up -d
 ```
-Note that this will command will still run the default (production) versions of the auxiliary images, such as nginx
-and the databases.
+Note that this will command will still run the default (production) versions of the auxiliary images, such as the
+databases.
 
 
 **Running the Tests**
