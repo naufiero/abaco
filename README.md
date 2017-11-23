@@ -28,7 +28,7 @@ Quickstart
     Then start the Abaco containers with the following two commands:
 
     ```shell
-    $ docker-compose -f dc-all.yml up -d
+    $ docker-compose up -d
     ```
 
     If all went well, the services will be running behind `nginx` on 8000. We assume the Docker Gateway is running on the default IP for Docker 1.9.1+ which is 172.17.0.1. If this is not the case for your setup, you will need to update the value of host within the store stanza of the all.conf file with the IP address of the Gateway. It also may take several seconds for the mongo db to be ready to accept connections.
