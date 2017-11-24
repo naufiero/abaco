@@ -34,6 +34,10 @@ workers_init_count: 1
 workers_max_run_time: 14400
 workers_worker_ttl: 86400
 workers_generate_clients: False
+workers_global_mounts: /home/apim/data1:/_abaco_data1:ro,/home/apim/data2:/_abaco_data2:rw
+workers_leave_containers: False
+workers_use_tas_uid: False
+workers_fifo_host_path_dir: /home/apim/_abaco_fifos
 
 
 # ---
@@ -45,4 +49,4 @@ web_tenant_name: dev_staging
 web_show_traceback: False
 web_log_ex: 86400
 web_case: camel
-
+web_max_content_length: 500000000
