@@ -91,13 +91,31 @@ The abaco_path variable needs to contain the path to a directory with an abaco.c
 know where to find the config file. Note that the abaco.conf contains the default IP address of the Docker0 gateway for
 Mongo and Redis. If your Docker0 gateway IP is different, you will need to updte the abaco.conf file.
 
+Several optional aspects of the Abaco development stack require additional configuration. By default, the databases
+(Redis, Mongo and RabbitMQ) do not use authentication. To test with authentication, uncomment the relevant stanzas from
+the docker-comppose-local-db.yml file and export the following variables:
+```shell
+$ export mongo_password=password
+$ export redi_password=password
+```
+
+In order to run containers with UIDs generated from TAS, put
+```shell
+use_tas_uid: True
+```
+in the local-dev.conf file and export the following:
+```shell
+$ export TAS_ROLE_ACCT=the_account
+$ export TAS_ROLE_PASS=the_password
+```
+
 Finally, start the Abaco containers with the following command:
 
 ```shell
-$ docker-compose -f dc-all.yml up -d
+$ docker-compose up -d
 ```
-Note that this will command will still run the default (production) versions of the auxiliary images, such as nginx
-and the databases.
+Note that this will command will still run the default (production) versions of the auxiliary images, such as the
+databases.
 
 
 **Running the Tests**

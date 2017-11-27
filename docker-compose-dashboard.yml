@@ -21,13 +21,13 @@ django:
     volumes:
         - ./dashboard/requests:/requests
     environment:
-        SENDGRID_USER:
-        SENDGRID_PASSWORD:
         # for TACC instance
         "AGAVE_CLIENT_KEY": "f_9vaEvm3oxCnNe9Z4VoxRXZGwca"
         "AGAVE_CLIENT_SECRET":
         "AGAVE_BASE_URL": "https://api.tacc.utexas.edu"
         # for SD2E instance
         "AGAVE_CLIENT_KEY": "ftYwvK5aYltAqePSJQGFp3NF1l8a"
-        "AGAVE_CLIENT_SECRET": 
+        "AGAVE_CLIENT_SECRET":
         "AGAVE_BASE_URL": "https://api.sd2e.org"
+        SENDGRID_USER:
+        SENDGRID_PASSWORD:

@@ -194,6 +194,29 @@ def subscribe(tenant,
         message = msg.pop('message', '')
         actor = Actor.from_db(actors_store[actor_id])
         execution_id = msg['_abaco_execution_id']
+        content_type = msg['_abaco_Content_Type']
+
+        # for binary data, create a fifo in the configured directory. The configured
+        # fifo_host_path_dir is equal to the fifo path in the worker container:
+        fifo_host_path = None
+        if content_type == 'application/octet-stream':
+            try:
+                fifo_host_path_dir = Config.get('workers', 'fifo_host_path_dir')
+            except (configparser.NoSectionError, configparser.NoOptionError):
+                logger.error("No fifo_host_path configured. Cannot manage binary data.")
+                Actor.set_status(actor_id, ERROR, msg="Abaco instance not configured for binary data.")
+                continue
+            fifo_host_path = os.path.join(fifo_host_path_dir, worker_id, execution_id)
+            logger.info("Create fifo at path: {}".format(fifo_host_path))
+            try:
+                os.mkfifo(fifo_host_path)
+            except Exception as e:
+                logger.error("Could not create fifo_path. Exception: {}".format(e))
+                raise e
+            # add the fifo as a mount:
+            global_mounts.append({'host_path': fifo_host_path,
+                                  'container_path': '/_abaco_binary_data',
+                                  'format': 'ro'})
 
         # the execution object was created by the controller, but we need to add the worker id to it now that we
         # know which worker will be working on the execution.
@@ -210,6 +233,9 @@ def subscribe(tenant,
         environment = actor['default_environment']
         logger.debug("Actor default environment: {}".format(environment))
 
+        # construct the user field from the actor's uid and gid:
+        user = get_container_user(actor)
+        logger.debug("Final user valiue: {}".format(user))
         # overlay the default_environment registered for the actor with the msg
         # dictionary
         environment.update(msg)
@@ -237,13 +263,15 @@ def subscribe(tenant,
                                                                             worker_ch,
                                                                             image,
                                                                             message,
+                                                                            user,
                                                                             environment,
                                                                             privileged,
                                                                             global_mounts,
-                                                                            leave_containers)
+                                                                            leave_containers,
+                                                                            fifo_host_path)
         except DockerStartContainerError as e:
-            logger.error("Got DockerStartContainerError: {}".format(str(e)))
-            Actor.set_status(actor_id, ERROR)
+            logger.error("Got DockerStartContainerError: {}".format(e))
+            Actor.set_status(actor_id, ERROR, "Error executing container: {}".format(e))
             continue
         # Add the completed stats to the execution
         logger.info("Actor container finished successfully. Got stats object:{}".format(str(stats)))
@@ -257,6 +285,24 @@ def subscribe(tenant,
         # Update the worker's last updated and last execution fields:
         Worker.update_worker_execution_time(actor_id, worker_id)
         logger.info("worker time stamps updated.")
+
+def get_container_user(actor):
+    logger.debug("top of get_container_user")
+    if actor.get('use_container_uid'):
+        logger.info("actor set to use_container_uid. Returning None for user")
+        return None
+    uid = actor.get('uid')
+    gid = actor.get('gid')
+    logger.debug("The uid: {} and gid:{} from the actor.".format(uid, gid))
+    if not uid:
+        if Config.get('workers', 'use_tas_uid') and not actor.get('use_container_uid'):
+            logger.warn('Warning - legacy actor running as image UID without use_container_uid!')
+        user = None
+    elif not gid:
+        user = uid
+    else:
+        user = '{}:{}'.format(uid, gid)
+    return user
 
 def main(worker_ch_name, worker_id, image):
     """

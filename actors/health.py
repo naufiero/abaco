@@ -133,6 +133,7 @@ def main():
                                       command,
                                       name='abaco_spawner_0',
                                       environment={'AE_IMAGE': AE_IMAGE},
+                                      mounts=[],
                                       log_file=log_file)
         except Exception as e:
             logger.critical("Could not restart spanwer. Exception: {}".format(e))

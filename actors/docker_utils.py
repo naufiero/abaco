@@ -30,8 +30,10 @@ class DockerError(Exception):
         Exception.__init__(self, message)
         self.message = message
 
+
 class DockerStartContainerError(DockerError):
     pass
+
 
 def rm_container(cid):
     """
@@ -93,7 +95,7 @@ def container_running(image=None, name=None):
     logger.debug("found containers: {}".format(containers))
     return len(containers) > 0
 
-def run_container_with_docker(image, command, name=None, environment={}, log_file='service.log'):
+def run_container_with_docker(image, command, name=None, environment={}, mounts=[], log_file='service.log'):
     """
     Run a container with docker mounted in it.
     Note: this function always mounts the abaco conf file so it should not be used by execute_actor().
@@ -104,6 +106,11 @@ def run_container_with_docker(image, command, name=None, environment={}, log_fil
     # bind the docker socket as r/w since this container gets docker.
     volumes = ['/var/run/docker.sock']
     binds = {'/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'ro': False}}
+    # add a bind key and dictionary as well as a volume for each mount
+    for m in mounts:
+        binds[m.get('host_path')] = {'bind': m.get('container_path'),
+                                     'ro': m.get('format') == 'ro'}
+        volumes.append(m.get('host_path'))
 
     # mount the abaco conf file. first we look for the environment variable, falling back to the value in Config.
     try:
@@ -163,12 +170,28 @@ def run_worker(image, ch_name, worker_id):
         log_file = 'worker.log'
     else:
         log_file = 'abaco.log'
+
+    # mount the directory on the host for creating fifos
+    try:
+        fifo_host_path_dir = Config.get('workers', 'fifo_host_path_dir')
+        logger.info("Using fifo_host_path_dir: {}".format(fifo_host_path_dir))
+    except (configparser.NoSectionError, configparser.NoOptionError) as e:
+        logger.error("Got exception trying to look up fifo_host_path_dir. Setting to None. Exception: {}".format(e))
+        fifo_host_path_dir = None
+    if fifo_host_path_dir:
+        mounts = [{'host_path': os.path.join(fifo_host_path_dir, worker_id),
+                   'container_path': os.path.join(fifo_host_path_dir, worker_id),
+                   'format': 'rw'}]
+    else:
+        mounts = []
+    logger.info("Final fifo_host_path_dir: {}".format(fifo_host_path_dir))
     container = run_container_with_docker(image=AE_IMAGE,
                                           command=command,
                                           environment={'ch_name': ch_name,
                                                        'image': image,
                                                        'worker_id': worker_id,
                                                        '_abaco_secret': os.environ.get('_abaco_secret')},
+                                          mounts=mounts,
                                           log_file=log_file)
     # don't catch errors -- if we get an error trying to run a worker, let it bubble up.
     # TODO - determines worker structure; should be placed in a proper DAO class.
@@ -185,7 +208,17 @@ def run_worker(image, ch_name, worker_id):
              'last_execution_time': 0,
              'last_health_check_time': get_current_utc_time() }
 
-def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=False, mounts=[], leave_container=False):
+def execute_actor(actor_id,
+                  worker_id,
+                  worker_ch,
+                  image,
+                  msg,
+                  user=None,
+                  d={},
+                  privileged=False,
+                  mounts=[],
+                  leave_container=False,
+                  fifo_host_path=None):
     """
     Creates and runs an actor container and supervises the execution, collecting statistics about resource consumption
     from the Docker daemon.
@@ -195,11 +228,13 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
     :param worker_ch: NO LONGER USED.
     :param image: the actor's image; worker must have already downloaded this image to the local docker registry.
     :param msg: the message being passed to the actor.
+    :param user: string in the form {uid}:{gid} representing the uid and gid to run the command as.
     :param d: dictionary representing the environment to instantiate within the actor container.
     :param privileged: whether this actor is "privileged"; i.e., its container should run in privileged mode with the
     docker daemon mounted.
     :param mounts: list of dictionaries representing the mounts to add; each dictionary mount should have 3 keys:
     host_path, container_path and format (which should have value 'ro' or 'rw').
+    :param fifo_host_path: If not None, a string representing a path on the host to a FIFO used for passing binary data to the actor:
     :return: result (dict), logs (str) - `result`: statistics about resource consumption; `logs`: output from docker logs.
     """
     logger.debug("top of execute_actor()")
@@ -209,7 +244,12 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
               'io': 0,
               'runtime': 0 }
     cli = docker.AutoVersionClient(base_url=dd)
-    d['MSG'] = msg
+
+    # don't try to pass binary messages through the environment as these can cause
+    # broken pipe errors. the binary data will be passed through the FIFO after the container
+    # is started.
+    if not fifo_host_path:
+        d['MSG'] = msg
     binds = {}
     volumes = []
 
@@ -232,7 +272,11 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
     # create and start the container
     logger.debug("Final container environment: {}".format(d))
     logger.debug("Final binds: {} and host_config: {} for the container.".format(binds, host_config))
-    container = cli.create_container(image=image, environment=d, volumes=volumes, host_config=host_config)
+    container = cli.create_container(image=image,
+                                     environment=d,
+                                     user=user,
+                                     volumes=volumes,
+                                     host_config=host_config)
     start_time = get_current_utc_time()
     try:
         cli.start(container=container.get('Id'))
@@ -245,6 +289,19 @@ def execute_actor(actor_id, worker_id, worker_ch, image, msg, d={}, privileged=F
     start = timeit.default_timer()
     Worker.update_worker_status(actor_id, worker_id, BUSY)
     running = True
+
+    # write binary data to FIFO if it exists:
+    if fifo_host_path:
+        try:
+            fifo = os.open(fifo_host_path, os.O_RDWR)
+            os.write(fifo, msg)
+            time.sleep(2)
+            os.close(fifo)
+        except Exception as e:
+            logger.error("Error writing the FIFO. Exception: {}".format(e))
+            os.remove(fifo_host_path)
+            cli.stop(container.get('Id'))
+            raise DockerStartContainerError("Error writing to fifo: {}".format(e))
 
     # create a separate cli for checking stats objects since these should be fast and we don't want to wait
     stats_cli = docker.AutoVersionClient(base_url=dd, timeout=1)

@@ -42,50 +42,15 @@ import requests
 import json
 
 from actors import models
+from util import headers, base_url, case, test_remove_initial_actors, \
+    response_format, basic_response_checks, get_actor_id, check_execution_details, \
+    execute_actor
 
-base_url = os.environ.get('base_url', 'http://localhost:8000')
-case = os.environ.get('case', 'snake')
+
 
 # #################
 # registration API
 # #################
-
-@pytest.fixture(scope='session')
-def headers():
-    with open('/tests/jwt-abaco_admin', 'r') as f:
-        jwt_default = f.read()
-    jwt = os.environ.get('jwt', jwt_default)
-    if jwt:
-        jwt_header = os.environ.get('jwt_header', 'X-Jwt-Assertion-DEV-DEVELOP')
-        headers = {jwt_header: jwt}
-    else:
-        token = os.environ.get('token', '')
-        headers = {'Authorization': 'Bearer {}'.format(token)}
-    return headers
-
-def test_remove_initial_actors(headers):
-    url = '{}/actors'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    for act in result:
-        url = '{}/actors/{}'.format(base_url, act.get('id'))
-        rsp = requests.delete(url, headers=headers)
-        basic_response_checks(rsp)
-
-def basic_response_checks(rsp, check_tenant=True):
-    assert rsp.status_code in [200, 201]
-    assert 'application/json' in rsp.headers['content-type']
-    data = json.loads(rsp.content.decode('utf-8'))
-    assert 'message' in data.keys()
-    assert 'status' in data.keys()
-    assert 'result' in data.keys()
-    assert 'version' in data.keys()
-    result = data['result']
-    if check_tenant:
-        if result is not None:
-            assert 'tenant' not in result
-    return result
-
 
 def test_dict_to_camel():
     dic = {"_links": {"messages": "http://localhost:8000/actors/v2/ca39fac2-60a7-11e6-af60-0242ac110009-059/messages",
@@ -154,15 +119,27 @@ def test_register_stateless_actor(headers):
     assert result['name'] == 'abaco_test_suite_statelesss'
     assert result['id'] is not None
 
-def get_actor_id(headers, name='abaco_test_suite'):
+def test_register_actor_default_env(headers):
     url = '{}/{}'.format(base_url, '/actors')
-    rsp = requests.get(url, headers=headers)
+    data = {'image': 'abacosamples/test',
+            'name': 'abaco_test_suite_default_env',
+            'stateless': True,
+            'default_environment': {'default_env_key1': 'default_env_value1',
+                                    'default_env_key2': 'default_env_value2'}
+            }
+    if case == 'camel':
+        data.pop('default_environment')
+        data['defaultEnvironment']= {'default_env_key1': 'default_env_value1',
+                                     'default_env_key2': 'default_env_value2'}
+    rsp = requests.post(url, json=data, headers=headers)
     result = basic_response_checks(rsp)
-    for k in result:
-        if k.get('name') == name:
-            return k.get('id')
-    # didn't find the test actor
-    assert False
+    assert 'description' in result
+    assert 'owner' in result
+    assert result['owner'] == 'testuser'
+    assert result['image'] == 'abacosamples/test'
+    assert result['name'] == 'abaco_test_suite_default_env'
+    assert result['id'] is not None
+
 
 def test_list_actor(headers):
     actor_id = get_actor_id(headers)
@@ -204,15 +181,37 @@ def test_update_actor_state_dict(headers):
     assert 'state' in result
     assert ast.literal_eval(result['state']) == {'foo': 'abc', 'bar': 1, 'baz': True}
 
+# invalid requests
+def test_register_without_image(headers):
+    url = '{}/actors'.format(base_url)
+    rsp = requests.post(url, headers=headers, data={})
+    response_format(rsp)
+    assert rsp.status_code not in range(1 - 399)
+    data = json.loads(rsp.content.decode('utf-8'))
+    message = data['message']
+    assert 'image' in message
+    assert 'Missing required parameter' in message
+
+# This test currectly fails due to a known issue with the error handling with
+# flask-restful
+@pytest.mark.xfail
+def test_register_with_put(headers):
+    url = '{}/actors'.format(base_url)
+    rsp = requests.put(url, headers=headers, data={'image': 'abacosamples/test'})
+    response_format(rsp)
+    assert rsp.status_code not in range(1 - 399)
+
 def test_cant_update_stateless_actor_state(headers):
     actor_id = get_actor_id(headers, name='abaco_test_suite_statelesss')
     url = '{}/actors/{}/state'.format(base_url, actor_id)
     rsp = requests.post(url, headers=headers, data={'state': 'abc'})
+    response_format(rsp)
     assert rsp.status_code not in range(1-399)
 
-def test_actor_is_ready(headers):
+def check_actor_is_ready(headers, actor_id=None):
     count = 0
-    actor_id = get_actor_id(headers)
+    if not actor_id:
+        actor_id = get_actor_id(headers)
     while count < 10:
         url = '{}/actors/{}'.format(base_url, actor_id)
         rsp = requests.get(url, headers=headers)
@@ -223,6 +222,17 @@ def test_actor_is_ready(headers):
         count += 1
     assert False
 
+def test_basic_actor_is_ready(headers):
+    check_actor_is_ready(headers)
+
+def test_stateless_actor_is_ready(headers):
+    actor_id = get_actor_id(headers, name='abaco_test_suite_statelesss')
+    check_actor_is_ready(headers, actor_id)
+
+def test_default_env_actor_is_ready(headers):
+    actor_id = get_actor_id(headers, name='abaco_test_suite_default_env')
+    check_actor_is_ready(headers, actor_id)
+
 def test_executions_empty_list(headers):
     actor_id = get_actor_id(headers)
     url = '{}/actors/{}/executions'.format(base_url, actor_id)
@@ -230,6 +240,7 @@ def test_executions_empty_list(headers):
     result = basic_response_checks(rsp)
     assert 'ids' in result
     assert len(result['ids']) == 0
+
 
 # ###################
 # executions and logs
@@ -291,39 +302,27 @@ def check_execution_details(result, actor_id, exc_id):
     assert 'runtime' in result
 
 
-def test_execute_actor(headers):
+def test_execute_basic_actor(headers):
     actor_id = get_actor_id(headers)
-    url = '{}/actors/{}/messages'.format(base_url, actor_id)
     data = {'message': 'testing execution'}
-    rsp = requests.post(url, data=data, headers=headers)
+    execute_actor(headers, actor_id, data=data)
+
+
+def test_execute_default_env_actor(headers):
+    actor_id = get_actor_id(headers, name='abaco_test_suite_default_env')
+    data = {'message': 'testing execution'}
+    result = execute_actor(headers, actor_id, data=data)
+    exec_id = result['id']
+    # get logs
+    url = '{}/actors/{}/executions/{}/logs'.format(base_url, actor_id, exec_id)
+    rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
-    assert result.get('msg')  == 'testing execution'
-    if case == 'snake':
-        assert result.get('execution_id')
-        exc_id = result.get('execution_id')
-    else:
-        assert result.get('executionId')
-        exc_id = result.get('executionId')
-    # check for the execution to complete
-    count = 0
-    while count < 10:
-        time.sleep(3)
-        url = '{}/actors/{}/executions'.format(base_url, actor_id)
-        rsp = requests.get(url, headers=headers)
-        result = basic_response_checks(rsp)
-        ids = result.get('ids')
-        if ids:
-            assert exc_id in ids
-        url = '{}/actors/{}/executions/{}'.format(base_url, actor_id, exc_id)
-        rsp = requests.get(url, headers=headers)
-        result = basic_response_checks(rsp)
-        status = result.get('status')
-        assert status
-        if status == 'COMPLETE':
-            check_execution_details(result, actor_id, exc_id)
-            return
-        count += 1
-    assert False
+    logs = result.get('logs')
+    assert 'default_env_key1' in logs
+    assert 'default_env_key2' in logs
+    assert 'default_env_value1' in logs
+    assert 'default_env_value1' in logs
+
 
 def test_list_execution_details(headers):
     actor_id = get_actor_id(headers)
@@ -350,6 +349,7 @@ def test_list_execution_details(headers):
     assert result['status'] == 'COMPLETE'
     assert result['id'] == exec_id
 
+
 def test_list_execution_logs(headers):
     actor_id = get_actor_id(headers)
     # get execution id
@@ -373,44 +373,9 @@ def test_list_execution_logs(headers):
 
 def test_execute_actor_json(headers):
     actor_id = get_actor_id(headers)
-    url = '{}/actors/{}/messages'.format(base_url, actor_id)
     data = {'key1': 'value1', 'key2': 'value2'}
-    # pass raw JSON to the messages endpoint.
-    rsp = requests.post(url, json=data, headers=headers)
-    result = basic_response_checks(rsp)
-    if case == 'snake':
-        assert result.get('execution_id')
-        exc_id = result.get('execution_id')
-    else:
-        assert result.get('executionId')
-        exc_id = result.get('executionId')
-    # check for the execution to complete
-    count = 0
-    while count < 10:
-        time.sleep(3)
-        url = '{}/actors/{}/executions'.format(base_url, actor_id)
-        rsp = requests.get(url, headers=headers)
-        result = basic_response_checks(rsp)
-        ids = result.get('ids')
-        if ids:
-            assert exc_id in ids
-        url = '{}/actors/{}/executions/{}'.format(base_url, actor_id, exc_id)
-        rsp = requests.get(url, headers=headers)
-        result = basic_response_checks(rsp)
-        status = result.get('status')
-        assert status
-        if status == 'COMPLETE':
-            if case == 'snake':
-                assert result.get('actor_id') == actor_id
-            else:
-                assert result.get('actorId') == actor_id
-            assert result.get('id') == exc_id
-            # note: it is possible for io to be 0 in which case an `assert result['io']` will fail.
-            assert 'io' in result
-            assert 'runtime' in result
-            return
-        count += 1
-    assert False
+    execute_actor(headers, actor_id=actor_id, json_data=data)
+
 
 def test_update_actor(headers):
     actor_id = get_actor_id(headers)

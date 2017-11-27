@@ -19,6 +19,9 @@ reg:
         api: reg
         mongo_password:
         redis_password:
+        TAS_ROLE_ACCT:
+        TAS_ROLE_PASS:
+
 
 mes:
     image: abaco/core$TAG
@@ -32,6 +35,8 @@ mes:
         api: mes
         mongo_password:
         redis_password:
+        TAS_ROLE_ACCT:
+        TAS_ROLE_PASS:
 
 agavemes:
     image: abaco/core$TAG
@@ -45,6 +50,8 @@ agavemes:
         api: agavemes
         mongo_password:
         redis_password:
+        TAS_ROLE_ACCT:
+        TAS_ROLE_PASS:
 
 admin:
     image: abaco/core$TAG
@@ -58,6 +65,8 @@ admin:
         api: admin
         mongo_password:
         redis_password:
+        TAS_ROLE_ACCT:
+        TAS_ROLE_PASS:
 
 spawner:
     image: abaco/core$TAG
@@ -71,6 +80,8 @@ spawner:
         _abaco_secret: 123
         mongo_password:
         redis_password:
+        TAS_ROLE_ACCT:
+        TAS_ROLE_PASS:
 
 clientg:
     image: abaco/core$TAG
@@ -84,6 +95,8 @@ clientg:
         _abaco_secret: 123
         mongo_password:
         redis_password:
+        TAS_ROLE_ACCT:
+        TAS_ROLE_PASS:
 
         # add the following pair of credentials for each tenant wanting client generation
         _abaco_AGAVE-PROD_username: abaco_service
@@ -101,3 +114,5 @@ health:
     environment:
         mongo_password:
         redis_password:
+        TAS_ROLE_ACCT:
+        TAS_ROLE_PASS:

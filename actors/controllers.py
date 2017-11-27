@@ -1,11 +1,12 @@
 import json
+import configparser
 
 from flask import g, request
 from flask_restful import Resource, Api, inputs
 from werkzeug.exceptions import BadRequest
 from agaveflask.utils import RequestParser, ok
 
-from auth import check_permissions
+from auth import check_permissions, get_tas_data
 from channels import ActorMsgChannel, CommandChannel
 from codes import SUBMITTED, PERMISSION_LEVELS, READ
 from config import Config
@@ -70,6 +71,19 @@ class ActorsResource(Resource):
         args['tenant'] = g.tenant
         args['api_server'] = g.api_server
         args['owner'] = g.user
+        use_container_uid = args.get('use_container_uid')
+        if Config.get('web', 'case') == 'camel':
+            use_container_uid = args.get('useContainerUid')
+        try:
+            use_tas = Config.get('workers', 'use_tas_uid')
+        except configparser.NoOptionError:
+            use_tas = False
+        if hasattr(use_tas, 'lower'):
+            use_tas = use_tas.lower() == 'true'
+        if use_tas and not use_container_uid:
+            uid, gid, _ = get_tas_data(g.user)
+            args['uid'] = uid
+            args['gid'] = gid
         actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
         logger.debug("new actor saved in db. id: {}. image: {}. tenant: {}".format(actor.db_id,
@@ -362,6 +376,22 @@ class MessagesResource(Resource):
         # if a special 'message' object isn't passed, use entire POST payload as message
         if not args.get('message'):
             logger.debug("POST body did not have a message field.")
+            # first check for binary data:
+            if request.headers.get('Content-Type') == 'application/octet-stream':
+                # ensure not sending too much data
+                length = request.headers.get('Content-Length')
+                if not length:
+                    raise ResourceError("Content Length required for application/octet-stream.")
+                try:
+                    int(length)
+                except Exception:
+                    raise ResourceError("Content Length must be an integer.")
+                if int(length) > int(Config.get('web', 'max_content_length')):
+                    raise ResourceError("Message exceeds max content length of: {}".format(Config.get('web', 'max_content_length')))
+                logger.debug("using get_data, setting content type to application/octet-stream.")
+                args['message'] = request.get_data()
+                args['_abaco_Content_Type'] = 'application/octet-stream'
+                return args
             json_data = request.get_json()
             if json_data:
                 logger.debug("message was JSON data.")
@@ -438,7 +468,10 @@ class MessagesResource(Resource):
         actor = Actor.from_db(actors_store[dbid])
         actor.ensure_one_worker()
         logger.debug("ensure_one_actor() called. id: {}.".format(actor_id))
-        result={'execution_id': exc, 'msg': args['message']}
+        if args.get('_abaco_Content_Type') == 'application/octet-stream':
+            result = {'execution_id': exc, 'msg': 'binary - omitted'}
+        else:
+            result={'execution_id': exc, 'msg': args['message']}
         result.update(get_hypermedia(actor, exc))
         case = Config.get('web', 'case')
         if not case == 'camel':
