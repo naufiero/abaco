@@ -268,7 +268,7 @@ class Actor(AbacoDAO):
     def ensure_one_worker(self):
         """This method will check the workers store for the actor and request a new worker if none exist."""
         logger.debug("top of Actor.ensure_one_worker().")
-        worker_id = Worker.ensure_one_worker(self.db_id)
+        worker_id = Worker.ensure_one_worker(self.db_id, self.tenant)
         logger.debug("Worker.ensure_one_worker returned worker_id: {}".format(worker_id))
         if worker_id:
             worker_ids = [worker_id]
@@ -545,18 +545,18 @@ class Worker(AbacoDAO):
     PARAMS = [
         # param_name, required/optional/provided/derived, attr_name, type, help, default
         ('tenant', 'required', 'tenant', str, 'The tenant that this worker belongs to.', None),
-        # `id` is required by the time a client using the __init__ method for a worker object.
-        # They should already have the `id` field having used request_worker first.
         ('id', 'required', 'id', str, 'The unique id for this worker.', None),
-        ('ch_name', 'required', 'ch_name', str, 'The name of the associated worker chanel.', None),
-        ('image', 'required', 'image', list, 'The list of images associated with this worker', None),
-        ('location', 'required', 'location', str, 'The location of the docker daemon used by this worker.', None),
-        ('cid', 'required', 'cid', str, 'The container ID of this worker.', None),
         ('status', 'required', 'status', str, 'Status of the worker.', None),
-        ('host_id', 'required', 'host_id', str, 'id of the host where worker is running.', None),
-        ('host_ip', 'required', 'host_ip', str, 'ip of the host where worker is running.', None),
-        ('last_execution_time', 'required', 'last_execution_time', str, 'Last time the worker executed an actor container.', None),
-        ('last_health_check_time', 'required', 'last_health_check_time', str, 'Last time the worker had a health check.',
+        # Initially, only `tenant, `id` and `status` are required by the time a client using the __init__ method for a worker object.
+        # They should already have the `id` field having used request_worker first.
+        ('ch_name', 'optional', 'ch_name', str, 'The name of the associated worker chanel.', None),
+        ('image', 'optional', 'image', list, 'The list of images associated with this worker', None),
+        ('location', 'optional', 'location', str, 'The location of the docker daemon used by this worker.', None),
+        ('cid', 'optional', 'cid', str, 'The container ID of this worker.', None),
+        ('host_id', 'optional', 'host_id', str, 'id of the host where worker is running.', None),
+        ('host_ip', 'optional', 'host_ip', str, 'ip of the host where worker is running.', None),
+        ('last_execution_time', 'optional', 'last_execution_time', str, 'Last time the worker executed an actor container.', None),
+        ('last_health_check_time', 'optional', 'last_health_check_time', str, 'Last time the worker had a health check.',
          None),
         ]
 
@@ -598,7 +598,7 @@ class Worker(AbacoDAO):
             raise errors.WorkerException("Worker not found.")
 
     @classmethod
-    def ensure_one_worker(cls, actor_id):
+    def ensure_one_worker(cls, actor_id, tenant):
         """
         Atomically ensure at least one worker exists in the database. If not, adds a worker to the database in
         requested status.
@@ -606,7 +606,7 @@ class Worker(AbacoDAO):
         """
         logger.debug("top of ensure_one_worker.")
         worker_id = Worker.get_uuid()
-        worker = {'status': REQUESTED, 'id': worker_id}
+        worker = {'status': REQUESTED, 'id': worker_id, 'tenant': tenant}
         val = workers_store.add_if_empty(actor_id, worker_id, worker)
         if val:
             logger.info("got worker: {} from add_if_empty.".format(val))
