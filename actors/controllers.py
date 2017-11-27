@@ -449,7 +449,7 @@ class MessagesResource(Resource):
 
 class WorkersResource(Resource):
     def get(self, actor_id):
-        logger.debug("top of GET /actors/{}/workers.".format(actor_id))
+        logger.debug("top of GET /actors/{}/workers for tenant {}.".format(actor_id, g.tenant))
         dbid = Actor.get_dbid(g.tenant, actor_id)
         try:
             Actor.from_db(actors_store[dbid])
