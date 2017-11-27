@@ -497,8 +497,11 @@ class WorkersResource(Resource):
         result = []
         for id, worker in workers.items():
             worker.update({'id': id})
-            w = Worker(**worker)
-            result.append(w.display())
+            try:
+                w = Worker(**worker)
+                result.append(w.display())
+            except Exception as e:
+                logger.error("Unable to instantiate worker in workers endpoint from description: {}. ".format(worker))
         return ok(result=result, msg="Workers retrieved successfully.")
 
     def validate_post(self):
