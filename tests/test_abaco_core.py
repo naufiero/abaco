@@ -190,7 +190,6 @@ def test_register_without_image(headers):
     data = json.loads(rsp.content.decode('utf-8'))
     message = data['message']
     assert 'image' in message
-    assert 'Missing required parameter' in message
 
 # This test currectly fails due to a known issue with the error handling with
 # flask-restful
