@@ -123,6 +123,13 @@ class ActorResource(Resource):
         except KeyError as e:
             logger.info("got KeyError {} trying to retrieve actor or executions with id {}".format(
                 e, id))
+        # delete the actor's message c
+        try:
+            ch = ActorMsgChannel(actor_id=id)
+            ch.delete()
+        except Exception as e:
+            # if we get an error trying to remove the inbox, log it but keep going
+            logger.error("Unable to delete the actor's message channel for actor: {}, exception: {}".format(id, e))
         del actors_store[id]
         logger.info("actor {} deleted from store.".format(id))
         del permissions_store[id]
