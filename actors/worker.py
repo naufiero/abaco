@@ -75,7 +75,8 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
                 # clean up the event queue on this anonymous channel. this should be fixed in channelpy.
                 ch._queue._event_queue
         elif msg == 'stop':
-            logger.info("Received stop message, stopping worker...")
+            logger.info("Worker with worker_id: {} (actor_id: {}) received stop message, "
+                        "stopping worker...".format(worker_id, actor_id))
             # first, delete an associated client
             # its possible this worker was not passed a client,
             # but if so, we need to delete it before shutting down.
@@ -90,21 +91,26 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
                                                        secret=secret)
 
                 if msg['status'] == 'ok':
-                    logger.info("Delete request completed successfully.")
+                    logger.info("Client delete request completed successfully for "
+                                "worker_id: {}, client_id: {}.".format(worker_id), ag_client.api_key)
                 else:
-                    logger.error("Error deleting client. Message: {}".format(msg['message']))
+                    logger.error("Error deleting client for "
+                                 "worker_id: {}, client_id: {}. Message: {}".format(worker_id, msg['message'],
+                                                                                    ag_client.api_key))
                 clients_ch.close()
             else:
                 logger.info("Did not receive client. Not issuing delete. Exiting.")
             try:
                 Worker.delete_worker(actor_id, worker_id)
             except WorkerException as e:
-                logger.info("Got WorkerException from delete_worker(). Exception: {}".format(e))
+                logger.info("Got WorkerException from delete_worker(). "
+                            "worker_id: {}"
+                            "Exception: {}".format(worker_id, e))
             keep_running = False
             actor_ch.close()
             worker_ch.delete()
-            logger.info("Closing actor channel for actor: {}".format(actor_id))
-            logger.info("Worker is now exiting.")
+            logger.info("Closing actor channel for actor: {} worker_id: {}".format(actor_id, worker_id))
+            logger.info("Worker with worker_id: {} is now exiting.".format(worker_id))
             sys.exit()
 
 
