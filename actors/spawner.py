@@ -11,7 +11,7 @@ from config import Config
 from docker_utils import DockerError, run_worker
 from models import Actor, Worker
 from stores import workers_store
-from channels import ActorMsgChannel, ClientsChannel, CommandChannel, WorkerChannel
+from channels import ActorMsgChannel, ClientsChannel, CommandChannel, WorkerChannel, SpawnerWorkerChannel
 
 from agaveflask.logs import get_logger
 logger = get_logger(__name__)
@@ -167,11 +167,10 @@ class Spawner(object):
 
         for ch in new_channels:
             try:
-                # the new_channels are the actual worker channels so do not want to delete
-                # them; instead, only want to close our local connection
-                ch.close()
+                # the new_channels are the spawnerworker channels so they can be deleted.
+                ch.delete()
             except Exception as e:
-                logger.error("Got exception trying to close worker channel: {}".format(e))
+                logger.error("Got exception trying to delete spawnerworker channel: {}".format(e))
         logger.info("Done processing command.")
 
     def start_workers(self, actor_id, worker_ids, image, tenant, num_workers):
@@ -196,9 +195,10 @@ class Spawner(object):
         return channels, anon_channels, workers
 
     def start_worker(self, image, tenant, worker_id):
-        ch = WorkerChannel(worker_id=worker_id)
+        ch = SpawnerWorkerChannel(worker_id=worker_id)
         # start an actor executor container and wait for a confirmation that image was pulled.
-        worker_dict = run_worker(image, ch.name, worker_id)
+        worker_dict = run_worker(image, worker_id)
+        worker_dict['ch_name'] = WorkerChannel.get_name(worker_id)
         worker = Worker(tenant=tenant, **worker_dict)
         logger.info("worker started successfully, waiting on ack that image was pulled...")
         result = ch.get()

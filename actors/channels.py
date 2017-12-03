@@ -10,14 +10,33 @@ from config import Config
 
 
 class WorkerChannel(Channel):
-    """Channel for communication with a worker. Pass the name of the worker to communicate with an
+    """Channel for communication with a worker. Pass the id of the worker to communicate with an
+    existing worker.
+    """
+    @classmethod
+    def get_name(cls, worker_id):
+        """Return the name of the channel that would be used for this worker_id."""
+        return 'worker_{}'.format(worker_id)
+
+    def __init__(self, worker_id=None):
+        self.uri = Config.get('rabbit', 'uri')
+        ch_name = None
+        if worker_id:
+            ch_name = WorkerChannel.get_name(worker_id)
+        super().__init__(name=ch_name,
+                         connection_type=RabbitConnection,
+                         uri=self.uri)
+
+
+class SpawnerWorkerChannel(Channel):
+    """Channel facilitating communication between a spawner and a worker during startup. Pass the name of the worker to communicate with an
     existing worker.
     """
     def __init__(self, worker_id=None):
         self.uri = Config.get('rabbit', 'uri')
         ch_name = None
         if worker_id:
-            ch_name = 'worker_{}'.format(worker_id)
+            ch_name = 'spawner_worker_{}'.format(worker_id)
         super().__init__(name=ch_name,
                          connection_type=RabbitConnection,
                          uri=self.uri)
