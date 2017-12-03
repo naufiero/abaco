@@ -7,7 +7,7 @@ import configparser
 from agave import Agave
 
 from auth import get_tenant_verify
-from channels import ActorMsgChannel, ClientsChannel, CommandChannel,WorkerChannel
+from channels import ActorMsgChannel, ClientsChannel, CommandChannel, WorkerChannel, SpawnerWorkerChannel
 from codes import ERROR, READY, BUSY, COMPLETE
 from config import Config
 from docker_utils import DockerError, DockerStartContainerError, execute_actor, pull_image
@@ -33,23 +33,17 @@ def shutdown_worker(worker_id):
 def shutdown_workers(actor_id):
     """Graceful shutdown of all workers for an actor. Pass db_id as the `actor_id` argument."""
     logger.debug("shutdown_workers() called for actor: {}".format(actor_id))
-    workers = Worker.get_workers(actor_id)
+    try:
+        workers = Worker.get_workers(actor_id)
+    except Exception as e:
+        logger.error("Got exception from get_workers: {}".format(e))
+    if workers == {}:
+        logger.info("shutdown_workers did not receive any workers from Worker.get_worker for actor: {}".format(actor_id))
     # @TODO - this code is not thread safe. we need to update the workers state in a transaction:
     for _, worker in workers.items():
-        # if there is already a channel, tell the worker to shut itself down
-        if 'ch_name' in worker:
-            logger.info("worker had channel: {}. calling shutdown_worker() for worker: {}".format(worker['ch_name'],
-                                                                                                  worker.get('id')))
-            shutdown_worker(worker['id'])
-        else:
-            # otherwise, just remove from db:
-            try:
-                logger.info("worker: {} did not have a channel. Deleting worker.".format(worker.get('id')))
-                worker_id = worker.get('id')
-                Worker.delete_worker(actor_id, worker_id)
-            except WorkerException as e:
-                logger.error("Got a WorkerException trying to delete worker with id: {}; exception: {}".format(
-                    worker_id, e))
+        logger.debug("entering shutdown lop for worker: {}".format(worker))
+        shutdown_worker(worker['id'])
+
 
 def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_client):
     """ Target for a thread to listen on the worker channel for a message to stop processing.
@@ -310,15 +304,15 @@ def get_container_user(actor):
         user = '{}:{}'.format(uid, gid)
     return user
 
-def main(worker_ch_name, worker_id, image):
+def main(worker_id, image):
     """
     Main function for the worker process.
 
     This function
     """
-    logger.info("Entering main() for worker: {}, channel: {}, image: {}".format(
-        worker_id, worker_ch_name, image))
-    worker_ch = WorkerChannel(worker_id=worker_id)
+    logger.info("Entering main() for worker: {}, image: {}".format(
+        worker_id, image))
+    spawner_worker_ch = SpawnerWorkerChannel(worker_id=worker_id)
 
     # first, attempt to pull image from docker hub:
     try:
@@ -330,14 +324,14 @@ def main(worker_ch_name, worker_id, image):
         # image name that does not exist in the registry. This is the first time we would
         # find that out.
         logger.info("worker got a DockerError trying to pull image. Error: {}.".format(e))
-        worker_ch.put({'status': 'error', 'msg': str(e)})
+        spawner_worker_ch.put({'status': 'error', 'msg': str(e)})
         raise e
     logger.info("Image {} pulled successfully.".format(image))
 
     # inform spawner that image pulled successfully and, simultaneously,
     # wait to receive message from spawner that it is time to subscribe to the actor channel
     logger.debug("Worker waiting on message from spawner...")
-    result = worker_ch.put_sync({'status': 'ok'})
+    result = spawner_worker_ch.put_sync({'status': 'ok'})
     logger.info("Worker received reply from spawner. result: {}.".format(result))
 
     if result['status'] == 'error':
@@ -362,8 +356,15 @@ def main(worker_ch_name, worker_id, image):
         refresh_token = result.get('refresh_token')
     else:
         logger.info("Did not get client:yes, got result:{}".format(result))
-    Actor.set_status(actor_id, READY)
+    try:
+        Actor.set_status(actor_id, READY)
+    except KeyError:
+        # it is possible the actor was already deleted during worker start up; if
+        # so, the worker should have a stop message waiting for it. starting subscribe
+        # as usual should allow this process to work as expected.
+        pass
     logger.info("Actor status set to READY. subscribing to inbox.")
+    worker_ch = WorkerChannel(worker_id=worker_id)
     subscribe(tenant,
               actor_id,
               worker_id,
@@ -382,10 +383,8 @@ if __name__ == '__main__':
     logger.info("Inital log for new worker.")
 
     # read channel, worker_id and image from the environment
-    worker_ch_name = os.environ.get('ch_name')
     worker_id = os.environ.get('worker_id')
     image = os.environ.get('image')
-    logger.info("Channel name: {}  Image: {} ".format(worker_ch_name, image))
 
     # call the main() function:
-    main(worker_ch_name, worker_id, image)
+    main(worker_id, image)

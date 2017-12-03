@@ -155,15 +155,15 @@ def run_container_with_docker(image, command, name=None, environment={}, mounts=
     logger.info("container started successfully: {}".format(container))
     return container
 
-def run_worker(image, ch_name, worker_id):
+def run_worker(image, worker_id):
     """
     Run an actor executor worker with a given channel and image.
     :return:
     """
     logger.debug("top of run_worker()")
     command = 'python3 -u /actors/worker.py'
-    logger.debug("docker_utils running worker. image:{}, command:{}, chan:{}".format(
-        image, command, ch_name))
+    logger.debug("docker_utils running worker. image:{}, command:{}".format(
+        image, command))
 
     # determine what log file to use
     if get_log_file_strategy() == 'split':
@@ -187,8 +187,7 @@ def run_worker(image, ch_name, worker_id):
     logger.info("Final fifo_host_path_dir: {}".format(fifo_host_path_dir))
     container = run_container_with_docker(image=AE_IMAGE,
                                           command=command,
-                                          environment={'ch_name': ch_name,
-                                                       'image': image,
+                                          environment={'image': image,
                                                        'worker_id': worker_id,
                                                        '_abaco_secret': os.environ.get('_abaco_secret')},
                                           mounts=mounts,
@@ -201,7 +200,6 @@ def run_worker(image, ch_name, worker_id):
              'location': dd,
              'id': worker_id,
              'cid': container.get('Id'),
-             'ch_name': ch_name,
              'status': BUSY,
              'host_id': host_id,
              'host_ip': host_ip,
