@@ -57,7 +57,7 @@ class Spawner(object):
             for _, worker in workers_dict.items():
                 # don't stop the new workers:
                 if worker['id'] not in worker_ids:
-                    ch = WorkerChannel(name=worker['ch_name'])
+                    ch = WorkerChannel(worker_id=worker['id'])
                     ch.put('stop')
                     logger.info("Sent 'stop' message to worker channel: {}".format(ch))
         else:
@@ -196,7 +196,7 @@ class Spawner(object):
         return channels, anon_channels, workers
 
     def start_worker(self, image, tenant, worker_id):
-        ch = WorkerChannel()
+        ch = WorkerChannel(worker_id=worker_id)
         # start an actor executor container and wait for a confirmation that image was pulled.
         worker_dict = run_worker(image, ch.name, worker_id)
         worker = Worker(tenant=tenant, **worker_dict)

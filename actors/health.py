@@ -51,7 +51,7 @@ def check_workers(actor_id, ttl):
             continue
         # first check if worker is responsive; if not, will need to manually kill
         logger.info("Checking health for worker: {}".format(worker))
-        ch = WorkerChannel(name=worker['ch_name'])
+        ch = WorkerChannel(worker_id=worker['id'])
         worker_id = worker.get('id')
         try:
             logger.debug("Issuing status check to channel: {}".format(worker['ch_name']))
@@ -93,13 +93,13 @@ def check_workers(actor_id, ttl):
             if last_execution + ttl < time.time():
                 # shutdown worker
                 logger.info("Shutting down worker beyond ttl.")
-                shutdown_worker(worker['ch_name'])
+                shutdown_worker(worker['id'])
             else:
                 logger.info("Still time left for this worker.")
         elif worker['status'] == codes.ERROR:
             # shutdown worker
             logger.info("Shutting down worker in error status.")
-            shutdown_worker(worker['ch_name'])
+            shutdown_worker(worker['id'])
         else:
             logger.debug("Worker not in READY status, will postpone.")
 

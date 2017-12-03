@@ -13,9 +13,12 @@ class WorkerChannel(Channel):
     """Channel for communication with a worker. Pass the name of the worker to communicate with an
     existing worker.
     """
-    def __init__(self, name=None):
+    def __init__(self, worker_id=None):
         self.uri = Config.get('rabbit', 'uri')
-        super().__init__(name=name,
+        ch_name = None
+        if worker_id:
+            ch_name = 'worker_{}'.format(worker_id)
+        super().__init__(name=ch_name,
                          connection_type=RabbitConnection,
                          uri=self.uri)
 

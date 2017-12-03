@@ -166,7 +166,7 @@ class ActorResource(Resource):
         actors_store[actor.db_id] = actor.to_db()
         logger.info("updated actor {} stored in db.".format(actor_id))
         if update_image:
-            worker_ids = [Worker.request_worker(actor.db_id)]
+            worker_ids = [Worker.request_worker(tenant=g.tenant, actor_id=actor.db_id)]
             ch = CommandChannel()
             ch.put_cmd(actor_id=actor.db_id, worker_ids=worker_ids, image=actor.image, tenant=args['tenant'])
             ch.close()
@@ -553,7 +553,8 @@ class WorkersResource(Resource):
             num_to_add = int(num) - len(workers.items())
             logger.info("adding {} more workers for actor {}".format(num_to_add, actor_id))
             for idx in range(num_to_add):
-                worker_ids.append(Worker.request_worker(actor_id))
+                worker_ids.append(Worker.request_worker(tenant=g.tenant,
+                                                        actor_id=actor_id))
             logger.info("New worker ids: {}".format(worker_ids))
             ch = CommandChannel()
             ch.put_cmd(actor_id=actor.db_id,
@@ -598,7 +599,7 @@ class WorkerResource(Resource):
             logger.debug("Did not find worker: {}. actor: {}.".format(worker_id, actor_id))
             raise ResourceError(e.msg, 404)
         logger.info("calling shutdown_worker(). worker: {}. actor: {}.".format(worker_id, actor_id))
-        shutdown_worker(worker['ch_name'])
+        shutdown_worker(worker['id'])
         logger.info("shutdown_worker() called for worker: {}. actor: {}.".format(worker_id, actor_id))
         return ok(result=None, msg="Worker scheduled to be stopped.")
 
