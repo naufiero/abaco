@@ -23,12 +23,12 @@ logger = get_logger(__name__)
 # required.
 keep_running = True
 
-def shutdown_worker(ch_name):
+def shutdown_worker(worker_id):
     """Gracefully shutdown a single worker."""
-    logger.debug("shutdown_worker called for ch_name: {}".format(ch_name))
-    ch = WorkerChannel(name=ch_name)
+    logger.debug("shutdown_worker called for worker_id: {}".format(worker_id))
+    ch = WorkerChannel(worker_id=worker_id)
     ch.put("stop")
-    logger.info("A 'stop' message was sent to worker channel: {}".format(ch_name))
+    logger.info("A 'stop' message was sent to worker: {}".format(worker_id))
 
 def shutdown_workers(actor_id):
     """Graceful shutdown of all workers for an actor. Pass db_id as the `actor_id` argument."""
@@ -40,7 +40,7 @@ def shutdown_workers(actor_id):
         if 'ch_name' in worker:
             logger.info("worker had channel: {}. calling shutdown_worker() for worker: {}".format(worker['ch_name'],
                                                                                                   worker.get('id')))
-            shutdown_worker(worker['ch_name'])
+            shutdown_worker(worker['id'])
         else:
             # otherwise, just remove from db:
             try:
@@ -318,7 +318,7 @@ def main(worker_ch_name, worker_id, image):
     """
     logger.info("Entering main() for worker: {}, channel: {}, image: {}".format(
         worker_id, worker_ch_name, image))
-    worker_ch = WorkerChannel(name=worker_ch_name)
+    worker_ch = WorkerChannel(worker_id=worker_id)
 
     # first, attempt to pull image from docker hub:
     try:

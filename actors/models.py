@@ -616,14 +616,14 @@ class Worker(AbacoDAO):
             return None
 
     @classmethod
-    def request_worker(cls, actor_id):
+    def request_worker(cls, tenant, actor_id):
         """
         Add a new worker to the database in requested status. This method returns an id for the worker and
         should be called before putting a message on the command queue.
         """
         logger.debug("top of request_worker().")
         worker_id = Worker.get_uuid()
-        worker = {'status': REQUESTED, 'id': worker_id}
+        worker = {'status': REQUESTED, 'tenant': tenant, 'id': worker_id}
         # it's possible the actor_id is not in the workers_store yet (i.e., new actor with no workers)
         # In that case we need to catch a KeyError:
         try:
