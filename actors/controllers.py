@@ -14,6 +14,7 @@ from errors import DAOError, ResourceError, PermissionsException, WorkerExceptio
 from models import dict_to_camel, Actor, Execution, ExecutionsSummary, Worker, get_permissions, \
     add_permission
 
+from mounts import get_all_mounts
 from stores import actors_store, executions_store, logs_store, permissions_store
 from worker import shutdown_workers, shutdown_worker
 
@@ -77,13 +78,19 @@ class ActorsResource(Resource):
         try:
             use_tas = Config.get('workers', 'use_tas_uid')
         except configparser.NoOptionError:
+            logger.debug("no use_tas_uid config.")
             use_tas = False
         if hasattr(use_tas, 'lower'):
             use_tas = use_tas.lower() == 'true'
+        else:
+            logger.error("use_tas_uid configured but not as a string. use_tas_uid: {}".format(use_tas))
+        logger.debug("use_tas={}. user_container_uid={}".format(use_tas, use_container_uid))
         if use_tas and not use_container_uid:
-            uid, gid, _ = get_tas_data(g.user)
+            uid, gid, tas_homeDirectory = get_tas_data(g.user)
             args['uid'] = uid
             args['gid'] = gid
+            args['tas_homeDirectory'] = tas_homeDirectory
+        args['mounts'] = get_all_mounts(args)
         actor = Actor(**args)
         actors_store[actor.db_id] = actor.to_db()
         logger.debug("new actor saved in db. id: {}. image: {}. tenant: {}".format(actor.db_id,
