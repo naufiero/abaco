@@ -108,34 +108,6 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
             sys.exit()
 
 
-def get_global_mounts():
-    """
-    Read and parse the global_mounts config. 
-    Returns a list of dictionaries containing host_path, container_path and mode. 
-    """
-    result = []
-    try:
-        mount_strs = Config.get("workers", "global_mounts")
-    except configparser.NoOptionError:
-        mount_strs = None
-    if not mount_strs:
-        return result
-    mounts = mount_strs.split(",")
-    for m in mounts:
-        parts = m.split(":")
-        if not len(parts) == 3:
-            # we will "swallow" invalid global_mounts config since this is not something the user can fix;
-            # however, we log an error:
-            logger.error("Invalid global_mounts config. "
-                         "Each config must be two paths and a format separated by a colon: {}".format(m))
-        else:
-            result.append({'host_path': parts[0],
-                           'container_path': parts[1],
-                           'mode': parts[2]})
-    logger.info("Returning global mounts: {}".format(result))
-    return result
-
-
 def subscribe(tenant,
               actor_id,
               worker_id,
@@ -152,7 +124,6 @@ def subscribe(tenant,
     """
     logger.debug("Top of subscribe().")
     actor_ch = ActorMsgChannel(actor_id)
-    global_mounts = get_global_mounts()
     try:
         leave_containers = Config.get('workers', 'leave_containers')
     except configparser.NoOptionError:
@@ -195,7 +166,8 @@ def subscribe(tenant,
         actor = Actor.from_db(actors_store[actor_id])
         execution_id = msg['_abaco_execution_id']
         content_type = msg['_abaco_Content_Type']
-
+        mounts = actor.mounts
+        logger.debug("actor mounts: {}".format(mounts))
         # for binary data, create a fifo in the configured directory. The configured
         # fifo_host_path_dir is equal to the fifo path in the worker container:
         fifo_host_path = None
@@ -214,9 +186,9 @@ def subscribe(tenant,
                 logger.error("Could not create fifo_path. Exception: {}".format(e))
                 raise e
             # add the fifo as a mount:
-            global_mounts.append({'host_path': fifo_host_path,
-                                  'container_path': '/_abaco_binary_data',
-                                  'format': 'ro'})
+            mounts.append({'host_path': fifo_host_path,
+                           'container_path': '/_abaco_binary_data',
+                           'format': 'ro'})
 
         # the execution object was created by the controller, but we need to add the worker id to it now that we
         # know which worker will be working on the execution.
@@ -266,7 +238,7 @@ def subscribe(tenant,
                                                                             user,
                                                                             environment,
                                                                             privileged,
-                                                                            global_mounts,
+                                                                            mounts,
                                                                             leave_containers,
                                                                             fifo_host_path)
         except DockerStartContainerError as e:
