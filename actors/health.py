@@ -19,7 +19,7 @@ from config import Config
 from docker_utils import rm_container, DockerError, container_running, run_container_with_docker
 from models import Actor, Worker
 from channels import CommandChannel, WorkerChannel
-from stores import actors_store
+from stores import actors_store, workers_store
 from worker import shutdown_worker
 
 AE_IMAGE = os.environ.get('AE_IMAGE', 'abaco/core')
@@ -31,6 +31,23 @@ logger = get_logger(__name__)
 def get_actor_ids():
     """Returns the list of actor ids currently registered."""
     return [db_id for db_id, _ in actors_store.items()]
+
+def check_worker_health(actor_id, worker):
+    """Check the specific health of a worker object."""
+    worker_id = worker.get('id')
+    logger.info("Checking status of worker from db with worker_id: {}".format())
+    if not worker_id:
+        logger.error("Corrupt data in the workers_store. Worker object without an id attribute. {}".format(worker))
+        workers_store.pop(actor_id)
+        return None
+    # make sure the actor id still exists:
+    try:
+        actors_store[actor_id]
+    except KeyError:
+        logger.error("Corrupt data in the workers_store. Worker object found but no corresponding actor. {}".format(worker))
+        workers_store.pop(actor_id)
+        return None
+
 
 def check_workers(actor_id, ttl):
     """Check health of all workers for an actor."""
@@ -66,10 +83,14 @@ def check_workers(actor_id, ttl):
                 Worker.delete_worker(actor_id, worker_id)
             except Exception as e:
                 logger.error("Got exception trying to delete worker: {}".format(e))
+            try:
+                ch.close()
+            except Exception as e:
+                logger.error("Got an error trying to close the worker channel for dead worker. Exception: {}".format(e))
             continue
         try:
             ch.close()
-        except Exception:
+        except Exception as e:
             logger.error("Got an error trying to close the worker channel. Exception: {}".format(e))
         if not result == 'ok':
             logger.error("Worker responded unexpectedly: {}, deleting worker.".format(result))
@@ -147,6 +168,8 @@ def main():
     for id in ids:
         check_workers(id, ttl)
         # manage_workers(id)
+    for actor_id, worker in workers_store.items():
+        check_worker_health(worker, actor_id, ttl)
 
 if __name__ == '__main__':
     main()
