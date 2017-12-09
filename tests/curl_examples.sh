@@ -49,6 +49,9 @@ for i in {1..10}; do for j in {1..20}; do curl -H "X-Jwt-Assertion-AGAVE-PROD: $
 
 for i in {1..40}; do curl -H "X-Jwt-Assertion-AGAVE-PROD: $jwt" -X POST --data "message=test number $i" localhost:8000/actors/test_0/messages; done
 
+for i in {1..100}; do echo "Sending message $i"; curl -d "message=test $i" -H "X-Jwt-Assertion-TACC-PROD: $jwt" localhost:8001/actors/$aid/messages; sleep 1; done
+
+
 # start a container with pyredis
 docker run --rm -it -v $(pwd)/local-dev.conf:/etc/service.conf jstubbs/abaco_core bash
 
