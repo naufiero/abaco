@@ -40,6 +40,7 @@
                             <th>Total Runtime</th>
                             <th>Create Time</th>
                             <th>Last Update Time</th>
+                            <th>Total Workers</th>
                             <th>Worker ID</th>
                             <th>Last Execution Time</th>
                             <th>Last Health Check</th>
@@ -60,10 +61,11 @@
                             <td>{{ actor.runtime }}</td>
                             <td>{{ actor.createTime }}</td>
                             <td>{{ actor.lastUpdateTime }}</td>
-                            <td>{{ actor.worker.id }}</td>
-                            <td>{{ actor.worker.lastExecutionTime }}</td>
-                            <td>{{ actor.worker.lastHealthCheckTime }}</td>
-                            <td>{{ actor.worker.status }}</td>
+                            <td>{{ actor.totWorkers }}</td>
+                            <td>{{ actor.workerId }}</td>
+                            <td>{{ actor.workerLastExecutionTime }}</td>
+                            <td>{{ actor.workerLastHealthCheckTime }}</td>
+                            <td>{{ actor.workerStatus }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
