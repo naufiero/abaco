@@ -134,6 +134,7 @@ class ActorResource(Resource):
         try:
             ch = ActorMsgChannel(actor_id=id)
             ch.delete()
+            logger.info("Deleted actor message channel for actor: {}".format(id))
         except Exception as e:
             # if we get an error trying to remove the inbox, log it but keep going
             logger.error("Unable to delete the actor's message channel for actor: {}, exception: {}".format(id, e))
