@@ -1,5 +1,6 @@
 import base64
 import datetime
+import inspect
 import json
 import os
 from Crypto.PublicKey import RSA
@@ -18,6 +19,27 @@ from django.core.mail import send_mail
 from django.http import HttpResponse, JsonResponse
 
 import errors
+
+def get_request():
+    """Walk up the stack, return the nearest first argument named "request"."""
+    frame = None
+    try:
+        for f in inspect.stack()[1:]:
+            frame = f[0]
+            code = frame.f_code
+            if code.co_varnames and code.co_varnames[0] == "request":
+                request = frame.f_locals['request']
+    finally:
+        del frame
+    return request
+
+def update_session_tokens(**kwargs):
+    """Update the request's session with the latest tokens since the client may have
+    automatically refreshed them."""
+
+    request = get_request()
+    request.session['access_token'] = kwargs['access_token']
+    request.session['refresh_token'] = kwargs['refresh_token']
 
 def get_current_utc_time():
     """Return string representation of current time in UTC."""
@@ -70,7 +92,7 @@ def get_agave_client(username, password):
     if not client_key or not client_secret:
         raise Exception("Missing OAuth client credentials.")
     return Agave(api_server=base_url, username=username, password=password, client_name="ipt", api_key=client_key,
-                 api_secret=client_secret)
+                 api_secret=client_secret, token_callback=update_session_tokens)
 
 def get_agave_client_tokens(access_token, refresh_token):
     client_key = os.environ.get('AGAVE_CLIENT_KEY')
@@ -81,7 +103,7 @@ def get_agave_client_tokens(access_token, refresh_token):
     if not client_secret:
         raise Exception("Missing OAuth client secret.")
     return Agave(api_server=base_url, token=access_token, refresh_token=refresh_token, client_name="ipt",
-                 api_key=client_key, api_secret=client_secret)
+                 api_key=client_key, api_secret=client_secret, token_callback=update_session_tokens)
 
 def get_agave_client_session(request):
     """Return an instantiated Agave client using data from an authenticated session."""
@@ -147,14 +169,21 @@ def is_abaco_user(request):
 
 def admin(request):
     """List all current actors registered in the system."""
-    if not check_for_tokens(request):
-        return redirect(reverse("login"))
-    if not is_admin(request):
-        return HttpResponse('Unauthorized', status=401)
-    access_token = request.session.get("access_token")
-    headers = {'Authorization': 'Bearer {}'.format(access_token)}
+    if os.environ.get('JWT_HEADER') and os.environ.get('JWT_VALUE') and os.environ.get('AGAVE_BASE_URL'):
+        jwt_header = os.environ.get('JWT_HEADER')
+        jwt_value = os.environ.get('JWT_VALUE')
+        base_url = os.environ.get('AGAVE_BASE_URL')
+        headers = {jwt_header: jwt_value}
+        url = '{}/actors/admin'.format(base_url)
+    else:
+        if not check_for_tokens(request):
+            return redirect(reverse("login"))
+        if not is_admin(request):
+            return HttpResponse('Unauthorized', status=401)
+        access_token = request.session.get("access_token")
+        headers = {'Authorization': 'Bearer {}'.format(access_token)}
+        url = '{}/actors/v2/admin'.format(os.environ.get('AGAVE_BASE_URL', "https://api.tacc.utexas.edu"))
     context = {"admin": is_admin(request)}
-    url = '{}/actors/v2/admin'.format(os.environ.get('AGAVE_BASE_URL', "https://api.tacc.utexas.edu"))
     actors = []
     error = None
     try:
@@ -179,18 +208,32 @@ def admin(request):
             error = "No actors found."
         else:
             for a in actors_data:
-                if a.get('worker'):
+                tot_workers = 0
+                a['workerStatus'] = ''
+                a['workerLastHealthCheckTime'] = ''
+                a['workerLastExecutionTime'] = ''
+                a['workerId'] = ''
+                if a.get("workers"):
+                  for w, worker_data in a.get("workers").items():
+                      tot_workers += 1
+                      a['workerId'] += '{}, '.format(worker_data.get('id'))
+                      a['workerStatus'] += '{}, '.format(worker_data.get('status'))
+                      try:
+                          a['workerLastHealthCheckTime'] += '{}, '.format(display_time(worker_data.get('last_health_check_time')))
+                          a['workerLastExecutionTime'] += '{}, '.format(display_time(worker_data.get('last_execution_time')))
+                      except KeyError as e:
+                          logger.error("Error pulling worker data from admin api. Exception: {}".format(e))
+                elif a.get('worker'):
+                    tot_workers = 1
+                    a['workerId'] == a['worker'].get('id')
+                    a['workerStatus'] = a['worker']['status']
                     try:
-                        a['worker']['lastHealthCheckTime'] = display_time(a['worker'].get('lastHealthCheckTime'))
-                        a['worker']['lastExecutionTime'] = display_time(a['worker'].get('lastExecutionTime'))
+                        a['workerLastHealthCheckTime'] = display_time(a['worker'].get('last_health_check_time'))
+                        a['workerLastExecutionTime'] = display_time(a['worker'].get('last_execution_time'))
                     except KeyError as e:
                         logger.error("Error pulling worker data from admin api. Exception: {}".format(e))
-                else:
-                    a['worker'] = {'lastHealthCheckTime': '',
-                                   'lastExecutionTime': '',
-                                   'id': '',
-                                   'status': ''}
                 logger.info("Adding actor data after converting to camel: {}".format(a))
+                a['totWorkers'] = tot_workers
                 a['createTime'] = display_time(a.get('createTime'))
                 a['lastUpdateTime'] = display_time(a.get('lastUpdateTime'))
                 actors.append(a)
