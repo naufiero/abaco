@@ -75,9 +75,14 @@ class ClientGenerator(object):
                 logger.error(msg)
                 anon_ch.put({'status': 'error',
                              'message': msg})
+            # @TODO -
+            # delete the anonymous channel from this thread but sleep first to avoid the race condition.
+            time.sleep(1.5)
+            anon_ch.delete()
+            # NOT doing this for now -- deleting entire anon channel instead (see above)
             # clean up the anon channel event queue. this is an issue with the
             # channelpy library
-            anon_ch._queue._event_queue.delete()
+            # anon_ch._queue._event_queue.delete()
 
     def new_client(self, cmd, anon_ch):
         valid, msg, owner = self.check_new_params(cmd)
