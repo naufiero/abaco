@@ -1,6 +1,7 @@
 import os
 import sys
 import threading
+import time
 
 import channelpy
 import configparser
@@ -66,8 +67,13 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
                 logger.debug("received health check. returning 'ok'.")
                 ch = msg['reply_to']
                 ch.put('ok')
+                # @TODO -
+                # delete the anonymous channel from this thread but sleep first to avoid the race condition.
+                time.sleep(1.5)
+                ch.delete()
+                # NOT doing this for now -- deleting entire anon channel instead (see above)
                 # clean up the event queue on this anonymous channel. this should be fixed in channelpy.
-                ch._queue._event_queue
+                # ch._queue._event_queue
         elif msg == 'stop':
             logger.info("Worker with worker_id: {} (actor_id: {}) received stop message, "
                         "stopping worker...".format(worker_id, actor_id))
@@ -305,6 +311,10 @@ def main(worker_id, image):
     logger.debug("Worker waiting on message from spawner...")
     result = spawner_worker_ch.put_sync({'status': 'ok'})
     logger.info("Worker received reply from spawner. result: {}.".format(result))
+
+    # should be OK to close the spawner_worker_ch on the worker side since spawner was first client
+    # to open it.
+    spawner_worker_ch.close()
 
     if result['status'] == 'error':
         # we do not expect to get an error response at this point. this needs investigation
