@@ -32,20 +32,35 @@ def get_actor_ids():
     """Returns the list of actor ids currently registered."""
     return [db_id for db_id, _ in actors_store.items()]
 
+def check_workers_store(ttl):
+    logger.debug("Top of check_workers_store.")
+    """Run through all workers in workers_store and ensure there is no data integrity issue."""
+    for actor_id, worker in workers_store.items():
+        check_worker_health(worker, actor_id, ttl)
+
 def check_worker_health(actor_id, worker):
     """Check the specific health of a worker object."""
+    logger.debug("top of check_worker_health")
     worker_id = worker.get('id')
     logger.info("Checking status of worker from db with worker_id: {}".format())
     if not worker_id:
         logger.error("Corrupt data in the workers_store. Worker object without an id attribute. {}".format(worker))
-        workers_store.pop(actor_id)
+        try:
+            workers_store.pop(actor_id)
+        except KeyError:
+            # it's possible another health agent already removed the worker record.
+            pass
         return None
     # make sure the actor id still exists:
     try:
         actors_store[actor_id]
     except KeyError:
         logger.error("Corrupt data in the workers_store. Worker object found but no corresponding actor. {}".format(worker))
-        workers_store.pop(actor_id)
+        try:
+            workers_store.pop(actor_id)
+        except KeyError:
+            # it's possible another health agent already removed the worker record.
+            pass
         return None
 
 
@@ -168,8 +183,7 @@ def main():
     for id in ids:
         check_workers(id, ttl)
         # manage_workers(id)
-    for actor_id, worker in workers_store.items():
-        check_worker_health(worker, actor_id, ttl)
+    check_workers_store(ttl)
 
 if __name__ == '__main__':
     main()
