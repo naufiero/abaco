@@ -127,6 +127,7 @@ class Spawner(object):
                     logger.error("Got a ChannelTimeoutException trying to generate a client: {}".format(e))
                     # put actor in an error state and return
                     self.error_out_actor(actor_id, [], str(e))
+                    client_ch.close()
                     return
                 client_ch.close()
                 # we need to ignore errors when generating clients because it's possible it is not set up for a specific
@@ -161,10 +162,14 @@ class Spawner(object):
                              'tenant': tenant,
                              'client': 'no'})
                 logger.debug("Sent OK message over anonymous worker channel.")
-            # delete the anonymous channel event queue. this is an issue with the
-            # channelpy library.
-            channel._queue._event_queue.delete()
+            # @TODO -
+            # delete the anonymous channel from this thread but sleep first to avoid the race condition.
+            time.sleep(1.5)
+            channel.delete()
 
+        # due to the race condition deleting channels (potentially before all workers have received all messages)
+        # we put a sleep here.
+        time.sleep(1)
         for ch in new_channels:
             try:
                 # the new_channels are the spawnerworker channels so they can be deleted.
