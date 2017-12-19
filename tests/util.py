@@ -5,7 +5,7 @@ import pytest
 import requests
 import time
 
-base_url = os.environ.get('base_url', 'http://localhost:8000')
+base_url = os.environ.get('base_url', 'http://172.17.0.1:8000')
 case = os.environ.get('case', 'snake')
 
 
@@ -124,4 +124,19 @@ def execute_actor(headers, actor_id, data=None, json_data=None, binary=None):
             return result
         count += 1
     assert False
+
+def create_delete_actor():
+    with open('jwt-abaco_admin', 'r') as f:
+        jwt_default = f.read()
+    headers = {'X-Jwt-Assertion-AGAVE-PROD': jwt_default}
+    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite_python'}
+    rsp = requests.post('{}/actors'.format(base_url), data=data, headers=headers)
+    result = basic_response_checks(rsp)
+    aid = result.get('id')
+    print("Created actor: {}".format(aid))
+    try:
+        requests.delete('{}/actors/{}'.format(base_url, aid), headers=headers)
+        print("deleted actor")
+    except Exception as e:
+        print("Got exception tring to delete actor: {}".format(e.response.content))
 
