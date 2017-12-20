@@ -14,7 +14,9 @@ mongo:
         - "{{ store_mongo_port }}:27017"
     volumes:
         - /home/apim/mongo_data:/data/db
-
+{% if store_mongo_password is defined %}
+    command: --auth
+{% endif %}
 rabbit:
     image: rabbitmq:3.5.3-management
     ports:
