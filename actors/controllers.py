@@ -12,7 +12,7 @@ from codes import SUBMITTED, PERMISSION_LEVELS, READ
 from config import Config
 from errors import DAOError, ResourceError, PermissionsException, WorkerException
 from models import dict_to_camel, Actor, Execution, ExecutionsSummary, Worker, get_permissions, \
-    add_permission
+    set_permission
 
 from mounts import get_all_mounts
 from stores import actors_store, executions_store, logs_store, permissions_store
@@ -98,7 +98,7 @@ class ActorsResource(Resource):
                                                                                    actor.tenant))
         actor.ensure_one_worker()
         logger.debug("ensure_one_worker() called")
-        add_permission(g.user, actor.db_id, 'UPDATE')
+        set_permission(g.user, actor.db_id, 'UPDATE')
         logger.debug("UPDATE permission added to user: {}".format(g.user))
         return ok(result=actor.display(), msg="Actor created successfully.", request=request)
 
@@ -658,7 +658,7 @@ class PermissionsResource(Resource):
                 "actor not found: {}'".format(actor_id), 404)
         args = self.validate_post()
         logger.debug("POST permissions body validated for actor: {}.".format(actor_id))
-        add_permission(args['user'], id, args['level'])
+        set_permission(args['user'], id, args['level'])
         logger.info("Permission added for user: {} actor: {} level: {}".format(args['user'], id, args['level']))
         permissions = get_permissions(id)
         return ok(result=permissions, msg="Permission added successfully.")

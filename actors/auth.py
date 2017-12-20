@@ -192,16 +192,22 @@ def check_permissions(user, actor_id, level):
     logger.debug("Checking user: {} permissions for actor id: {}".format(user, actor_id))
     # get all permissions for this actor
     permissions = get_permissions(actor_id)
-    for pem in permissions:
+    for pem_user, pem_level in permissions.items():
         # if the actor has been shared with the WORLD_USER anyone can use it
-        if user == WORLD_USER:
+        if pem_user == WORLD_USER:
             logger.info("Allowing request - actor has been shared with the WORLD_USER.")
             return True
         # otherwise, check if the permission belongs to this user and has the necessary level
-        if pem['user'] == user:
-            if pem['level'] >= level:
+        if pem_user == user:
+            if pem_level >= level:
                 logger.info("Allowing request - user has appropriate permission with the actor.")
                 return True
+            else:
+                # we found the permission for the user but it was insufficient; return False right away
+                logger.info("Found permission {}, rejecting request.".format(pem_level))
+                return False
+    # didn't find the user or world_user, return False
+    logger.info("user had no permissions for actor. Actor's permissions: {}".format(permissions))
     return False
 
 def get_db_id():

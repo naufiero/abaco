@@ -223,5 +223,5 @@ $ docker run --rm -v ~/.ssh/cic-iu.pem:/root/.ssh/cic-iu.pem -v $(pwd)/ansible/d
 Deploy Abaco:
 
 ```shell
-$ docker run --rm -v ~/.ssh/cic-iu.pem:/root/.ssh/cic-iu.pem -v $(pwd)/ansible:/deploy agaveapi/deployer -i /deploy/dev/hosts /deploy/deploy_abaco.plbk
+$ docker run --rm -v ~/.ssh/jenkins-prod:/root/.ssh/id_rsa -v $(pwd)/ansible:/deploy agaveapi/deployer -i /deploy/dev/hosts /deploy/deploy_abaco.plbk
 ```
