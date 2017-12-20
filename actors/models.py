@@ -198,7 +198,7 @@ class Actor(AbacoDAO):
         ('api_server', 'provided', 'api_server', str, 'The base URL for the tenant that this actor belongs to.', None),
         ('owner', 'provided', 'owner', str, 'The user who created this actor.', None),
         ('mounts', 'provided', 'mounts', list, 'List of volume mounts to mount into each actor container.', []),
-        ('tas_homeDirectory', 'optional', 'tas_homeDirectory', str, 'Absolute path to the TAS defined home directory associated with the owner of the actor', None),
+        ('tasdir', 'optional', 'tasdir', str, 'Absolute path to the TAS defined home directory associated with the owner of the actor', None),
         ('uid', 'optional', 'uid', str, 'The uid to run the container as. Only used if user_container_uid is false.', None),
         ('gid', 'optional', 'gid', str, 'The gid to run the container as. Only used if user_container_uid is false.', None),
 
