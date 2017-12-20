@@ -734,23 +734,16 @@ def get_permissions(actor_id):
     :return:
     """
     try:
-        permissions = json.loads(permissions_store[actor_id])
-        return permissions
+        return permissions_store[actor_id]
     except KeyError:
         raise errors.PermissionsException("Actor {} does not exist".format(actor_id))
 
-def add_permission(user, actor_id, level):
-    """Add a permission for a user and level to an actor."""
-    logger.debug("top of add_permission().")
+def set_permission(user, actor_id, level):
+    """Set the permission for a user and level to an actor."""
+    logger.debug("top of set_permission().")
     try:
-        permissions = get_permissions(actor_id)
-    except errors.PermissionsException:
-        permissions = []
-    for pem in permissions:
-        if pem.get('user') == 'user' and pem.get('level') == level:
-            logger.debug("user: {} alreay had permission: {} for actor: {}".format(user, level, actor_id))
-            return
-    permissions.append({'user': user,
-                        'level': level})
-    logger.info("permission: {} added for user: {} and actor: {}".format(level, user, actor_id))
-    permissions_store[actor_id] = json.dumps(permissions)
+        permissions_store.update(actor_id, user, level)
+    except KeyError:
+        # if actor has no permissions, a KeyError will be thrown
+        permissions_store[actor_id] = {user: level}
+    logger.info("Permission set for actor: {}; user: {} at level: {}".format(actor_id, user, level))
