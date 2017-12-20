@@ -499,7 +499,7 @@ def test_add_permissions(headers):
     url = '{}/actors/{}/permissions'.format(base_url, actor_id)
     data = {'user': 'tester', 'level': 'UPDATE'}
     rsp = requests.post(url, data=data, headers=headers)
-    result = basic_response_checks(rsp)
+    basic_response_checks(rsp)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     assert len(result) == 2
