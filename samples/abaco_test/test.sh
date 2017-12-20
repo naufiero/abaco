@@ -21,3 +21,10 @@ if [ -e /_abaco_data1 ]; then
 else
   echo "Mount does not exist"
 fi;
+
+# check for work and corral
+echo "****Contents of jstubbs work:****"
+ls -l /work/01837/jstubbs
+
+echo "****Contents of /corral:****"
+ls -l /corral
