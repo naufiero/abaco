@@ -11,17 +11,18 @@ def replace_tokens(s, actor):
     """Replaces the following tokens in a string based on a dictionary representing an actor:
          tenant_id: the tenant id associated with the actor.
          username: the username of the owner of the actor.
-         tas_homeDirectory: the homeDirectory attribute returned from tas. This attribute requires the
+         tasdir: the homeDirectory attribute returned from tas. This attribute requires the
                             use_tas_uid config must be set to true.
     """
     logger.debug("top of replace_tokens for string: {}".format(s))
     s = s.replace('{username}', actor['owner'])
     s = s.replace('{tenant_id}', actor['tenant'])
-    if '{tas_homeDirectory}' in s:
-        if 'tas_homeDirectory' in actor:
-                s = s.replace('{tas_homeDirectory}', actor['tas_homeDirectory'])
+    if '{tasdir}' in s:
+        if 'tasdir' in actor and type(actor['tasdir']) == str:
+            logger.debug("tasdir in actor is a string, value: {}. attempting to replace tasdir from string s: {}".format(actor['tasdir'], s))
+            s = s.replace('{tasdir}', actor['tasdir'])
         else:
-            logger.error("actor did not have a tas_homeDirectory though "
+            logger.error("actor did not have a tasdir string though "
                          "there is one in the mounts string. s: {}. actor: {}".format(s, actor))
             # better to return an empty string in this case:
             return ''
