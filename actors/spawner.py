@@ -60,6 +60,7 @@ class Spawner(object):
                     ch = WorkerChannel(worker_id=worker['id'])
                     ch.put('stop')
                     logger.info("Sent 'stop' message to worker channel: {}".format(ch))
+                    ch.close()
         else:
             logger.info("No workers to stop.")
 
