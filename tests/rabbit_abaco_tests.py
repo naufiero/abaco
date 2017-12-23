@@ -14,11 +14,12 @@ bash-4.3# python3 /tests/rabbit_abaco_tests.py
 import os
 import sys
 import time
-
 import requests
 
 from util import base_url, case, headers, basic_response_checks
 
+sys.path.append('/')
+sys.path.append('/actors')
 from actors import channels, codes, stores, models
 
 

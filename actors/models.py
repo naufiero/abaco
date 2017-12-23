@@ -283,6 +283,7 @@ class Actor(AbacoDAO):
                        tenant=self.tenant,
                        num=1,
                        stop_existing=False)
+            ch.close()
             return worker_ids
         else:
             logger.debug("Actor.ensure_one_worker() returning None.")

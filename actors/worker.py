@@ -26,10 +26,11 @@ keep_running = True
 
 def shutdown_worker(worker_id):
     """Gracefully shutdown a single worker."""
-    logger.debug("shutdown_worker called for worker_id: {}".format(worker_id))
+    logger.debug("top of shutdown_worker for worker_id: {}".format(worker_id))
     ch = WorkerChannel(worker_id=worker_id)
     ch.put("stop")
     logger.info("A 'stop' message was sent to worker: {}".format(worker_id))
+    ch.close()
 
 def shutdown_workers(actor_id):
     """Graceful shutdown of all workers for an actor. Pass db_id as the `actor_id` argument."""
@@ -42,7 +43,6 @@ def shutdown_workers(actor_id):
         logger.info("shutdown_workers did not receive any workers from Worker.get_worker for actor: {}".format(actor_id))
     # @TODO - this code is not thread safe. we need to update the workers state in a transaction:
     for _, worker in workers.items():
-        logger.debug("entering shutdown lop for worker: {}".format(worker))
         shutdown_worker(worker['id'])
 
 
@@ -107,9 +107,10 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
                             "worker_id: {}"
                             "Exception: {}".format(worker_id, e))
             keep_running = False
-            actor_ch.close()
+            # actor_ch.close()
+            actor_ch.delete()
             worker_ch.delete()
-            logger.info("Closing actor channel for actor: {} worker_id: {}".format(actor_id, worker_id))
+            logger.info("WorkerChannel deleted and ActorMsgChannel closed for actor: {} worker_id: {}".format(actor_id, worker_id))
             logger.info("Worker with worker_id: {} is now exiting.".format(worker_id))
             sys.exit()
 

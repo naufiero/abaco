@@ -130,7 +130,9 @@ class ActorResource(Resource):
         except KeyError as e:
             logger.info("got KeyError {} trying to retrieve actor or executions with id {}".format(
                 e, id))
-        # delete the actor's message c
+        # delete the actor's message channel
+        # TODO - needs work; each worker is subscribed to the ActorMsgChannel. If the workers are not
+        # closed before the ch.delete() below, the ActorMsgChannel will survive.
         try:
             ch = ActorMsgChannel(actor_id=id)
             ch.delete()
