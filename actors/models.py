@@ -9,11 +9,11 @@ from hashids import Hashids
 from agaveflask.utils import RequestParser
 
 from channels import CommandChannel
-from codes import REQUESTED, SUBMITTED
+from codes import REQUESTED, SUBMITTED, EXECUTE
 from config import Config
 import errors
 
-from stores import actors_store, clients_store, executions_store, logs_store, permissions_store, workers_store
+from stores import actors_store, clients_store, executions_store, logs_store, nonce_store, permissions_store, workers_store
 
 from agaveflask.logs import get_logger
 logger = get_logger(__name__)
@@ -309,6 +309,199 @@ class Actor(AbacoDAO):
         actors_store.update(actor_id, 'status', status)
         if status_message:
             actors_store.update(actor_id, 'status_message', status_message)
+
+
+class Nonce(AbacoDAO):
+    """Basic data access object for working with actor nonces."""
+
+    PARAMS = [
+        # param_name, required/optional/provided/derived, attr_name, type, help, default
+        ('tenant', 'provided', 'tenant', str, 'The tenant that this nonce belongs to.', None),
+        ('db_id', 'provided', 'db_id', str, 'Primary key in the database for the actor associates with this nonce.', None),
+        ('roles', 'provided', 'roles', list, 'Roles occupied by the user when creating this nonce.', []),
+        ('owner', 'provided', 'owner', str, 'username associated with this nonce.', None),
+        ('api_server', 'provided', 'api_server', str, 'api_server associated with this nonce.', None),
+
+        ('level', 'optional', 'level', str,
+         'Permission level associated with this nonce. Default is {}.'.format(EXECUTE), EXECUTE),
+        ('max_uses', 'optional', 'max_uses', int,
+         'Maximum number of times this nonce can be redeemed. Default is unlimited.', -1),
+
+        ('id', 'derived', 'id', str, 'Unique id for this nonce.', None),
+        ('actor_id', 'derived', 'actor_id', str, 'The human readable id for the actor associated with this nonce.',
+         None),
+        ('create_time', 'derived', 'create_time', str, 'Time stamp (UTC) when this nonce was created.', None),
+        ('last_use_time', 'derived', 'last_use_time', str, 'Time stamp (UTC) when thic nonce was last redeemed.', None),
+        ('current_uses', 'derived', 'current_uses', int, 'Number of times this nonce has been redeemed.', 0),
+        ('remaining_uses', 'derived', 'remaining_uses', int, 'Number of uses remaining for this nonce.', -1),
+    ]
+
+    def get_derived_value(self, name, d):
+        """Compute a derived value for the attribute `name` from the dictionary d of attributes provided."""
+        # first, see if the attribute is already in the object:
+        if hasattr(self, name):
+            return
+        # next, see if it was passed:
+        try:
+            return d[name]
+        except KeyError:
+            pass
+
+        # check for provided fields:
+        try:
+            self.tenant = d['tenant']
+        except KeyError:
+            logger.error("The nonce controller did not pass tenant to the Nonce model.")
+            raise errors.DAOError("Could not instantiate nonce: tenant parameter missing.")
+        try:
+            self.api_server = d['api_server']
+        except KeyError:
+            logger.error("The nonce controller did not pass api_server to the Nonce model.")
+            raise errors.DAOError("Could not instantiate nonce: api_server parameter missing.")
+        try:
+            self.db_id = d['db_id']
+        except KeyError:
+            logger.error("The nonce controller did not pass db_id to the Nonce model.")
+            raise errors.DAOError("Could not instantiate nonce: db_id parameter missing.")
+        try:
+            self.owner = d['owner']
+        except KeyError:
+            logger.error("The nonce controller did not pass owner to the Nonce model.")
+            raise errors.DAOError("Could not instantiate nonce: owner parameter missing.")
+        try:
+            self.roles = d['roles']
+        except KeyError:
+            logger.error("The nonce controller did not pass roles to the Nonce model.")
+            raise errors.DAOError("Could not instantiate nonce: roles parameter missing.")
+
+        # generate a nonce id:
+        self.id = self.get_nonce_id(self.tenant, self.get_uuid())
+
+        # derive the actor_id from the db_id
+        self.actor_id = Actor.get_display_id(self.tenant, self.db_id)
+
+        # time fields
+        time_str = get_current_utc_time()
+        self.create_time = time_str
+        # initially there are no uses
+        self.last_use_time = None
+
+        # apply defaults to provided fields since those aren't applied in the constructor:
+        self.current_uses = 0
+        self.remaining_uses = self.max_uses
+
+        # always return the requested attribute since the __init__ expects it.
+        return getattr(self, name)
+
+    def get_nonce_id(self, tenant, uuid):
+        """Return the nonce id from the tenant and uuid."""
+        return '{}-{}'.format(tenant, uuid)
+
+    def get_hypermedia(self):
+        return {'_links': { 'self': '{}/actors/v2/{}/nonces/{}'.format(self.api_server, self.actor_id, self.id),
+                            'owner': '{}/profiles/v2/{}'.format(self.api_server, self.owner),
+                            'actor': '{}/actors/v2/{}'.format(self.api_server, self.actor_id)
+        }}
+
+    def display(self):
+        """Return a representation fit for display."""
+        self.update(self.get_hypermedia())
+        self.pop('db_id')
+        self.pop('tenant')
+        time_str = self.pop('create_time')
+        self['create_time'] = display_time(time_str)
+        time_str = self.pop('last_use_time')
+        self['last_use_time'] = display_time(time_str)
+        return self.case()
+
+    @classmethod
+    def get_tenant_from_nonce_id(cls, nonce_id):
+        """Returns the tenant from the nonce id."""
+        # the nonce id has the form <tenant_id>-<uuid>, where uuid should contain no "-" characters.
+        # so, we split from the right on '-' and stop after the first occurrence.
+        return nonce_id.rsplit('-', 1)
+
+    @classmethod
+    def get_nonces(cls, actor_id):
+        """Retrieve all nonces for an actor. Pass db_id as `actor_id` parameter."""
+        try:
+            nonces = nonce_store[actor_id]
+        except KeyError:
+            # return an empty Abaco dict if not found
+            return AbacoDAO()
+        return [Nonce(**nonce) for _, nonce in nonces.items()]
+
+    @classmethod
+    def get_nonce(cls, actor_id, nonce_id):
+        """Retrieve a nonce for an actor. Pass db_id as `actor_id` parameter."""
+        try:
+            nonce = nonce_store[actor_id][nonce_id]
+            return Nonce(**nonce)
+        except KeyError:
+            raise errors.DAOError("Nonce not found.")
+
+    @classmethod
+    def add_nonce(cls, actor_id, nonce):
+        """
+        Atomically append a new nonce to the nonce_store for an actor. 
+        The actor_id parameter should be the db_id and the nonce parameter should be a nonce object
+        created from the contructor.
+        """
+        try:
+            nonce_store.update(actor_id, nonce.id, nonce)
+            logger.debug("nonce {} appended to nonces for actor {}".format(nonce.id, actor_id))
+        except KeyError:
+            nonce_store[actor_id] = {nonce.id: nonce}
+            logger.debug("nonce {} added for actor {}".format(nonce.id, actor_id))
+
+    @classmethod
+    def delete_nonce(cls, actor_id, nonce_id):
+        """Delete a nonce from the nonce_store."""
+        del nonce_store[actor_id][nonce_id]
+
+    @classmethod
+    def check_and_redeem_nonce(cls, actor_id, nonce_id):
+        """
+        Atomically, check for the existence of a nonce for a given actor_id and redeem it if it
+        has not expired. Otherwise, raises PermissionsError. 
+        """
+        def _transaction(nonces):
+            """
+            This function can be passed to nonce_store.within_transaction() to atomically check 
+            whether a nonce is expired and, if not, redeem a use. The parameter, nonces, should
+            be the value under the key `actor_id` associated with the nonce.
+            """
+            # first pull the nonce from the nonces parameter
+            try:
+                nonce = nonces[nonce_id]
+            except KeyError:
+                raise PermissionError("Nonce does not exist.")
+            # check if there are remaining uses
+            try:
+                if nonce['remaining_uses'] == -1:
+                    logger.debug("nonce has infinite uses. updating nonce.")
+                    nonce['current_uses'] += 1
+                    nonce['last_use_time'] = get_current_utc_time()
+                    nonce_store.update(actor_id, nonce_id, nonce)
+                elif nonce['remaining_uses'] > 0:
+                    logger.debug("nonce still has uses remaining. updating nonce.")
+                    nonce['current_uses'] += 1
+                    nonce['remaining_uses'] -= 1
+                    nonce_store.update(actor_id, nonce_id, nonce)
+                else:
+                    logger.debug("nonce did not have at least 1 use remaining.")
+                    raise PermissionError("No remaining uses left for this nonce.")
+            except KeyError:
+                logger.debug("nonce did not have a remaining_uses attribute.")
+                raise PermissionError("No remaining uses left for this nonce.")
+
+        # first, make sure the nonce exists for the actor id:
+        try:
+            nonce_store[actor_id][nonce_id]
+        except KeyError:
+            raise PermissionError("Nonce does not exist.")
+        # atomically, check if the nonce is still valid and add a use if so:
+        nonce_store.within_transaction(_transaction, actor_id)
 
 
 class Execution(AbacoDAO):

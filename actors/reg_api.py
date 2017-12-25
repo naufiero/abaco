@@ -6,13 +6,13 @@ from agaveflask.utils import AgaveApi, handle_error
 
 from controllers import ActorResource, ActorStateResource, ActorsResource, \
     ActorExecutionsResource, ActorExecutionResource, \
-    ActorExecutionLogsResource
+    ActorExecutionLogsResource, ActorNoncesResource, ActorNonceResource
 from auth import authn_and_authz
-
+from errors import errors
 
 app = Flask(__name__)
 CORS(app)
-api = AgaveApi(app)
+api = AgaveApi(app, errors=errors)
 
 # Authn/z
 @app.before_request
@@ -20,9 +20,15 @@ def auth():
     authn_and_authz()
 
 # Set up error handling
-@app.errorhandler(Exception)
-def handle_all_errors(e):
-    return handle_error(e)
+# @app.errorhandler(Exception)
+# def handle_all_errors(e):
+#     return handle_error(e)
+api.handle_error = handle_error
+api.handle_exception = handle_error
+api.handle_user_exception = handle_error
+
+# app.handle_exception = handle_error
+# app.handle_user_exception = handle_error
 
 # Resources
 api.add_resource(ActorsResource, '/actors')
@@ -30,6 +36,8 @@ api.add_resource(ActorResource, '/actors/<string:actor_id>')
 api.add_resource(ActorStateResource, '/actors/<string:actor_id>/state')
 api.add_resource(ActorExecutionsResource, '/actors/<string:actor_id>/executions')
 api.add_resource(ActorExecutionResource, '/actors/<string:actor_id>/executions/<string:execution_id>')
+api.add_resource(ActorNoncesResource, '/actors/<string:actor_id>/nonces')
+api.add_resource(ActorNonceResource, '/actors/<string:actor_id>/nonces/<string:nonce_id>')
 api.add_resource(ActorExecutionLogsResource, '/actors/<string:actor_id>/executions/<string:execution_id>/logs')
 
 if __name__ == '__main__':

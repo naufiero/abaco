@@ -21,7 +21,7 @@ from agaveflask.utils import ok, RequestParser
 from config import Config
 import codes
 from errors import PermissionsException
-from models import Actor, get_permissions
+from models import Actor, get_permissions, Nonce
 
 from errors import ResourceError
 from stores import actors_store, permissions_store
@@ -61,19 +61,43 @@ def authn_and_authz():
         auth.authn_and_authz()
 
     """
-    # we use the agaveflask authn_and_authz function, passing in our authorization callback.
-    agaveflask_az(authorization)
+    accept_nonce = Config.get('web', 'accept_nonce')
+    if accept_nonce:
+        agaveflask_az(check_nonce, authorization)
+    else:
+        # we use the agaveflask authn_and_authz function, passing in our authorization callback.
+        agaveflask_az(authorization)
+
+def check_nonce():
+    """
+    This function is an agaveflask authentication callback used to process the existence of a query parameter,
+    x-nonce, an alternative authentication mechanism to JWT.
+    
+    When an x-nonce query parameter is provided, the request context is updated with the identity of the user owning
+    the actor to which the nonce belongs. Note that the roles of said user will not be calculated so, in particular, 
+    any privileged action cannot be taken via a nonce. 
+    """
+    try:
+        nonce_id = request.args['x-nonce']
+    except KeyError:
+        raise PermissionError("No JWT or nonce provided.")
+    # the nonce encodes the tenant in its id:
+    g.tenant = Nonce.get_tenant_from_nonce_id(nonce_id)
+    # get the actor_id base on the request path
+    actor_id = get_db_id()
+    Nonce.check_and_redeem_nonce(actor_id, nonce_id)
+    # if we were able to redeem the nonce, update auth context with the actor owner data:
+    nonce = Nonce.get_nonce(actor_id, nonce_id)
+    g.user = nonce.owner
+    # update roles data with that stored on the nonce:
+    g.roles = nonce.roles
+    # now, manually call our authorization function:
+    authorization()
 
 def authorization():
-    """Entry point for authorization. Use as follows:
-
-    import auth
-
-    my_app = Flask(__name__)
-    @my_app.before_request
-    def authz_for_my_app():
-        auth.authorization()
-
+    """This is the agaveflask authorization callback and implements the main Abaco authorization
+    logic. This function is called by agaveflask after all authentication processing and initial
+    authorization logic has run.
     """
     g.admin = False
     if request.method == 'OPTIONS':
@@ -153,6 +177,8 @@ def authorization():
     if not has_pem:
         logger.info("NOT allowing request.")
         raise PermissionsException("Not authorized -- you do not have access to this actor.")
+
+
 
 def check_privileged():
     """Check if request is trying to make an actor privileged."""

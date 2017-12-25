@@ -74,6 +74,11 @@ def pull_image(image):
             raise DockerError(msg)
     return rsp
 
+
+def list_all_containers():
+    """Returns a list of all containers """
+    cli = docker.AutoVersionClient(base_url=dd)
+
 def container_running(image=None, name=None):
     """Check if there is a running container for an image.
     image should be fully qualified; e.g. image='jstubbs/abaco_core'
