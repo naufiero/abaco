@@ -8,10 +8,10 @@ from agaveflask.utils import RequestParser, ok
 
 from auth import check_permissions, get_tas_data
 from channels import ActorMsgChannel, CommandChannel
-from codes import SUBMITTED, PERMISSION_LEVELS, READ
+from codes import SUBMITTED, PERMISSION_LEVELS, READ, PERMISSION_LEVELS
 from config import Config
 from errors import DAOError, ResourceError, PermissionsException, WorkerException
-from models import dict_to_camel, Actor, Execution, ExecutionsSummary, Worker, get_permissions, \
+from models import dict_to_camel, Actor, Execution, ExecutionsSummary, Nonce, Worker, get_permissions, \
     set_permission
 
 from mounts import get_all_mounts
@@ -300,6 +300,112 @@ class ActorExecutionsResource(Resource):
             except ValueError:
                 raise ResourceError(message="Argument {} must be an integer.".format(k))
         return args
+
+
+class ActorNoncesResource(Resource):
+    """Manage nonces for an actor"""
+
+    def get(self, actor_id):
+        logger.debug("top of GET /actors/{}/nonces".format(actor_id))
+        dbid = Actor.get_dbid(g.tenant, actor_id)
+        try:
+            Actor.from_db(actors_store[dbid])
+        except KeyError:
+            logger.debug("did not find actor: {}.".format(actor_id))
+            raise ResourceError(
+                "No actor found with id: {}.".format(actor_id), 404)
+        nonces = Nonce.get_nonces(actor_id=dbid)
+        return ok(result=[n.display() for n in nonces], msg="Actor nonces retrieved successfully.")
+
+    def post(self, actor_id):
+        """Create a new nonce for an actor."""
+        logger.debug("top of POST /actors/{}/nonces".format(actor_id))
+        dbid = Actor.get_dbid(g.tenant, actor_id)
+        try:
+            Actor.from_db(actors_store[dbid])
+        except KeyError:
+            logger.debug("did not find actor: {}.".format(actor_id))
+            raise ResourceError(
+                "No actor found with id: {}.".format(actor_id), 404)
+        args = self.validate_post()
+        logger.debug("nonce post args validated: {}.".format(actor_id))
+
+        # supply "provided" fields:
+        args['tenant'] = g.tenant
+        args['api_server'] = g.api_server
+        args['db_id'] = dbid
+        args['owner'] = g.user
+        args['roles'] = g.roles
+
+        # create and store the nonce:
+        nonce = Nonce(**args)
+        Nonce.add_nonce(dbid, nonce)
+        logger.info("nonce added for actor: {}.".format(actor_id))
+        return ok(result=nonce.display(), msg="Actor nonce created successfully.")
+
+    def validate_post(self):
+        parser = Nonce.request_parser()
+        try:
+            args = parser.parse_args()
+        except BadRequest as e:
+            msg = 'Unable to process the JSON description.'
+            if hasattr(e, 'data'):
+                msg = e.data.get('message')
+            raise DAOError("Invalid nonce description: {}".format(msg))
+        # additional checks
+        if 'level' in args:
+            if not args['level'] in PERMISSION_LEVELS:
+                raise DAOError("Invalid nonce description. "
+                               "The level attribute must be one of: {}".format(PERMISSION_LEVELS))
+        if Config.get('web', 'case') == 'snake':
+            if 'max_uses' in args:
+                self.validate_max_uses(args['max_uses'])
+        else:
+            if 'maxUses' in args:
+                self.validate_max_uses(args['maxUses'])
+        return args
+
+    def validate_max_uses(self, max_uses):
+        try:
+            m = int(max_uses)
+        except Exception:
+            raise DAOError("The max uses parameter must be an integer.")
+        if m ==0 or m < -1:
+            raise DAOError("The max uses parameter must be a positive integer or -1 "
+                           "(to denote unlimited uses).")
+
+
+
+
+class ActorNonceResource(Resource):
+    """Manage a specific nonce for an actor"""
+
+    def get(self, actor_id, nonce_id):
+        """Lookup details about a nonce."""
+        logger.debug("top of GET /actors/{}/nonces/{}".format(actor_id, nonce_id))
+        dbid = Actor.get_dbid(g.tenant, actor_id)
+        try:
+            Actor.from_db(actors_store[dbid])
+        except KeyError:
+            logger.debug("did not find actor: {}.".format(actor_id))
+            raise ResourceError(
+                "No actor found with id: {}.".format(actor_id), 404)
+        nonce = Nonce.get_nonce(actor_id=dbid, nonce_id=nonce_id)
+        return ok(result=nonce.display(), msg="Actor nonce retrieved successfully.")
+
+
+    def delete(self, actor_id, nonce_id):
+        """Delete a nonce."""
+        logger.debug("top of DELETE /actors/{}/nonces/{}".format(actor_id, nonce_id))
+        dbid = Actor.get_dbid(g.tenant, actor_id)
+        try:
+            Actor.from_db(actors_store[dbid])
+        except KeyError:
+            logger.debug("did not find actor: {}.".format(actor_id))
+            raise ResourceError(
+                "No actor found with id: {}.".format(actor_id), 404)
+        Nonce.delete_nonce(actor_id, nonce_id)
+        return ok(result=None, msg="Actor nonce deleted successfully.")
 
 
 class ActorExecutionResource(Resource):
