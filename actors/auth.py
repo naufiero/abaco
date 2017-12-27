@@ -77,16 +77,21 @@ def check_nonce():
     the actor to which the nonce belongs. Note that the roles of said user will not be calculated so, in particular, 
     any privileged action cannot be taken via a nonce. 
     """
+    logger.debug("top of check_nonce")
     try:
         nonce_id = request.args['x-nonce']
     except KeyError:
         raise PermissionError("No JWT or nonce provided.")
+    logger.debug("checking nonce with id: {}".format(nonce_id))
     # the nonce encodes the tenant in its id:
     g.tenant = Nonce.get_tenant_from_nonce_id(nonce_id)
+    logger.debug("tenant associated with nonce: {}".format(g.tenant))
     # get the actor_id base on the request path
     actor_id = get_db_id()
+    logger.debug("db_id: {}".format(actor_id))
     Nonce.check_and_redeem_nonce(actor_id, nonce_id)
     # if we were able to redeem the nonce, update auth context with the actor owner data:
+    logger.debug("nonce valid and redeemed.")
     nonce = Nonce.get_nonce(actor_id, nonce_id)
     g.user = nonce.owner
     # update roles data with that stored on the nonce:
