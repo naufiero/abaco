@@ -15,7 +15,7 @@ from models import dict_to_camel, Actor, Execution, ExecutionsSummary, Nonce, Wo
     set_permission
 
 from mounts import get_all_mounts
-from stores import actors_store, executions_store, logs_store, permissions_store
+from stores import actors_store, executions_store, logs_store, nonce_store, permissions_store
 from worker import shutdown_workers, shutdown_worker
 
 from agaveflask.logs import get_logger
@@ -144,6 +144,8 @@ class ActorResource(Resource):
         logger.info("actor {} deleted from store.".format(id))
         del permissions_store[id]
         logger.info("actor {} permissions deleted from store.".format(id))
+        del nonce_store[id]
+        logger.info("actor {} nonnces delete from nonce store.".format(id))
         return ok(result=None, msg='Actor deleted successfully.')
 
     def put(self, actor_id):
@@ -404,7 +406,7 @@ class ActorNonceResource(Resource):
             logger.debug("did not find actor: {}.".format(actor_id))
             raise ResourceError(
                 "No actor found with id: {}.".format(actor_id), 404)
-        Nonce.delete_nonce(actor_id, nonce_id)
+        Nonce.delete_nonce(dbid, nonce_id)
         return ok(result=None, msg="Actor nonce deleted successfully.")
 
 
