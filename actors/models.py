@@ -395,7 +395,7 @@ class Nonce(AbacoDAO):
 
     def get_nonce_id(self, tenant, uuid):
         """Return the nonce id from the tenant and uuid."""
-        return '{}-{}'.format(tenant, uuid)
+        return '{}_{}'.format(tenant, uuid)
 
     def get_hypermedia(self):
         return {'_links': { 'self': '{}/actors/v2/{}/nonces/{}'.format(self.api_server, self.actor_id, self.id),
@@ -417,9 +417,9 @@ class Nonce(AbacoDAO):
     @classmethod
     def get_tenant_from_nonce_id(cls, nonce_id):
         """Returns the tenant from the nonce id."""
-        # the nonce id has the form <tenant_id>-<uuid>, where uuid should contain no "-" characters.
-        # so, we split from the right on '-' and stop after the first occurrence.
-        return nonce_id.rsplit('-', 1)
+        # the nonce id has the form <tenant_id>_<uuid>, where uuid should contain no "_" characters.
+        # so, we split from the right on '_' and stop after the first occurrence.
+        return nonce_id.rsplit('_', 1)[0]
 
     @classmethod
     def get_nonces(cls, actor_id):
@@ -457,7 +457,7 @@ class Nonce(AbacoDAO):
     @classmethod
     def delete_nonce(cls, actor_id, nonce_id):
         """Delete a nonce from the nonce_store."""
-        del nonce_store[actor_id][nonce_id]
+        nonce_store.pop_field(actor_id, nonce_id)
 
     @classmethod
     def check_and_redeem_nonce(cls, actor_id, nonce_id):
