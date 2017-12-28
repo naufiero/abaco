@@ -8,7 +8,7 @@ from agaveflask.utils import RequestParser, ok
 
 from auth import check_permissions, get_tas_data
 from channels import ActorMsgChannel, CommandChannel
-from codes import SUBMITTED, PERMISSION_LEVELS, READ, PERMISSION_LEVELS
+from codes import SUBMITTED, PERMISSION_LEVELS, READ, UPDATE, PERMISSION_LEVELS, PermissionLevel
 from config import Config
 from errors import DAOError, ResourceError, PermissionsException, WorkerException
 from models import dict_to_camel, Actor, Execution, ExecutionsSummary, Nonce, Worker, get_permissions, \
@@ -98,7 +98,7 @@ class ActorsResource(Resource):
                                                                                    actor.tenant))
         actor.ensure_one_worker()
         logger.debug("ensure_one_worker() called")
-        set_permission(g.user, actor.db_id, 'UPDATE')
+        set_permission(g.user, actor.db_id, UPDATE)
         logger.debug("UPDATE permission added to user: {}".format(g.user))
         return ok(result=actor.display(), msg="Actor created successfully.", request=request)
 
@@ -375,8 +375,6 @@ class ActorNoncesResource(Resource):
         if m ==0 or m < -1:
             raise DAOError("The max uses parameter must be a positive integer or -1 "
                            "(to denote unlimited uses).")
-
-
 
 
 class ActorNonceResource(Resource):
@@ -768,7 +766,7 @@ class PermissionsResource(Resource):
                 "actor not found: {}'".format(actor_id), 404)
         args = self.validate_post()
         logger.debug("POST permissions body validated for actor: {}.".format(actor_id))
-        set_permission(args['user'], id, args['level'])
+        set_permission(args['user'], id, PermissionLevel(args['level']))
         logger.info("Permission added for user: {} actor: {} level: {}".format(args['user'], id, args['level']))
         permissions = get_permissions(id)
         return ok(result=permissions, msg="Permission added successfully.")

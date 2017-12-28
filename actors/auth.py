@@ -68,6 +68,17 @@ def authn_and_authz():
         # we use the agaveflask authn_and_authz function, passing in our authorization callback.
         agaveflask_az(authorization)
 
+def required_level(request):
+    """Returns the required permission level for the request."""
+    if request.method == 'OPTIONS':
+        return codes.NONE
+    elif request.method == 'GET':
+        return codes.READ
+    elif request.method == 'POST' and 'messages' in request.url_rule.rule:
+        return codes.EXECUTE
+    return codes.UPDATE
+
+
 def check_nonce():
     """
     This function is an agaveflask authentication callback used to process the existence of a query parameter,
@@ -89,7 +100,8 @@ def check_nonce():
     # get the actor_id base on the request path
     actor_id = get_db_id()
     logger.debug("db_id: {}".format(actor_id))
-    Nonce.check_and_redeem_nonce(actor_id, nonce_id)
+    level = required_level(request)
+    Nonce.check_and_redeem_nonce(actor_id, nonce_id, level)
     # if we were able to redeem the nonce, update auth context with the actor owner data:
     logger.debug("nonce valid and redeemed.")
     nonce = Nonce.get_nonce(actor_id, nonce_id)
@@ -184,7 +196,6 @@ def authorization():
         raise PermissionsException("Not authorized -- you do not have access to this actor.")
 
 
-
 def check_privileged():
     """Check if request is trying to make an actor privileged."""
     logger.debug("top of check_privileged")
@@ -223,19 +234,20 @@ def check_permissions(user, actor_id, level):
     logger.debug("Checking user: {} permissions for actor id: {}".format(user, actor_id))
     # get all permissions for this actor
     permissions = get_permissions(actor_id)
-    for pem_user, pem_level in permissions.items():
+    for p_user, p_name in permissions.items():
         # if the actor has been shared with the WORLD_USER anyone can use it
-        if pem_user == WORLD_USER:
+        if p_user == WORLD_USER:
             logger.info("Allowing request - actor has been shared with the WORLD_USER.")
             return True
         # otherwise, check if the permission belongs to this user and has the necessary level
-        if pem_user == user:
-            if pem_level >= level:
+        if p_user == user:
+            p_pem = codes.PermissionLevel(p_name)
+            if p_pem >= level:
                 logger.info("Allowing request - user has appropriate permission with the actor.")
                 return True
             else:
                 # we found the permission for the user but it was insufficient; return False right away
-                logger.info("Found permission {}, rejecting request.".format(pem_level))
+                logger.info("Found permission {}, rejecting request.".format(level))
                 return False
     # didn't find the user or world_user, return False
     logger.info("user had no permissions for actor. Actor's permissions: {}".format(permissions))
