@@ -9,7 +9,7 @@ from hashids import Hashids
 from agaveflask.utils import RequestParser
 
 from channels import CommandChannel
-from codes import REQUESTED, SUBMITTED, EXECUTE
+from codes import REQUESTED, SUBMITTED, EXECUTE, PermissionLevel
 from config import Config
 import errors
 
@@ -323,7 +323,7 @@ class Nonce(AbacoDAO):
         ('api_server', 'provided', 'api_server', str, 'api_server associated with this nonce.', None),
 
         ('level', 'optional', 'level', str,
-         'Permission level associated with this nonce. Default is {}.'.format(EXECUTE), EXECUTE),
+         'Permission level associated with this nonce. Default is {}.'.format(EXECUTE), EXECUTE.name),
         ('max_uses', 'optional', 'max_uses', int,
          'Maximum number of times this nonce can be redeemed. Default is unlimited.', -1),
 
@@ -460,7 +460,7 @@ class Nonce(AbacoDAO):
         nonce_store.pop_field(actor_id, nonce_id)
 
     @classmethod
-    def check_and_redeem_nonce(cls, actor_id, nonce_id):
+    def check_and_redeem_nonce(cls, actor_id, nonce_id, level):
         """
         Atomically, check for the existence of a nonce for a given actor_id and redeem it if it
         has not expired. Otherwise, raises PermissionsError. 
@@ -476,6 +476,13 @@ class Nonce(AbacoDAO):
                 nonce = nonces[nonce_id]
             except KeyError:
                 raise PermissionError("Nonce does not exist.")
+            # check if the nonce level is sufficient
+            try:
+                if PermissionLevel(nonce['level']) < level:
+                    raise PermissionError("Nonce does not have sufficient permissions level.")
+            except KeyError:
+                raise PermissionError("Nonce did not have an associated level.")
+
             # check if there are remaining uses
             try:
                 if nonce['remaining_uses'] == -1:
@@ -935,9 +942,11 @@ def get_permissions(actor_id):
 def set_permission(user, actor_id, level):
     """Set the permission for a user and level to an actor."""
     logger.debug("top of set_permission().")
+    if not isinstance(level, PermissionLevel):
+        raise errors.DAOError("level must be a PermissionLevel object.")
     try:
-        permissions_store.update(actor_id, user, level)
+        permissions_store.update(actor_id, user, level.name)
     except KeyError:
         # if actor has no permissions, a KeyError will be thrown
-        permissions_store[actor_id] = {user: level}
+        permissions_store[actor_id] = {user: level.name}
     logger.info("Permission set for actor: {}; user: {} at level: {}".format(actor_id, user, level))

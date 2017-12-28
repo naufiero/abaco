@@ -41,7 +41,7 @@ import pytest
 import requests
 import json
 
-from actors import models
+from actors import models, codes
 from util import headers, base_url, case, test_remove_initial_actors, \
     response_format, basic_response_checks, get_actor_id, check_execution_details, \
     execute_actor
@@ -63,6 +63,25 @@ def test_dict_to_camel():
     dcamel = models.dict_to_camel(dic)
     assert 'executionId' in dcamel
     assert dcamel['executionId'] == "458ab16c-60a8-11e6-8547-0242ac110008-053"
+
+def test_permission_NONE_READ():
+    assert codes.NONE < codes.READ
+
+def test_permission_NONE_EXECUTE():
+    assert codes.NONE < codes.EXECUTE
+
+def test_permission_NONE_UPDATE():
+    assert codes.NONE < codes.UPDATE
+
+def test_permission_READ_EXECUTE():
+    assert codes.READ < codes.EXECUTE
+
+def test_permission_READ_UPDATE():
+    assert codes.READ < codes.UPDATE
+
+def test_permission_EXECUTE_UPDATE():
+    assert codes.EXECUTE < codes.UPDATE
+
 
 def test_list_actors(headers):
     url = '{}/{}'.format(base_url, '/actors')
@@ -186,7 +205,7 @@ def test_register_without_image(headers):
     url = '{}/actors'.format(base_url)
     rsp = requests.post(url, headers=headers, data={})
     response_format(rsp)
-    assert rsp.status_code not in range(1 - 399)
+    assert rsp.status_code not in range(1, 399)
     data = json.loads(rsp.content.decode('utf-8'))
     message = data['message']
     assert 'image' in message
@@ -198,14 +217,14 @@ def test_register_with_put(headers):
     url = '{}/actors'.format(base_url)
     rsp = requests.put(url, headers=headers, data={'image': 'abacosamples/test'})
     response_format(rsp)
-    assert rsp.status_code not in range(1 - 399)
+    assert rsp.status_code not in range(1, 399)
 
 def test_cant_update_stateless_actor_state(headers):
     actor_id = get_actor_id(headers, name='abaco_test_suite_statelesss')
     url = '{}/actors/{}/state'.format(base_url, actor_id)
     rsp = requests.post(url, headers=headers, data={'state': 'abc'})
     response_format(rsp)
-    assert rsp.status_code not in range(1-399)
+    assert rsp.status_code not in range(1, 399)
 
 def check_actor_is_ready(headers, actor_id=None):
     count = 0
@@ -388,6 +407,195 @@ def test_update_actor(headers):
     assert result['id'] is not None
 
 
+# ################
+# nonce API
+# ################
+
+def check_nonce_fields(nonce, actor_id=None, nonce_id=None,
+                       current_uses=None, max_uses=None, remaining_uses=None, level=None, owner=None):
+    """Basic checks of the nonce object returned from the API."""
+    nid = nonce.get('id')
+    # check that nonce id has a valid tenant:
+    assert nid
+    assert nid.rsplit('_', 1)[0]
+    if nonce_id:
+        assert nonce.get('id') == nonce_id
+    assert nonce.get('owner')
+    if owner:
+        assert nonce.get('owner') == owner
+    assert nonce.get('level')
+    if level:
+        assert nonce.get('level') == level
+    assert nonce.get('roles')
+
+    # case-specific checks:
+    if case == 'snake':
+        assert nonce.get('actor_id')
+        if actor_id:
+            assert nonce.get('actor_id') == actor_id
+        assert nonce.get('api_server')
+        assert nonce.get('create_time')
+        assert nonce.get('current_uses')
+        if current_uses:
+            assert nonce.get('current_uses') == current_uses
+        assert nonce.get('last_use_time')
+        assert nonce.get('max_uses')
+        if max_uses:
+            assert nonce.get('max_uses') == max_uses
+        assert 'remaining_uses' in nonce
+        if remaining_uses:
+            assert nonce.get('remaining_uses') == remaining_uses
+    else:
+        assert nonce.get('actorId')
+        if actor_id:
+            assert nonce.get('actorId') == actor_id
+        assert nonce.get('apiServer')
+        assert nonce.get('createTime')
+        assert 'currentUses'in nonce
+        if current_uses:
+            assert nonce.get('currentUses') == current_uses
+        assert nonce.get('lastUseTime')
+        assert nonce.get('maxUses')
+        if max_uses:
+            assert nonce.get('maxUses') == max_uses
+        assert 'remainingUses' in nonce
+        if remaining_uses:
+            assert nonce.get('remainingUses') == remaining_uses
+
+def test_list_empty_nonce(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/nonces'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    # initially, no nonces
+    assert len(result) == 0
+
+def test_create_unlimited_nonce(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/nonces'.format(base_url, actor_id)
+    # passing no data to the POST should use the defaults for a nonce:
+    # unlimited uses and EXECUTE level
+    rsp = requests.post(url, headers=headers)
+    result = basic_response_checks(rsp)
+    check_nonce_fields(result, level='EXECUTE', max_uses=-1, current_uses=0, remaining_uses=-1)
+
+def test_create_limited_nonce(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/nonces'.format(base_url, actor_id)
+    if case == 'snake':
+        data = {'max_uses': 3, 'level': 'READ'}
+    else:
+        data = {'maxUses': 3, 'level': 'READ'}
+    # unlimited uses and EXECUTE level
+    rsp = requests.post(url, headers=headers, data=data)
+    result = basic_response_checks(rsp)
+    check_nonce_fields(result, actor_id=actor_id, level='READ',
+                       max_uses=3, current_uses=0, remaining_uses=3)
+
+def test_list_nonces(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/nonces'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    # should now have 2 nonces
+    assert len(result) == 2
+
+def test_redeem_unlimited_nonce(headers):
+    actor_id = get_actor_id(headers)
+    # first, get the nonce id:
+    nonce_id = None
+    url = '{}/actors/{}/nonces'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    for nonce in result:
+        if case == 'snake':
+            if nonce.get('max_uses') == -1:
+                nonce_id = nonce.get('id')
+        else:
+            if nonce.get('maxUses') == -1:
+                nonce_id = nonce.get('id')
+
+    # if we didn't find an unlimited nonce, there's a problem:
+    assert nonce_id
+    # redeem the unlimited nonce for reading:
+    url = '{}/actors/{}?x-nonce={}'.format(base_url, actor_id, nonce_id)
+    # no JWT header -- we're using the nonce
+    rsp = requests.get(url)
+    basic_response_checks(rsp)
+    url = '{}/actors/{}/executions?x-nonce={}'.format(base_url, actor_id, nonce_id)
+    # no JWT header -- we're using the nonce
+    rsp = requests.get(url)
+    basic_response_checks(rsp)
+    url = '{}/actors/{}/messages?x-nonce={}'.format(base_url, actor_id, nonce_id)
+    # no JWT header -- we're using the nonce
+    rsp = requests.get(url)
+    basic_response_checks(rsp)
+    # check that we have 3 uses and unlimited remaining uses:
+    url = '{}/actors/{}/nonces/{}'.format(base_url, actor_id, nonce_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    check_nonce_fields(result, actor_id=actor_id, level='EXECUTE',
+                       max_uses=-1, current_uses=3, remaining_uses=-1)
+    # redeem the unlimited nonce for executing:
+    url = '{}/actors/{}/messages?x-nonce={}'.format(base_url, actor_id, nonce_id)
+    rsp = requests.post(url, data={'message': 'test'})
+    basic_response_checks(rsp)
+    # check that we now have 4 uses and unlimited remaining uses:
+    url = '{}/actors/{}/nonces/{}'.format(base_url, actor_id, nonce_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    check_nonce_fields(result, actor_id=actor_id, level='EXECUTE',
+                       max_uses=-1, current_uses=4, remaining_uses=-1)
+
+def test_redeem_limited_nonce(headers):
+    actor_id = get_actor_id(headers)
+    # first, get the nonce id:
+    nonce_id = None
+    url = '{}/actors/{}/nonces'.format(base_url, actor_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    for nonce in result:
+        if case == 'snake':
+            if nonce.get('max_uses') == 3:
+                nonce_id = nonce.get('id')
+        else:
+            if nonce.get('maxUses') == 3:
+                nonce_id = nonce.get('id')
+    # if we didn't find the limited nonce, there's a problem:
+    assert nonce_id
+    # redeem the limited nonce for reading:
+    url = '{}/actors/{}?x-nonce={}'.format(base_url, actor_id, nonce_id)
+    # no JWT header -- we're using the nonce
+    rsp = requests.get(url)
+    basic_response_checks(rsp)
+    # check that we have 1 use and 2 remaining uses:
+    url = '{}/actors/{}/nonces/{}'.format(base_url, actor_id, nonce_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    check_nonce_fields(result, actor_id=actor_id, level='READ',
+                       max_uses=3, current_uses=1, remaining_uses=2)
+    # check that attempting to redeem the limited nonce for executing fails:
+    url = '{}/actors/{}/messages?x-nonce={}'.format(base_url, actor_id, nonce_id)
+    rsp = requests.post(url, data={'message': 'test'})
+    assert rsp.status_code not in range(1, 399)
+    # try redeeming 3 more times; first two should work, third should fail:
+    url = '{}/actors/{}?x-nonce={}'.format(base_url, actor_id, nonce_id)
+    # use #2
+    rsp = requests.get(url)
+    basic_response_checks(rsp)
+    # use #3
+    rsp = requests.get(url)
+    basic_response_checks(rsp)
+    # use #4 -- should fail
+    rsp = requests.get(url)
+    assert rsp.status_code not in range(1, 399)
+    # finally, check that nonce has no remaining uses:
+    url = '{}/actors/{}/nonces/{}'.format(base_url, actor_id, nonce_id)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    check_nonce_fields(result, actor_id=actor_id, level='READ',
+                       max_uses=3, current_uses=3, remaining_uses=0)
+
 
 # ################
 # admin API
@@ -504,6 +712,19 @@ def test_add_permissions(headers):
     result = basic_response_checks(rsp)
     assert len(result) == 2
 
+def test_modify_user_perissions(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}/permissions'.format(base_url, actor_id)
+    data = {'user': 'tester', 'level': 'READ'}
+    rsp = requests.post(url, data=data, headers=headers)
+    basic_response_checks(rsp)
+    rsp = requests.get(url, headers=headers)
+    result = basic_response_checks(rsp)
+    # should still only have 2 results; previous call should have
+    # modified the user's permission to READ
+    assert len(result) == 2
+
+
 
 # #########################
 # role based access control
@@ -562,7 +783,7 @@ def test_limited_user_cannot_create_priv_actor():
     url = '{}/{}'.format(base_url, '/actors')
     data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite', 'privileged': True}
     rsp = requests.post(url, data=data, headers=headers)
-    assert rsp.status_code not in range(1-399)
+    assert rsp.status_code not in range(1, 399)
 
 # privileged role:
 def test_priv_user_can_create_priv_actor():
