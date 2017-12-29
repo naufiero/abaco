@@ -435,7 +435,7 @@ def check_nonce_fields(nonce, actor_id=None, nonce_id=None,
             assert nonce.get('actor_id') == actor_id
         assert nonce.get('api_server')
         assert nonce.get('create_time')
-        assert nonce.get('current_uses')
+        assert 'current_uses' in nonce
         if current_uses:
             assert nonce.get('current_uses') == current_uses
         assert nonce.get('last_use_time')
