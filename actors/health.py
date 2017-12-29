@@ -38,6 +38,11 @@ def check_workers_store(ttl):
     for actor_id, worker in workers_store.items():
         check_worker_health(worker, actor_id, ttl)
 
+def remove_stopped_containers():
+    """Remove all containers that have exited."""
+    # @TODO -- implement
+    pass
+
 def check_worker_health(actor_id, worker):
     """Check the specific health of a worker object."""
     logger.debug("top of check_worker_health")
