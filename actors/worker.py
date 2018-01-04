@@ -92,7 +92,7 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
 
                 if msg['status'] == 'ok':
                     logger.info("Client delete request completed successfully for "
-                                "worker_id: {}, client_id: {}.".format(worker_id), ag_client.api_key)
+                                "worker_id: {}, client_id: {}.".format(worker_id, ag_client.api_key))
                 else:
                     logger.error("Error deleting client for "
                                  "worker_id: {}, client_id: {}. Message: {}".format(worker_id, msg['message'],
