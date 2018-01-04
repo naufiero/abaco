@@ -78,13 +78,17 @@ class ClientGenerator(object):
             # @TODO -
             # delete the anonymous channel from this thread but sleep first to avoid the race condition.
             time.sleep(1.5)
+            logger.info("deleting the anon_ch associated with the clientg message. anon_ch.name: {}".format(anon_ch.name))
             anon_ch.delete()
+            logger.debug("anon_ch deleted.")
+
             # NOT doing this for now -- deleting entire anon channel instead (see above)
             # clean up the anon channel event queue. this is an issue with the
             # channelpy library
             # anon_ch._queue._event_queue.delete()
 
     def new_client(self, cmd, anon_ch):
+        """Main function to process a `new` command message."""
         valid, msg, owner = self.check_new_params(cmd)
         if valid:
             try:
@@ -111,6 +115,7 @@ class ClientGenerator(object):
                          'message': m})
 
     def generate_client(self, cmd, owner):
+        """Generate an Agave OAuth client whose name is equal to the worker_id that will be using said client."""
         api_server, ag = self.get_agave(cmd['tenant'], actor_owner=owner)
         ag.clients.create(body={'clientName': cmd['worker_id']})
         # note - the client generates tokens representing the user who registered the actor
@@ -182,6 +187,7 @@ class ClientGenerator(object):
         return valid, msg, 'abaco_service'
 
     def delete_client(self, cmd, anon_ch):
+        """Main function to process a `delete` command message."""
         valid, msg, owner = self.check_del_params(cmd)
         if not valid:
             anon_ch.put({'status': 'error',
