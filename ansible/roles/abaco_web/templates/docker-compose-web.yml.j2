@@ -36,19 +36,6 @@ mes:
         - ./abaco.conf:/etc/service.conf
         - /home/apim/logs/mes.log:/var/log/service.log
 
-agavemes:
-    image: {{ docker_user }}/core:{{ abaco_tag }}
-    ports:
-        - "5002:5000"
-    environment:
-        server: {{ web_server_type }}
-        api: agavemes
-        mongo_password:
-        redis_password:
-    volumes:
-        - ./abaco.conf:/etc/service.conf
-        - /home/apim/logs/agavemes.log:/var/log/service.log
-
 admin:
     image: {{ docker_user }}/core:{{ abaco_tag }}
     ports:

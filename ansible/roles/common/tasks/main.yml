@@ -29,7 +29,6 @@
       - /home/apim/logs/reg.log
       - /home/apim/logs/admin.log
       - /home/apim/logs/mes.log
-      - /home/apim/logs/agavemes.log
       - /home/apim/logs/health.log
       - /home/apim/logs/spawner.log
       - /home/apim/logs/worker.log
