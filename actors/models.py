@@ -14,7 +14,7 @@ from codes import REQUESTED, SUBMITTED, EXECUTE, PermissionLevel
 from config import Config
 import errors
 
-from stores import actors_store, clients_store, executions_store, logs_store, nonce_store, permissions_store, workers_store
+from stores import actors_store, clients_store, executions_store, logs_store, nonce_store, permissions_store, workers_store, stats_store
 
 from agaveflask.logs import get_logger
 logger = get_logger(__name__)
@@ -308,7 +308,7 @@ class Actor(AbacoDAO):
     def set_status(cls, actor_id, status, status_message=None):
         """Update the status of an actor"""
         logger.debug("top of set_status for status: {}".format(status))
-        actors_store.update(actor_id, 'status', status)
+        s_store.update(actor_id, 'status', status)
         if status_message:
             actors_store.update(actor_id, 'status_message', status_message)
 
@@ -728,6 +728,7 @@ class ExecutionsSummary(AbacoDAO):
         return tot
 
     def get_derived_value(self, name, d):
+        # this is what gets called when you send it the id (second try, comes here to get derived value)
         """Compute a derived value for the attribute `name` from the dictionary d of attributes provided."""
         # first, see if the attribute is already in the object:
         try:
@@ -993,3 +994,81 @@ def set_permission(user, actor_id, level):
         # if actor has no permissions, a KeyError will be thrown
         permissions_store[actor_id] = {user: level.name}
     logger.info("Permission set for actor: {}; user: {} at level: {}".format(actor_id, user, level))
+
+
+# What i've added is below
+
+class CacheActorExecutionsSummary(AbacoDAO):
+    """ Summary information for all executions performed by an actor. """
+    PARAMS = [
+        # param_name, required/optional/provided/derived, attr_name, type, help, default
+        ('db_id', 'required', 'db_id', str, 'Primary key in the database for associated actor.', None),
+        ('api_server', 'derived', 'api_server', str, 'Base URL for the tenant that associated actor belongs to.', None),
+        ('actor_id', 'required', 'actor_id', str, 'id for the actor.', None),
+        ('owner', 'derived', 'owner', str, 'The user who created the associated actor.', None),
+        ('executions', 'derived', 'executions', list, 'List of all executions with summary fields.', None),
+        ('total_executions', 'derived', 'total_executions', str, 'Total number of execution.', None),
+        ('total_io', 'derived', 'total_io', str,
+         'Block I/O usage, in number of 512-byte sectors read from and written to, by all executions.', None),
+        ('total_runtime', 'derived', 'total_runtime', str, 'Runtime, in milliseconds, of all executions.', None),
+        ('total_cpu', 'derived', 'total_cpu', str, 'CPU usage, in user jiffies, of all execution.', None),
+        ]
+
+
+    def get_derived_value(self, name, d):
+
+        try:
+            if d[name]:
+                return d[name]
+        except KeyError:
+            pass
+        try:
+            dbid = d['db_id']
+        except KeyError:
+            logger.error("db_id missing from call to get_derived_value. d: {}".format(d))
+            raise errors.ExecutionException('db_id is required.')
+        try:
+            actor_id = d['actor_id']
+        except KeyError:
+            logger.error("actor_id is missing from call to get_derived_value. d: {}". format(d))
+            raise errors.ExecutionException('actor_id is required')
+
+        return stats_store[actor_id][name]
+
+
+
+class CacheExecutionsSummary(AbacoDao):
+    """param_name, required/optional/provided/derived, attr_name, type, help, default"""
+    PARAMS =
+        [
+        ('total_actors_all', 'derived', 'total_actors_all', str, 'Total number of actors - all time.', None),
+        ('total_executions_all', 'derived', 'total_executions_all', str, 'Total number of executions - all time.', None),
+        ('total_execution_runtime_all', 'derived', 'total_execution_runtime_all', str,
+         'Total runtime for executions - all time.', None),
+        ('total_execution_cpu_all', 'derived', 'total_execution_cpu_all', str, 'Total CPU used by executions - all time.', None),
+        ('total_execution_io_all', 'derived', 'total_execution_io_all', str, 'Total IO used by executions - all time', None)
+        ('total_actors_existing', 'derived', 'total_actors_existing', str, 'Total actors that currently exist.', None),
+        ('total_executions_existing', 'derived', 'total_executions_existing', str, 'Total number of executions that currently exist.', None),
+        ('total_execution_runtime_existing', 'derived', 'total_execution_runtime_existing', str, 'Total runtime for executions that currently exist.', None)
+        ('total_execution_cpu_existing', 'derived', 'total_execution_cpu_existing', str, 'Total CPU used by executions that currently exist.', None),
+        ('total_execution_io_existing', 'derived', 'total_execution_io_existing', str, 'Total IO used by executions that currently exist.', None)
+        ]
+
+
+    def get_derived_value(self, name, d):
+
+        try:
+            if d[name]:
+                return d[name]
+        except KeyError:
+            pass
+        try:
+            dbid = d['db_id']
+        except KeyError:
+            logger.error("db_id missing from call to get_derived_value. d: {}".format(d))
+            raise errors.ExecutionException('db_id is required.')
+
+
+        return stats_store['total'][name]
+
+

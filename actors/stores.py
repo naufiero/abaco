@@ -55,3 +55,5 @@ except (ValueError, configparser.NoOptionError):
 permissions_store = mongo_config_store(db='2')
 executions_store = mongo_config_store(db='3')
 clients_store = mongo_config_store(db='4')
+stats_store = mongo_config_store(db='5')
+ # this is just list of json ( AKA dictionary )

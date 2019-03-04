@@ -14,7 +14,7 @@ from codes import SUBMITTED, PERMISSION_LEVELS, READ, UPDATE, PERMISSION_LEVELS,
 from config import Config
 from errors import DAOError, ResourceError, PermissionsException, WorkerException
 from models import dict_to_camel, display_time, Actor, Execution, ExecutionsSummary, Nonce, Worker, get_permissions, \
-    set_permission, get_current_utc_time
+    set_permission, get_current_utc_time, CacheExecutionsSummary
 
 from mounts import get_all_mounts
 import codes
@@ -175,7 +175,7 @@ class AdminActorsResource(Resource):
             ch = ActorMsgChannel(actor_id=actor.db_id)
             actor.messages = len(ch._queue._queue)
             ch.close()
-            summary = ExecutionsSummary(db_id=actor.db_id)
+            summary = CacheExecutionsSummary(db_id=actor.db_id)
             actor.executions = summary.total_executions
             actor.runtime = summary.total_runtime
             if case == 'camel':
@@ -183,6 +183,7 @@ class AdminActorsResource(Resource):
             actors.append(actor)
         logger.info("actors retrieved.")
         return ok(result=actors, msg="Actors retrieved successfully.")
+    # actors_store stays the same, executionsummary will change to mine, neecs to pull from a new model
 
 class AdminWorkersResource(Resource):
     def get(self):

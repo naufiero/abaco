@@ -171,6 +171,8 @@ def is_abaco_user(request):
   #  return 'Internal/abaco-user' in roles or 'Internal/abaco-limited' in roles or 'Internal/abaco-admin' in roles
     return True
 
+# define
+
 # VIEWS
 
 def actors(request):
