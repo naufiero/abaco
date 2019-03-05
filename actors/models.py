@@ -1037,10 +1037,9 @@ class CacheActorExecutionsSummary(AbacoDAO):
 
 
 
-class CacheExecutionsSummary(AbacoDao):
+class CacheExecutionsSummary(AbacoDAO):
     """param_name, required/optional/provided/derived, attr_name, type, help, default"""
-    PARAMS =
-        [
+    PARAMS = [
         ('total_actors_all', 'derived', 'total_actors_all', str, 'Total number of actors - all time.', None),
         ('total_executions_all', 'derived', 'total_executions_all', str, 'Total number of executions - all time.', None),
         ('total_execution_runtime_all', 'derived', 'total_execution_runtime_all', str,
