@@ -1045,10 +1045,10 @@ class CacheExecutionsSummary(AbacoDAO):
         ('total_execution_runtime_all', 'derived', 'total_execution_runtime_all', str,
          'Total runtime for executions - all time.', None),
         ('total_execution_cpu_all', 'derived', 'total_execution_cpu_all', str, 'Total CPU used by executions - all time.', None),
-        ('total_execution_io_all', 'derived', 'total_execution_io_all', str, 'Total IO used by executions - all time', None)
+        ('total_execution_io_all', 'derived', 'total_execution_io_all', str, 'Total IO used by executions - all time', None),
         ('total_actors_existing', 'derived', 'total_actors_existing', str, 'Total actors that currently exist.', None),
         ('total_executions_existing', 'derived', 'total_executions_existing', str, 'Total number of executions that currently exist.', None),
-        ('total_execution_runtime_existing', 'derived', 'total_execution_runtime_existing', str, 'Total runtime for executions that currently exist.', None)
+        ('total_execution_runtime_existing', 'derived', 'total_execution_runtime_existing', str, 'Total runtime for executions that currently exist.', None),
         ('total_execution_cpu_existing', 'derived', 'total_execution_cpu_existing', str, 'Total CPU used by executions that currently exist.', None),
         ('total_execution_io_existing', 'derived', 'total_execution_io_existing', str, 'Total IO used by executions that currently exist.', None)
         ]
