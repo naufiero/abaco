@@ -1054,20 +1054,34 @@ class CacheExecutionsSummary(AbacoDAO):
         ]
 
 
-    def get_derived_value(self, name, d):
+    def get_empty_cache(self):
 
-        try:
-            if d[name]:
-                return d[name]
-        except KeyError:
-            pass
-        try:
-            dbid = d['db_id']
-        except KeyError:
-            logger.error("db_id missing from call to get_derived_value. d: {}".format(d))
-            raise errors.ExecutionException('db_id is required.')
+        totalcache = {'summary': {'total_actors_all': 0,
+                                  'total_executions_all': 0,
+                                  'total_execution_runtime_all': 0,
+                                  'total_execution_cpu_all': 0,
+                                  'total_execution_io_all': 0,
+                                  'total_actors_existing': 0,
+                                  'total_executions_existing': 0,
+                                  'total_execution_runtime_existing': 0,
+                                  'total_execution_cpu_existing': 0,
+                                  'total_execution_io_existing': 0,
+                                  },
+                      }
+        return totalcache
 
 
-        return stats_store['total'][name]
+# empty cache method that takes self, retuns the dict with 0's ^ of this params list above
+# returns data structure with the parmas defined with 0's as the values. called before the for loop in update.py
+#
+#then goes into the for loop, calls actor.es, sends it to the update method, updates running total
+# update takes self, cuurent_total, actor_total), returns current + actor; does this by
+# going through each of the params
 
+# total chache = model.getemptycache
+# actora = get all actors_store
+# for dbid in actors, create actorcache=model(dbid)
+# total cache.update(total_cahce)
+# through the for loop, keep updating that parma dic
+# stats_stor[special key for total] = {total_cache, which is a dictionary with the total variable}
 
