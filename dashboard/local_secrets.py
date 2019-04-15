@@ -3,4 +3,4 @@ PW_TSU='testshareuser'
 # password for user without admin role
 PW_TU='testuser'
 
-BASE_URL= 'https://dev.tenants.develop.tacc.cloud'
+BASE_URL= 'https://api.tacc.utexas.edu'

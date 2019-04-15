@@ -690,6 +690,7 @@ class ExecutionsSummary(AbacoDAO):
         ]
 
     def compute_summary_stats(self, dbid):
+
         try:
             actor = actors_store[dbid]
         except KeyError:
@@ -703,6 +704,7 @@ class ExecutionsSummary(AbacoDAO):
                'total_io': 0,
                'total_runtime': 0,
                'executions': []}
+
         try:
             executions = executions_store[dbid]
         except KeyError:
@@ -727,10 +729,12 @@ class ExecutionsSummary(AbacoDAO):
             tot['total_runtime'] += int(val['runtime'])
         return tot
 
+
     def get_derived_value(self, name, d):
         # this is what gets called when you send it the id (second try, comes here to get derived value)
         """Compute a derived value for the attribute `name` from the dictionary d of attributes provided."""
         # first, see if the attribute is already in the object:
+
         try:
             if d[name]:
                 return d[name]
@@ -1037,7 +1041,7 @@ class CacheActorExecutionsSummary(AbacoDAO):
 
 
 
-class CacheExecutionsSummary(AbacoDAO):
+class CacheExecutionsSummary(DbDict):
     """param_name, required/optional/provided/derived, attr_name, type, help, default"""
     PARAMS = [
         ('total_actors_all', 'derived', 'total_actors_all', str, 'Total number of actors - all time.', None),
@@ -1069,6 +1073,7 @@ class CacheExecutionsSummary(AbacoDAO):
                                   },
                       }
         return totalcache
+
 
 
 # empty cache method that takes self, retuns the dict with 0's ^ of this params list above

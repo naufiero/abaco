@@ -5,8 +5,11 @@ import pytest
 import requests
 import time
 
-base_url = os.environ.get('base_url', 'http://172.17.0.1:8000')
+base_url = os.environ.get('base_url', 'https://dev.tenants.aloedev.tacc.cloud')
 case = os.environ.get('case', 'snake')
+
+
+
 
 
 @pytest.fixture(scope='session')
@@ -16,18 +19,18 @@ def headers():
 def priv_headers():
     return get_jwt_headers('/tests/jwt-abaco_privileged')
 
-def get_jwt_headers(file_path='jwt-abaco_admin'):
+def get_jwt_headers(file_path='/tests/jwt-abaco_admin'):
     with open(file_path, 'r') as f:
         jwt_default = f.read()
     jwt = os.environ.get('jwt', jwt_default)
     if jwt:
         jwt_header = os.environ.get('jwt_header', 'X-Jwt-Assertion-DEV-DEVELOP')
-        print(jwt_header)
         headers = {jwt_header: jwt}
     else:
         token = os.environ.get('token', '')
         headers = {'Authorization': 'Bearer {}'.format(token)}
     return headers
+
 
 
 def get_tenant(headers):

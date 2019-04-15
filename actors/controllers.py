@@ -18,7 +18,7 @@ from models import dict_to_camel, display_time, Actor, Execution, ExecutionsSumm
 
 from mounts import get_all_mounts
 import codes
-from stores import actors_store, workers_store, executions_store, logs_store, nonce_store, permissions_store
+from stores import actors_store, workers_store, executions_store, logs_store, nonce_store, permissions_store, stats_store
 from worker import shutdown_workers, shutdown_worker
 
 from prometheus_client import start_http_server, Summary, MetricsHandler, Counter, Gauge, generate_latest
@@ -175,7 +175,7 @@ class AdminActorsResource(Resource):
             ch = ActorMsgChannel(actor_id=actor.db_id)
             actor.messages = len(ch._queue._queue)
             ch.close()
-            summary = CacheExecutionsSummary(db_id=actor.db_id)
+            summary = stats_store['summary']
             actor.executions = summary.total_executions
             actor.runtime = summary.total_runtime
             if case == 'camel':
@@ -544,7 +544,7 @@ class ActorExecutionsResource(Resource):
             raise ResourceError(
                 "No actor found with id: {}.".format(actor_id), 404)
         try:
-            summary = ExecutionsSummary(db_id=dbid)
+            summary = stats_store['summary']
         except DAOError as e:
             logger.debug("did not find executions summary: {}".format(actor_id))
             raise ResourceError("Could not retrieve executions summary for actor: {}. "
