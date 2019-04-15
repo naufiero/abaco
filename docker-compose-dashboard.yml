@@ -39,7 +39,7 @@ django:
 #        "JWT_VALUE": ""
         # for Aloe-Dev Instance
         "AGAVE_CLIENT_KEY": "PrvjJibzGlducHasXUWeTX1wOg8a"
-        "AGAVE_CLIENT_SECRET": "34pvSqDNSTe0eQdhc1VQcaahLDUa"
+        "AGAVE_CLIENT_SECRET": ""
         "AGAVE_BASE_URL": "https://dev.tenants.aloedev.tacc.cloud"
 
 

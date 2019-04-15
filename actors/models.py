@@ -308,7 +308,7 @@ class Actor(AbacoDAO):
     def set_status(cls, actor_id, status, status_message=None):
         """Update the status of an actor"""
         logger.debug("top of set_status for status: {}".format(status))
-        s_store.update(actor_id, 'status', status)
+        actors_store.update(actor_id, 'status', status)
         if status_message:
             actors_store.update(actor_id, 'status_message', status_message)
 
