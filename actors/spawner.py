@@ -112,6 +112,8 @@ class Spawner(object):
                     ch.put('stop-no-delete')
                     logger.info("Sent 'stop-no-delete' message to worker_id: {}".format(worker['id']))
                     ch.close()
+                else:
+                    logger.debug("skipping worker {} as it it not in worker_ids.".format(worker))
         else:
             logger.info("No workers to stop.")
 
@@ -315,14 +317,16 @@ class Spawner(object):
         tenant = cmd['tenant']
         stop_existing = cmd.get('stop_existing', True)
         num_workers = 1
-        logger.info("LOOK HERE command params: actor_id: {} worker_ids: {} image: {} stop_existing: {} num_workers: {}".format(
-            actor_id, worker_id, image, tenant, stop_existing, num_workers))
+        logger.info("LOOK HERE command params: actor_id: {} worker_ids: {} image: {} "
+                    "stop_existing: {} num_workers: {}".format(actor_id, worker_id, image, tenant, stop_existing, num_workers))
+
         logger.info("LOOK HERE - getting worker")
 
         # Status: REQUESTED -> SPAWNER_SETUP
         Worker.update_worker_status(actor_id, worker_id, SPAWNER_SETUP)
         logger.info("LOOK HERE - worker status updated to SPAWNER_SETUP")
         client_id = None
+        client_secret = None
         client_access_token = None
         client_refresh_token = None
         api_server = None
@@ -342,23 +346,30 @@ class Spawner(object):
         ch = SpawnerWorkerChannel(worker_id=worker_id)
 
         logger.info("LOOK HERE - attempting to start worker")
-        worker = self.start_worker(
-            image,
-            tenant,
-            actor_id,
-            worker_id,
-            client_id,
-            client_access_token,
-            client_refresh_token,
-            ch,
-            api_server,
-            client_secret
-        )
-        logger.info('LOOK HERE - made it out of start_worker')
+        try:
+            worker = self.start_worker(
+                image,
+                tenant,
+                actor_id,
+                worker_id,
+                client_id,
+                client_access_token,
+                client_refresh_token,
+                ch,
+                api_server,
+                client_secret
+            )
+        except Exception as e:
+            msg = "Spawner got an exception from call to start_worker. Exception:{}".format(e)
+            logger.error(msg)
+            self.error_out_actor(actor_id, worker_id, msg)
+            if client_id:
+                self.delete_client(tenant, actor_id, worker_id, client_id, secret)
+            return
+
+        logger.debug("Returned from start_worker; Created new worker: {}".format(worker))
         ch.close()
-
-
-        logger.info("Created new worker: {}".format(worker))
+        logger.debug("Client channel closed")
 
         if stop_existing:
             logger.info("Stopping existing workers: {}".format(worker_id))
@@ -391,6 +402,8 @@ class Spawner(object):
 
         if client_msg.get('status') == 'error':
             logger.error("Error generating client: {}".format(client_msg.get('message')))
+            self.error_out_actor(actor_id, worker_id, "Abaco was unable to generate an OAuth client for a new "
+                                                      "worker for this actor. System administrators have been notified.")
             Worker.update_worker_status(actor_id, worker_id, ERROR)
             raise SpawnerException("Error generating client") #TODO - clean up error message
         # else, client was generated successfully:
@@ -403,6 +416,21 @@ class Spawner(object):
                    client_msg['refresh_token'], \
                    client_msg['api_server'], \
                    client_msg['client_secret']
+
+    def delete_client(self, tenant, actor_id, worker_id, client_id, secret):
+        clients_ch = ClientsChannel()
+        msg = clients_ch.request_delete_client(tenant=tenant,
+                                               actor_id=actor_id,
+                                               worker_id=wid,
+                                               client_id=client_key,
+                                               secret=secret)
+        if msg['status'] == 'ok':
+            logger.info("Client delete request completed successfully for "
+                        "worker_id: {}, client_id: {}.".format(wid, client_key))
+        else:
+            logger.error("Error deleting client for "
+                         "worker_id: {}, client_id: {}. Message: {}".format(wid, msg['message'], client_key, msg))
+        client_ch.close()
 
     def start_worker(self,
                      image,
@@ -462,6 +490,7 @@ class Spawner(object):
                     if attempts > 20:
                         msg = "Spawner continued to get DockerError for 20 attempts. Exception: {}".format(e)
                         logger.critical(msg)
+                        # todo - should we be calling kill_worker here? (it is called in the exception block of the else below)
                         raise SpawnerException(msg)
                     continue
                 else:
@@ -488,9 +517,18 @@ class Spawner(object):
 
     def error_out_actor(self, actor_id, worker_id, message):
         """In case of an error, put the actor in error state and kill all workers"""
+        logger.debug("top of error_out_actor for worker: {}_{}".format(actor_id, worker_id))
         Actor.set_status(actor_id, ERROR, status_message=message)
+        # first we try to stop workers using the "graceful" approach -
+        try:
+            self.stop_workers(actor_id, worker_ids=[])
+            logger.info("Spawner just stopped worker {}_{} in error_out_actor".format(actor_id, worker_id))
+            return
+        except Exception as e:
+            logger.error("spawner got exception trying to run stop_workers. Exception: {}".format(e))
         try:
             self.kill_worker(actor_id, worker_id)
+            logger.info("Spawner just killed worker {}_{} in error_out_actor".format(actor_id, worker_id))
         except DockerError as e:
             logger.info("Received DockerError trying to kill worker: {}. Exception: {}".format(worker_id, e))
             logger.info("Spawner will continue on since this is exception processing.")
