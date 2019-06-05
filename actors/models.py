@@ -10,7 +10,7 @@ from hashids import Hashids
 from agaveflask.utils import RequestParser
 
 from channels import CommandChannel
-from codes import REQUESTED, SUBMITTED, EXECUTE, PermissionLevel
+from codes import REQUESTED, READY, ERROR, SUBMITTED, EXECUTE, PermissionLevel, SPAWNER_SETUP, PULLING_IMAGE, CREATING_CONTAINER, UPDATING_STORE, BUSY
 from config import Config
 import errors
 
@@ -1051,10 +1051,22 @@ class Worker(AbacoDAO):
         # UPDATING_STORE -> READY
         # READY -> BUSY -> READY ... etc
 
-
         prev_status = workers_store[actor_id][worker_id]['status']
 
-        
+        if status != ERROR:
+            if prev_status == REQUESTED and status != SPAWNER_SETUP:
+                raise Exception(f"Invalid State Transition f{prev_status} -> f{status}")
+            elif prev_status == SPAWNER_SETUP and status != PULLING_IMAGE:
+                raise Exception(f"Invalid State Transition f{prev_status} -> f{status}")
+            elif prev_status == PULLING_IMAGE and status != CREATING_CONTAINER:
+                raise Exception(f"Invalid State Transition f{prev_status} -> f{status}")
+            elif prev_status == CREATING_CONTAINER and status != UPDATING_STORE:
+                raise Exception(f"Invalid State Transition f{prev_status} -> f{status}")
+            elif prev_status == UPDATING_STORE and status != READY:
+                raise Exception(f"Invalid State Transition f{prev_status} -> f{status}")
+
+        if status == ERROR:
+            status = ERROR + f" PREVIOUS {prev_status}"
 
         worker = workers_store[actor_id][worker_id]
         logger.info(f"LOOK HERE Worker status will be changed from {worker['status']} to {status}")
