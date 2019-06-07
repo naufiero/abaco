@@ -49,12 +49,12 @@ services:
         networks:
             - abaco
 
-    metrics:
-        extends:
-            file: docker-compose-local.yml
-            service: metrics
-        networks:
-            - abaco
+#    metrics:
+#        extends:
+#            file: docker-compose-local.yml
+#            service: metrics
+#        networks:
+#            - abaco
 
     admin:
         extends:

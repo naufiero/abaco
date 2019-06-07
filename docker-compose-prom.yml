@@ -1,4 +1,5 @@
 version: "3.3"
+
 services:
     prometheus:
         # build: ./prometheus
@@ -15,8 +16,6 @@ services:
         #   - '-storage.local.path=/prometheus'
         ports:
             - 9090:9090
-#        networks:
-#            - testing
         deploy:
             placement:
                 constraints:
@@ -27,6 +26,8 @@ services:
                     memory: 500M
                 reservations:
                     memory: 200M
+        networks:
+            - prom
 
     grafana:
         image: grafana/grafana
@@ -41,12 +42,15 @@ services:
         env_file:
             - ./prometheus/grafana/config.monitoring
         networks:
-            - back-tier
-            - front-tier
+#            - back-tier
+#            - front-tier
+            - prom
         restart: always
 
     metrics:
         image: abaco/core$TAG
+        networks:
+            - prom
         volumes:
             - ./local-dev.conf:/etc/service.conf
             - ./abaco.log:/var/log/service.log
@@ -60,12 +64,15 @@ services:
             TAS_ROLE_ACCT:
             TAS_ROLE_PASS:
 
+
 volumes:
     grafana_data: {}
 
 networks:
-    front-tier:
-    back-tier:
+#    front-tier:
+#    back-tier:
+    prom:
+        driver: bridge
 
 #    alertmanager:
 #        image: abaco/alert$TAG
