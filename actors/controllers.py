@@ -56,6 +56,9 @@ except:
 
 class MetricsResource(Resource):
     def get(self):
+        enable_autoscaling = Config.get('workers', 'autoscaling')
+        if enable_autoscaling == 'False':
+            return
         actor_ids = self.get_metrics()
         self.check_metrics(actor_ids)
         # self.add_workers(actor_ids)
@@ -63,6 +66,8 @@ class MetricsResource(Resource):
 
     def get_metrics(self):
         logger.debug("top of get in MetricResource")
+
+
 
         actor_ids = [
             db_id
@@ -92,16 +97,17 @@ class MetricsResource(Resource):
                 logger.info("No current message count for actor {}".format(actor_id))
                 current_message_count = 0
 
-            change_rate = metrics_utils.calc_change_rate(
-                data,
-                last_metric,
-                actor_id
-            )
-            last_metric.update({actor_id: data})
+            # change_rate = metrics_utils.calc_change_rate(
+            #     data,
+            #     last_metric,
+            #     actor_id
+            # )
+            # last_metric.update({actor_id: data})
 
             workers = Worker.get_workers(actor_id)
             actor = actors_store[actor_id]
             logger.debug('METRICS: MAX WORKERS TEST {}'.format(actor))
+            logger.debug(f'METRICS: workers: {Worker.get_workers(actor_id)}')
 
             # If this actor has a custom max_workers, use that. Otherwise use default.
             if actor['max_workers']:
@@ -109,17 +115,6 @@ class MetricsResource(Resource):
             else:
                 max_workers = Config.get('spawner', 'max_workers_per_actor')
 
-
-            # Add a worker if actor has 0 workers & a message in the Q
-            # spawner_worker_ch = SpawnerWorkerChannel(worker_id=worker_id)
-            try:
-                if len(workers) == 0 and current_message_count >= 1:
-                    metrics_utils.scale_up(actor_id)
-                    logger.debug('METICS: ADDING WORKER SINCE THERE WERE NONE')
-                else:
-                    logger.debug('METRICS: worker creation criteria not met')
-            except Exception as e:
-                logger.debug("METRICS - Error scaling up: {} - {} - {}".format(type(e), e, e.args))
 
             # Add a worker if message count reaches a given number
             try:
@@ -131,11 +126,13 @@ class MetricsResource(Resource):
                 # changed - jfs: i think this block needs to run even if allow_autoscaling returns false
                 #           so that scale down can work once message count reaches zero in case where the
                 #           autoscaler previously scaled the worker pool to max_workers:
+                else:
+                    logger.warning('METRICS - COMMAND QUEUE is getting full. Skipping autoscale.')
+
                 if current_message_count == 0:
                     metrics_utils.scale_down(actor_id)
                     logger.debug("METRICS made it to scale down block")
-                else:
-                    logger.warning('METRICS - COMMAND QUEUE is getting full. Skipping autoscale.')
+
             except Exception as e:
                 logger.debug("METRICS - ANOTHER ERROR: {} - {} - {}".format(type(e), e, e.args))
 

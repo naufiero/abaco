@@ -122,13 +122,13 @@ def calc_change_rate(data, last_metric, actor_id):
     return change_rate
 
 
-def allow_autoscaling(cmd_q_len, max_workers, num_workers):
+def allow_autoscaling(max_workers, num_workers):
 
     if int(num_workers) >= int(max_workers):
-        logger.debug('METRICS NO AUTOSCALE - criteria not met. {} {} '.format(cmd_q_len, num_workers))
+        logger.debug('METRICS NO AUTOSCALE - criteria not met. {} '.format(num_workers))
         return False
 
-    logger.debug('METRICS AUTOSCALE - criteria met. {} {} '.format(cmd_q_len, num_workers))
+    logger.debug('METRICS AUTOSCALE - criteria met. {} '.format(num_workers))
     return True
 
 

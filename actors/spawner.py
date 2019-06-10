@@ -131,7 +131,7 @@ class Spawner(object):
                     "stop_existing: {} num_workers: {}".format(actor_id, worker_id, image, tenant, stop_existing, num_workers))
 
         logger.info("LOOK HERE - getting worker")
-
+        logger.info
         # Status: REQUESTED -> SPAWNER_SETUP
         Worker.update_worker_status(actor_id, worker_id, SPAWNER_SETUP)
         logger.info("LOOK HERE - worker status updated to SPAWNER_SETUP")

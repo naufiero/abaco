@@ -28,20 +28,20 @@ scrape_configs:
     static_configs:
       - targets: ['prometheus:9090']
 
-  - job_name: "abaco"
+  - job_name: 'abaco'
     scrape_interval: 5s
     static_configs:
-      - targets: ['metrics:5004']
+      - targets: ['metrics:5000']
         labels:
-          group: 'abaco-test'
+          group: 'abaco'
 #    dns_sd_configs:
 #      - names: ['localhost']
 #        port: 8000
 #        type: SRV
 #        refresh_interval: 5s
-
-alerting:
-  alertmanagers:
-  - static_configs:
-    - targets:
-      - alertmanager:9093
+#
+#alerting:
+#  alertmanagers:
+#  - static_configs:
+#    - targets:
+#      - alertmanager:9093
