@@ -138,7 +138,7 @@ def scale_up(actor_id):
     try:
         # create a worker & add to this actor
         actor = Actor.from_db(actors_store[actor_id])
-        worker_id = Worker.request_worker(tenant=tenant, actor_id=aid)
+        worker_id = Worker.request_worker(tenant=tenant, actor_id=actor_id)
         logger.info("New worker id: {}".format(worker_id))
         if actor.queue:
             channel_name = actor.queue
