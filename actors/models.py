@@ -10,17 +10,42 @@ from hashids import Hashids
 from agaveflask.utils import RequestParser
 
 from channels import CommandChannel
-from codes import REQUESTED, SUBMITTED, EXECUTE, PermissionLevel
+from codes import REQUESTED, READY, ERROR, SUBMITTED, EXECUTE, PermissionLevel, SPAWNER_SETUP, PULLING_IMAGE, CREATING_CONTAINER, UPDATING_STORE, BUSY
 from config import Config
 import errors
 
+<<<<<<< HEAD
 from stores import actors_store, clients_store, executions_store, logs_store, nonce_store, permissions_store, workers_store, stats_store
+=======
+from stores import actors_store, alias_store, clients_store, executions_store, logs_store, nonce_store, permissions_store, workers_store
+>>>>>>> fec6a4bc688ea0ede35c7390799669cc8fde2f73
 
 from agaveflask.logs import get_logger
 logger = get_logger(__name__)
 
 
 HASH_SALT = 'eJa5wZlEX4eWU'
+
+# default max length for an actor execution log - 1MB
+DEFAULT_MAX_LOG_LENGTH = 1000000
+
+def is_hashid(identifier):
+    """ 
+    Determine if `identifier` is an Abaco Hashid (e.g., actor id, worker id, nonce id, etc.
+    
+    :param identifier (str) - The identifier to check 
+    :return: (bool) - True if the identifier is an Abaco Hashid.
+    """
+    hashids = Hashids(salt=HASH_SALT)
+    dec = hashids.decode(identifier)
+    # the decode() method returns a non-empty tuple (containing the original uuid seed)
+    # iff the identifier was produced from an encode() with the HASH_SALT; otherwise, it returns an
+    # empty tuple. Therefore, the length of the produced tuple can be used to check whether the
+    # identify was created with the Abaco HASH_SALT.
+    if len(dec) > 0:
+        return True
+    else:
+        return False
 
 def under_to_camel(value):
     def camel_case():
@@ -134,7 +159,10 @@ class AbacoDAO(DbDict):
                     logger.debug("required missing field: {}. ".format(pname))
                     raise errors.DAOError("Required field {} missing.".format(pname))
             elif source == 'optional':
-                value = kwargs.get(pname, default)
+                try:
+                    value = kwargs[pname]
+                except KeyError:
+                    value = kwargs.get(pname, default)
             elif source == 'provided':
                 try:
                     value = kwargs[pname]
@@ -183,10 +211,13 @@ class Actor(AbacoDAO):
         ('name', 'optional', 'name', str, 'User defined name for this actor.', None),
         ('image', 'required', 'image', str, 'Reference to image on docker hub for this actor.', None),
 
-        ('stateless', 'optional', 'stateless', inputs.boolean, 'Whether the actor stores private state.', False),
+        ('stateless', 'optional', 'stateless', inputs.boolean, 'Whether the actor stores private state.', True),
         ('type', 'optional', 'type', str, 'Return type (none, bin, json) for this actor. Default is none.', 'none'),
         ('description', 'optional', 'description', str,  'Description of this actor', ''),
         ('privileged', 'optional', 'privileged', inputs.boolean, 'Whether this actor runs in privileged mode.', False),
+        ('max_workers', 'optional', 'max_workers', int, 'How many workers this actor is allowed at the same time.', None),
+        ('mem_limit', 'optional', 'mem_limit', str, 'maximum amount of memory this actor can use.', None),
+        ('max_cpus', 'optional', 'max_cpus', int, 'Maximum number of CPUs (nanoCPUs) this actor will have available to it.', None),
         ('use_container_uid', 'optional', 'use_container_uid', inputs.boolean, 'Whether this actor runs as the UID set in the container image.', False),
         ('default_environment', 'optional', 'default_environment', dict, 'A dictionary of default environmental variables and values.', {}),
         ('status', 'optional', 'status', str, 'Current status of the actor.', SUBMITTED),
@@ -204,6 +235,7 @@ class Actor(AbacoDAO):
         ('uid', 'optional', 'uid', str, 'The uid to run the container as. Only used if user_container_uid is false.', None),
         ('gid', 'optional', 'gid', str, 'The gid to run the container as. Only used if user_container_uid is false.', None),
 
+        ('queue', 'optional', 'queue', str, 'The command channel that this actor uses.', 'default'),
         ('db_id', 'derived', 'db_id', str, 'Primary key in the database for this actor.', None),
         ('id', 'derived', 'id', str, 'Human readable id for this actor.', None),
         ]
@@ -238,6 +270,39 @@ class Actor(AbacoDAO):
             return time_str
         else:
             return db_id
+
+    @classmethod
+    def get_actor_id(cls, tenant, identifier):
+        """
+        Return the db_id associated with the identifier 
+        :param identifier (str): either an actor_id or an alias. 
+        :return: The actor_id; rasies a KeyError if no actor suc exists. 
+        """
+        if is_hashid(identifier):
+            return identifier
+        # look for an alias with the identifier:
+        alias_id = Alias.generate_alias_id(tenant, identifier)
+        alias = Alias.retrieve_by_alias_id(alias_id)
+        return alias.actor_id
+
+    @classmethod
+    def get_actor(cls, identifier, is_alias=False):
+        """
+        Return the actor object based on `identifier` which could be either a dbid or an alias.
+        :param identifier (str): Unique identifier for an actor; either a dbid or an alias dbid.
+        :param is_alias (bool): Caller can pass a hint, "is_alias=True", to avoid extra code checks. 
+        
+        :return: Actor dictionary; caller should instantiate an Actor object from it.  
+        """
+        if not is_alias:
+            # check whether the identifier is an actor_id:
+            if is_hashid(identifier):
+                return actors_store[identifier]
+        # if we're here, either the caller set the is_alias=True hint or the is_hashid() returned False.
+        # either way, we need to check the alias store
+        alias = alias_store[identifier]
+        db_id = alias['db_id']
+        return actors_store[db_id]
 
     def get_uuid_code(self):
         """ Return the Agave code for this object.
@@ -275,18 +340,16 @@ class Actor(AbacoDAO):
         worker_id = Worker.ensure_one_worker(self.db_id, self.tenant)
         logger.debug("Worker.ensure_one_worker returned worker_id: {}".format(worker_id))
         if worker_id:
-            worker_ids = [worker_id]
-            logger.info("Actor.ensure_one_worker() putting message on command channel for worker_id: {}".format(
-                worker_id))
-            ch = CommandChannel()
+            logger.info("Actor.ensure_one_worker() putting message on command "
+                        "channel for worker_id: {}".format(worker_id))
+            ch = CommandChannel(name=self.queue)
             ch.put_cmd(actor_id=self.db_id,
-                       worker_ids=worker_ids,
+                       worker_id=worker_id,
                        image=self.image,
                        tenant=self.tenant,
-                       num=1,
                        stop_existing=False)
             ch.close()
-            return worker_ids
+            return worker_id
         else:
             logger.debug("Actor.ensure_one_worker() returning None.")
             return None
@@ -313,6 +376,88 @@ class Actor(AbacoDAO):
             actors_store.update(actor_id, 'status_message', status_message)
 
 
+class Alias(AbacoDAO):
+    """Data access object for working with Actor aliases."""
+
+    PARAMS = [
+        # param_name, required/optional/provided/derived, attr_name, type, help, default
+        ('tenant', 'provided', 'tenant', str, 'The tenant that this alias belongs to.', None),
+        ('alias_id', 'provided', 'alias_id', str, 'Primary key for alias for the actor and primary key to this store; must be globally unique.', None),
+        ('alias', 'required', 'alias', str, 'Actual alias for the actor; must be unique within a tenant.', None),
+        ('actor_id', 'required', 'actor_id', str, 'The human readable id for the actor associated with this alias.',
+         None),
+        ('db_id', 'provided', 'db_id', str, 'Primary key in the database for the actor associated with this alias.', None),
+        ('owner', 'provided', 'owner', str, 'The user who created this alias.', None),
+        ('api_server', 'provided', 'api_server', str, 'The base URL for the tenant that this alias belongs to.', None),
+    ]
+
+    # the following nouns cannot be used for an alias as they
+    RESERVED_WORDS = ['executions', 'nonces', 'logs', 'messages', 'adapters', 'admin']
+    FORBIDDEN_CHAR = [':', '/', '?', '#', '[', ']', '@', '!', '$', '&', "'", '(', ')', '*', '+', ',', ';', '=']
+
+
+    @classmethod
+    def generate_alias_id(cls, tenant, alias):
+        """Generate the alias id from the alias name and tenant."""
+        return '{}_{}'.format(tenant, alias)
+
+    @classmethod
+    def generate_alias_from_id(cls, alias_id):
+        """Generate the alias id from the alias name and tenant."""
+        # assumes the format of the alias_id is {tenant}_{alias} where {tenant} does NOT have an underscore (_) char
+        # in it -
+        return alias_id[alias_id.find('_')+1:]
+
+    def check_reserved_words(self):
+        if self.alias in Alias.RESERVED_WORDS:
+            raise errors.DAOError("{} is a reserved word. "
+                                  "The following reserved words cannot be used "
+                                  "for an alias: {}.".format(self.alias, Alias.RESERVED_WORDS))
+
+    def check_forbidden_char(self):
+        for char in Alias.FORBIDDEN_CHAR:
+            if char in self.alias:
+                raise errors.DAOError("'{}' is a forbidden character. "
+                                      "The following characters cannot be used "
+                                      "for an alias: ['{}'].".format(char, "', '".join(Alias.FORBIDDEN_CHAR)))
+
+    def check_and_create_alias(self):
+        """Check to see if an alias is unique and create it if so. If not, raises a DAOError."""
+
+        # first, make sure alias is not a reserved word:
+        self.check_reserved_words()
+        # second, make sure alias is not using a forbidden char:
+        self.check_forbidden_char()
+        # attempt to create the alias within a transaction
+        obj = alias_store.add_key_val_if_empty(self.alias_id, self)
+        if not obj:
+            raise errors.DAOError("Alias {} already exists.".format(self.alias))
+        return obj
+
+    @classmethod
+    def retrieve_by_alias_id(cls, alias_id):
+        """ Returns the Alias object associate with the alias_id or raises a KeyError."""
+        logger.debug("top of retrieve_by_alias_id; alias_id: {}".format(alias_id))
+        obj = alias_store[alias_id]
+        logger.debug("got alias obj: {}".format(obj))
+        return Alias(**obj)
+
+    def get_hypermedia(self):
+        return {'_links': { 'self': '{}/actors/v2/aliases/{}'.format(self.api_server, self.alias),
+                            'owner': '{}/profiles/v2/{}'.format(self.api_server, self.owner),
+                            'actor': '{}/actors/v2/{}'.format(self.api_server, self.actor_id)
+        }}
+
+    def display(self):
+        """Return a representation fit for display."""
+        self.update(self.get_hypermedia())
+        self.pop('db_id')
+        self.pop('tenant')
+        self.pop('alias_id')
+        self.pop('api_server')
+        return self.case()
+
+
 class Nonce(AbacoDAO):
     """Basic data access object for working with actor nonces."""
 
@@ -328,10 +473,12 @@ class Nonce(AbacoDAO):
          'Permission level associated with this nonce. Default is {}.'.format(EXECUTE), EXECUTE.name),
         ('max_uses', 'optional', 'max_uses', int,
          'Maximum number of times this nonce can be redeemed. Default is unlimited.', -1),
-
+        ('description', 'optional', 'description', str, 'Description of this nonce', ''),
+      
         ('id', 'derived', 'id', str, 'Unique id for this nonce.', None),
         ('actor_id', 'derived', 'actor_id', str, 'The human readable id for the actor associated with this nonce.',
          None),
+        ('alias', 'derived', 'alias', str, 'The alias id associated with this nonce.', None),
         ('create_time', 'derived', 'create_time', str, 'Time stamp (UTC) when this nonce was created.', None),
         ('last_use_time', 'derived', 'last_use_time', str, 'Time stamp (UTC) when thic nonce was last redeemed.', None),
         ('current_uses', 'derived', 'current_uses', int, 'Number of times this nonce has been redeemed.', 0),
@@ -360,11 +507,27 @@ class Nonce(AbacoDAO):
         except KeyError:
             logger.error("The nonce controller did not pass api_server to the Nonce model.")
             raise errors.DAOError("Could not instantiate nonce: api_server parameter missing.")
+        # either an alias or a db_id must be passed, but not both -
         try:
             self.db_id = d['db_id']
+            self.alias = None
         except KeyError:
-            logger.error("The nonce controller did not pass db_id to the Nonce model.")
-            raise errors.DAOError("Could not instantiate nonce: db_id parameter missing.")
+            try:
+                self.alias = d['alias']
+                self.db_id = None
+                self.actor_id = None
+            except KeyError:
+                logger.error("The nonce controller did not pass db_id or alias to the Nonce model.")
+                raise errors.DAOError("Could not instantiate nonce: both db_id and alias parameters missing.")
+        if not self.db_id:
+            try:
+                self.alias = d['alias']
+                self.actor_id = None
+            except KeyError:
+                logger.error("The nonce controller did not pass db_id or alias to the Nonce model.")
+                raise errors.DAOError("Could not instantiate nonce: both db_id and alias parameters missing.")
+        if self.alias and self.db_id:
+            raise errors.DAOError("Could not instantiate nonce: both db_id and alias parameters present.")
         try:
             self.owner = d['owner']
         except KeyError:
@@ -379,8 +542,10 @@ class Nonce(AbacoDAO):
         # generate a nonce id:
         self.id = self.get_nonce_id(self.tenant, self.get_uuid())
 
-        # derive the actor_id from the db_id
-        self.actor_id = Actor.get_display_id(self.tenant, self.db_id)
+        # derive the actor_id from the db_id if this is an actor nonce:
+        logger.debug("inside get_derived_value for nonce; name={}; d={}; self={}".format(name, d, self))
+        if self.db_id:
+            self.actor_id = Actor.get_display_id(self.tenant, self.db_id)
 
         # time fields
         time_str = get_current_utc_time()
@@ -410,11 +575,25 @@ class Nonce(AbacoDAO):
         self.update(self.get_hypermedia())
         self.pop('db_id')
         self.pop('tenant')
+        alias_id = self.pop('alias')
+        if alias_id:
+            alias_st = Alias.generate_alias_from_id(alias_id=alias_id)
+            self['alias'] = alias_st
         time_str = self.pop('create_time')
         self['create_time'] = display_time(time_str)
         time_str = self.pop('last_use_time')
         self['last_use_time'] = display_time(time_str)
         return self.case()
+
+    @classmethod
+    def get_validate_nonce_key(cls, actor_id, alias):
+        if not actor_id and not alias:
+            raise errors.DAOError('add_nonce did not receive an alias or an actor_id')
+        if actor_id and alias:
+            raise errors.DAOError('add_nonce received both an alias and an actor_id')
+        if actor_id:
+            return actor_id
+        return alias
 
     @classmethod
     def get_tenant_from_nonce_id(cls, nonce_id):
@@ -424,45 +603,49 @@ class Nonce(AbacoDAO):
         return nonce_id.rsplit('_', 1)[0]
 
     @classmethod
-    def get_nonces(cls, actor_id):
+    def get_nonces(cls, actor_id, alias):
         """Retrieve all nonces for an actor. Pass db_id as `actor_id` parameter."""
+        nonce_key = Nonce.get_validate_nonce_key(actor_id, alias)
         try:
-            nonces = nonce_store[actor_id]
+            nonces = nonce_store[nonce_key]
         except KeyError:
             # return an empty Abaco dict if not found
             return AbacoDAO()
         return [Nonce(**nonce) for _, nonce in nonces.items()]
 
     @classmethod
-    def get_nonce(cls, actor_id, nonce_id):
+    def get_nonce(cls, actor_id, alias, nonce_id):
         """Retrieve a nonce for an actor. Pass db_id as `actor_id` parameter."""
+        nonce_key = Nonce.get_validate_nonce_key(actor_id, alias)
         try:
-            nonce = nonce_store[actor_id][nonce_id]
+            nonce = nonce_store[nonce_key][nonce_id]
             return Nonce(**nonce)
         except KeyError:
             raise errors.DAOError("Nonce not found.")
 
     @classmethod
-    def add_nonce(cls, actor_id, nonce):
+    def add_nonce(cls, actor_id, alias, nonce):
         """
         Atomically append a new nonce to the nonce_store for an actor. 
         The actor_id parameter should be the db_id and the nonce parameter should be a nonce object
         created from the contructor.
         """
+        nonce_key = Nonce.get_validate_nonce_key(actor_id, alias)
         try:
-            nonce_store.update(actor_id, nonce.id, nonce)
-            logger.debug("nonce {} appended to nonces for actor {}".format(nonce.id, actor_id))
+            nonce_store.update(nonce_key, nonce.id, nonce)
+            logger.debug("nonce {} appended to nonces for actor/alias {}".format(nonce.id, nonce_key))
         except KeyError:
-            nonce_store[actor_id] = {nonce.id: nonce}
-            logger.debug("nonce {} added for actor {}".format(nonce.id, actor_id))
+            nonce_store[nonce_key] = {nonce.id: nonce}
+            logger.debug("nonce {} added for actor/alias {}".format(nonce.id, nonce_key))
 
     @classmethod
-    def delete_nonce(cls, actor_id, nonce_id):
+    def delete_nonce(cls, actor_id, alias, nonce_id):
         """Delete a nonce from the nonce_store."""
-        nonce_store.pop_field(actor_id, nonce_id)
+        nonce_key = Nonce.get_validate_nonce_key(actor_id, alias)
+        nonce_store.pop_field(nonce_key, nonce_id)
 
     @classmethod
-    def check_and_redeem_nonce(cls, actor_id, nonce_id, level):
+    def check_and_redeem_nonce(cls, actor_id, alias, nonce_id, level):
         """
         Atomically, check for the existence of a nonce for a given actor_id and redeem it if it
         has not expired. Otherwise, raises PermissionsError. 
@@ -471,7 +654,7 @@ class Nonce(AbacoDAO):
             """
             This function can be passed to nonce_store.within_transaction() to atomically check 
             whether a nonce is expired and, if not, redeem a use. The parameter, nonces, should
-            be the value under the key `actor_id` associated with the nonce.
+            be the value under the key `nonce_key` associated with the nonce.
             """
             # first pull the nonce from the nonces parameter
             try:
@@ -491,12 +674,12 @@ class Nonce(AbacoDAO):
                     logger.debug("nonce has infinite uses. updating nonce.")
                     nonce['current_uses'] += 1
                     nonce['last_use_time'] = get_current_utc_time()
-                    nonce_store.update(actor_id, nonce_id, nonce)
+                    nonce_store.update(nonce_key, nonce_id, nonce)
                 elif nonce['remaining_uses'] > 0:
                     logger.debug("nonce still has uses remaining. updating nonce.")
                     nonce['current_uses'] += 1
                     nonce['remaining_uses'] -= 1
-                    nonce_store.update(actor_id, nonce_id, nonce)
+                    nonce_store.update(nonce_key, nonce_id, nonce)
                 else:
                     logger.debug("nonce did not have at least 1 use remaining.")
                     raise errors.PermissionsException("No remaining uses left for this nonce.")
@@ -504,13 +687,14 @@ class Nonce(AbacoDAO):
                 logger.debug("nonce did not have a remaining_uses attribute.")
                 raise errors.PermissionsException("No remaining uses left for this nonce.")
 
-        # first, make sure the nonce exists for the actor id:
+        # first, make sure the nonce exists for the nonce_key:
+        nonce_key = Nonce.get_validate_nonce_key(actor_id, alias)
         try:
-            nonce_store[actor_id][nonce_id]
+            nonce_store[nonce_key][nonce_id]
         except KeyError:
             raise errors.PermissionsException("Nonce does not exist.")
         # atomically, check if the nonce is still valid and add a use if so:
-        nonce_store.within_transaction(_transaction, actor_id)
+        nonce_store.within_transaction(_transaction, nonce_key)
 
 
 class Execution(AbacoDAO):
@@ -642,6 +826,13 @@ class Execution(AbacoDAO):
             log_ex = int(log_ex)
         except ValueError:
             log_ex = -1
+        try:
+            max_log_length = int(Config.get('web', 'max_log_length'))
+        except:
+            max_log_length = DEFAULT_MAX_LOG_LENGTH
+        if len(logs) > DEFAULT_MAX_LOG_LENGTH:
+            logger.info("truncating log for execution: {}".format(exc_id))
+            logs = logs[:max_log_length]
         if log_ex > 0:
             logger.info("Storing log with expiry. exc_id: {}".format(exc_id))
             logs_store.set_with_expiry(exc_id, logs)
@@ -795,6 +986,11 @@ class Worker(AbacoDAO):
         # first, see if the attribute is already in the object:
         if hasattr(self, name):
             return
+        # next, see if it was passed:
+        try:
+            return d[name]
+        except KeyError:
+            pass
         # time fields
         if name == 'create_time':
             time_str = get_current_utc_time()
@@ -830,7 +1026,7 @@ class Worker(AbacoDAO):
         clients could be attempting to delete workers at the same time. Pass db_id as `actor_id`
         parameter.
         """
-        logger.debug("top of delete_worker().")
+        logger.debug("top of delete_worker(). actor_id: {}; worker_id: {}".format(actor_id, worker_id))
         try:
             wk = workers_store.pop_field(actor_id, worker_id)
             logger.info("worker deleted. actor: {}. worker: {}.".format(actor_id, worker_id))
@@ -870,7 +1066,7 @@ class Worker(AbacoDAO):
         try:
             # we know this worker_id is new since we just generated it, so we don't need to use the update
             # method.
-            workers_store[actor_id][worker_id] = worker
+            workers_store.update(actor_id, worker_id, worker)
             logger.info("added additional worker with id: {} to workers_store.".format(worker_id))
         except KeyError:
             workers_store[actor_id] = {worker_id: worker}
@@ -912,12 +1108,43 @@ class Worker(AbacoDAO):
     @classmethod
     def update_worker_status(cls, actor_id, worker_id, status):
         """Pass db_id as `actor_id` parameter."""
-        logger.debug("top of update_worker_status().")
+        logger.debug("LOOK HERE top of update_worker_status().")
+        # The valid state transitions are as follows - set correct ERROR:
+        # REQUESTED -> SPAWNER_SETUP
+        # SPAWNER_SETUP -> PULLING_IMAGE
+        # PULLING_IMAGE -> CREATING_CONTAINER
+        # CREATING_CONTAINER -> UPDATING_STORE
+        # UPDATING_STORE -> READY
+        # READY -> BUSY -> READY ... etc
+
+        prev_status = workers_store[actor_id][worker_id]['status']
+
+        # workers can always transition to an ERROR status from any status and from an ERROR status to
+        # any status.
+        if status != ERROR and ERROR not in prev_status:
+            if prev_status == REQUESTED and status != SPAWNER_SETUP:
+                raise Exception(f"Invalid State Transition f{prev_status} -> f{status}")
+            elif prev_status == SPAWNER_SETUP and status != PULLING_IMAGE:
+                raise Exception(f"Invalid State Transition f{prev_status} -> f{status}")
+            elif prev_status == PULLING_IMAGE and status != CREATING_CONTAINER:
+                raise Exception(f"Invalid State Transition f{prev_status} -> f{status}")
+            elif prev_status == CREATING_CONTAINER and status != UPDATING_STORE:
+                raise Exception(f"Invalid State Transition f{prev_status} -> f{status}")
+            elif prev_status == UPDATING_STORE and status != READY:
+                raise Exception(f"Invalid State Transition f{prev_status} -> f{status}")
+
+        if status == ERROR:
+            status = ERROR + f" PREVIOUS {prev_status}"
+
+        logger.info(f"worker status will be changed from {prev_status} to {status}")
+
+        # get worker's current status and then do V this separately
+        # this is not threadsafe
         try:
             workers_store.update_subfield(actor_id, worker_id, 'status', status)
         except Exception as e:
             logger.error("Got exception trying to update worker {} subfield status to {}; "
-                         "e: {}; type(e)".format(worker_id, status, e, type(e)))
+                         "e: {}; type(e): {}".format(worker_id, status, e, type(e)))
         logger.info("worker status updated to: {}. worker_id: {}".format(status, worker_id))
 
     def get_uuid_code(self):
@@ -935,6 +1162,15 @@ class Worker(AbacoDAO):
         self['last_health_check_time'] = display_time(last_health_check_time_str)
         self['create_time'] = display_time(create_time_str)
         return self.case()
+
+class PregenClient(AbacoDAO):
+    """
+    Data access object for pregenerated OAuth clients for worker. Use of these clients requires an initial
+    load script to populate the pregen_clients store with clients available for use.
+
+    Each client object
+    """
+    pass
 
 class Client(AbacoDAO):
     """
@@ -998,6 +1234,7 @@ def set_permission(user, actor_id, level):
         # if actor has no permissions, a KeyError will be thrown
         permissions_store[actor_id] = {user: level.name}
     logger.info("Permission set for actor: {}; user: {} at level: {}".format(actor_id, user, level))
+<<<<<<< HEAD
 
 
 # What i've added is below
@@ -1082,3 +1319,5 @@ class CacheExecutionsSummary(DbDict):
         """
         # todo - add each individual item to the summary
 
+=======
+>>>>>>> fec6a4bc688ea0ede35c7390799669cc8fde2f73

@@ -16,6 +16,7 @@ from codes import ERROR, READY, BUSY, COMPLETE
 from config import Config
 from docker_utils import DockerError, DockerStartContainerError, DockerStopContainerError, execute_actor, pull_image
 from errors import WorkerException
+import globals
 from models import Actor, Execution, Worker
 from stores import actors_store, workers_store
 
@@ -25,6 +26,9 @@ logger = get_logger(__name__)
 # keep_running will be updated by the thread listening on the worker channel when a graceful shutdown is
 # required.
 keep_running = True
+
+# maximum number of consecutive errors a worker can encounter before giving up and moving itself into an ERROR state.
+MAX_WORKER_CONSECUTIVE_ERRORS = 5
 
 def shutdown_worker(worker_id, delete_actor_ch=True):
     """Gracefully shutdown a single worker."""
@@ -78,9 +82,15 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
                 # NOT doing this for now -- deleting entire anon channel instead (see above)
                 # clean up the event queue on this anonymous channel. this should be fixed in channelpy.
                 # ch._queue._event_queue
+        elif msg == 'force_quit':
+            logger.info("Worker with worker_id: {} (actor_id: {}) received a force_quit message, "
+                        "forcing the execution to halt...".format(worker_id, actor_id))
+            globals.force_quit = True
+
         elif msg == 'stop' or msg == 'stop-no-delete':
             logger.info("Worker with worker_id: {} (actor_id: {}) received stop message, "
                         "stopping worker...".format(worker_id, actor_id))
+            globals.keep_running = False
 
             # when an actor's image is updated, old workers are deleted while new workers are
             # created. Deleting the actor msg channel in this case leads to race conditions
@@ -117,7 +127,6 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
                 logger.info("Got WorkerException from delete_worker(). "
                             "worker_id: {}"
                             "Exception: {}".format(worker_id, e))
-            keep_running = False
             # delete associated channels:
             if delete_actor_ch:
                 actor_ch.delete()
@@ -126,10 +135,11 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
             logger.info("Worker with worker_id: {} is now exiting.".format(worker_id))
             _thread.interrupt_main()
             logger.info("main thread interrupted.")
-            os._exit()
+            os._exit(0)
 
 def subscribe(tenant,
               actor_id,
+              image,
               worker_id,
               api_server,
               client_id,
@@ -144,14 +154,31 @@ def subscribe(tenant,
     """
     logger.debug("Top of subscribe().")
     actor_ch = ActorMsgChannel(actor_id)
+    logger.info(f"LOOK HERE - made it to subscribe - actor ID: {actor_id}")
     try:
         leave_containers = Config.get('workers', 'leave_containers')
     except configparser.NoOptionError:
-        logger.info("No leave_containers value confiured.")
+        logger.info("No leave_containers value configured.")
         leave_containers = False
     if hasattr(leave_containers, 'lower'):
         leave_containers = leave_containers.lower() == "true"
     logger.info("leave_containers: {}".format(leave_containers))
+
+    try:
+        mem_limit = Config.get('workers', 'mem_limit')
+    except configparser.NoOptionError:
+        logger.info("No mem_limit value configured.")
+        mem_limit = "-1"
+    mem_limit = str(mem_limit)
+
+    try:
+        max_cpus = Config.get('workers', 'max_cpus')
+    except configparser.NoOptionError:
+        logger.info("No max_cpus value configured.")
+        max_cpus = "-1"
+
+    logger.info("max_cpus: {}".format(max_cpus))
+
     ag = None
     if api_server and client_id and client_secret and access_token and refresh_token:
         logger.info("Creating agave client.")
@@ -168,25 +195,31 @@ def subscribe(tenant,
     t = threading.Thread(target=process_worker_ch, args=(tenant, worker_ch, actor_id, worker_id, actor_ch, ag))
     t.start()
     logger.info("Worker subscribing to actor channel.")
-
+    logger.info("LOOK HERE - starting subscribe process")
     # keep track of whether we need to update the worker's status back to READY; otherwise, we
     # will hit redis with an UPDATE every time the subscription loop times out (i.e., every 2s)
     update_worker_status = True
 
-    # shared global tracking whether this worker should keep running; shared between this thread and
-    # the "worker channel processing" thread.
-    global keep_running
+    # global tracks whether this worker should keep running.
+    globals.keep_running = True
+
+    # consecutive_errors tracks the number of consecutive times a worker has gotten an error trying to process a
+    # message. Even though the message will be requeued, we do not want the worker to continue processing
+    # indefinitely when a compute node is unhealthy.
+    consecutive_errors = 0
 
     # main subscription loop -- processing messages from actor's mailbox
-    while keep_running:
+    while globals.keep_running:
+        logger.debug("top of keep_running")
         if update_worker_status:
             Worker.update_worker_status(actor_id, worker_id, READY)
+            logger.debug("updated worker status to READY in SUBSCRIBE")
             update_worker_status = False
         try:
             msg, msg_obj = actor_ch.get_one()
         except channelpy.ChannelClosedException:
             logger.info("Channel closed, worker exiting...")
-            keep_running = False
+            globals.keep_running = False
             sys.exit()
         logger.info("worker {} processing new msg.".format(worker_id))
 
@@ -225,7 +258,7 @@ def subscribe(tenant,
             socket_host_path_dir = Config.get('workers', 'socket_host_path_dir')
         except (configparser.NoSectionError, configparser.NoOptionError) as e:
             logger.error("No socket_host_path configured. Cannot manage results data. Nacking message")
-            Actor.set_status(actor_id, ERROR, msg="Abaco instance not configured for results data.")
+            Actor.set_status(actor_id, ERROR, status_message="Abaco instance not configured for results data.")
             msg_obj.nack(requeue=True)
             raise e
         socket_host_path = '{}.sock'.format(os.path.join(socket_host_path_dir, worker_id, execution_id))
@@ -242,7 +275,7 @@ def subscribe(tenant,
                 fifo_host_path_dir = Config.get('workers', 'fifo_host_path_dir')
             except (configparser.NoSectionError, configparser.NoOptionError) as e:
                 logger.error("No fifo_host_path configured. Cannot manage binary data.")
-                Actor.set_status(actor_id, ERROR, msg="Abaco instance not configured for binary data. Nacking message.")
+                Actor.set_status(actor_id, ERROR, status_message="Abaco instance not configured for binary data. Nacking message.")
                 msg_obj.nack(requeue=True)
                 raise e
             fifo_host_path = os.path.join(fifo_host_path_dir, worker_id, execution_id)
@@ -274,6 +307,12 @@ def subscribe(tenant,
             privileged = True
         logger.debug("privileged: {}".format(privileged))
 
+        # overlay resource limits if set on actor:
+        if actor.mem_limit:
+            mem_limit = actor.mem_limit
+        if actor.max_cpus:
+            max_cpus = actor.max_cpus
+
         # retrieve the default environment registered with the actor.
         environment = actor['default_environment']
         logger.debug("Actor default environment: {}".format(environment))
@@ -287,7 +326,10 @@ def subscribe(tenant,
         environment['_abaco_access_token'] = ''
         environment['_abaco_actor_dbid'] = actor_id
         environment['_abaco_actor_id'] = actor.id
+        environment['_abaco_worker_id'] = worker_id
+        environment['_abaco_container_repo'] = actor.image
         environment['_abaco_actor_state'] = actor.state
+        environment['_abaco_actor_name'] = actor.name or 'None'
         logger.debug("Overlayed environment: {}".format(environment))
 
         # if we have an agave client, get a fresh set of tokens:
@@ -306,6 +348,7 @@ def subscribe(tenant,
         else:
             logger.info("Agave client `ag` is None -- not passing access token.")
         logger.info("Passing update environment: {}".format(environment))
+        logger.info("LOOK HERE - about to execute actor")
         try:
             stats, logs, final_state, exit_code, start_time = execute_actor(actor_id,
                                                                             worker_id,
@@ -318,16 +361,30 @@ def subscribe(tenant,
                                                                             mounts,
                                                                             leave_containers,
                                                                             fifo_host_path,
-                                                                            socket_host_path)
+                                                                            socket_host_path,
+                                                                            mem_limit,
+                                                                            max_cpus)
         except DockerStartContainerError as e:
             logger.error("Worker {} got DockerStartContainerError: {} trying to start actor for execution {}."
                          "Placing message back on queue.".format(worker_id, e, execution_id))
-            # if we failed to start the actor container, we leave the worker up and re-queue the original
-            # message; NOTE - we use the "low level" put() instead of put_message() because we have the
-            # exact message we want to place in the queue; put_message is used by the controller to
+            # if we failed to start the actor container, we leave the worker up and re-queue the original message
             msg_obj.nack(requeue=True)
             logger.debug('message requeued.')
-            continue
+            consecutive_errors += 1
+            if consecutive_errors > MAX_WORKER_CONSECUTIVE_ERRORS:
+                logger.error("Worker {} failed to successfully start actor for execution {} {} consecutive times; "
+                             "Exception: {}. Putting the actor in error status and shutting "
+                             "down workers.".format(worker_id, execution_id, MAX_WORKER_CONSECUTIVE_ERRORS, e))
+                Actor.set_status(actor_id, ERROR, "Error executing container: {}; w".format(e))
+                shutdown_workers(actor_id, delete_actor_ch=False)
+                # wait for worker to be shutdown..
+                time.sleep(600)
+                break
+            else:
+                # sleep five seconds before getting a message again to give time for the compute
+                # node and/or docker health to recover
+                time.sleep(5)
+                continue
         except DockerStopContainerError as e:
             logger.error("Worker {} was not able to stop actor for execution: {}; Exception: {}. "
                          "Putting the actor in error status and shutting down workers.".format(worker_id, execution_id, e))
@@ -341,7 +398,8 @@ def subscribe(tenant,
             break
         except Exception as e:
             logger.error("Worker {} got an unexpected exception trying to run actor for execution: {}."
-                         "Putting the actor in error status and shutting down workers. Exception: {}; type: {}".format(worker_id, execution_id, e, type(e)))
+                         "Putting the actor in error status and shutting down workers. "
+                         "Exception: {}; type: {}".format(worker_id, execution_id, e, type(e)))
             Actor.set_status(actor_id, ERROR, "Error executing container: {}".format(e))
             # the execute_actor function raises a DockerStartContainerError if it met an exception before starting the
             # actor container; if the container was started, then another exception should be raised. Therefore,
@@ -353,15 +411,19 @@ def subscribe(tenant,
             break
         # ack the message
         msg_obj.ack()
-
+        logger.debug("container finished successfully ")
         # Add the completed stats to the execution
         logger.info("Actor container finished successfully. Got stats object:{}".format(str(stats)))
         Execution.finalize_execution(actor_id, execution_id, COMPLETE, stats, final_state, exit_code, start_time)
         logger.info("Added execution: {}".format(execution_id))
 
         # Add the logs to the execution
-        Execution.set_logs(execution_id, logs)
-        logger.info("Added execution logs.")
+        try:
+            Execution.set_logs(execution_id, logs)
+            logger.debug("Successfully added execution logs.")
+        except Exception as e:
+            msg = "Got exception trying to set logs for exception {}; Exception: {}".format(execution_id, e)
+            logger.error(msg)
 
         # Update the worker's last updated and last execution fields:
         try:
@@ -370,10 +432,12 @@ def subscribe(tenant,
             # it is possible that this worker was sent a gracful shutdown command in the other thread
             # and that spawner has already removed this worker from the store.
             logger.info("worker {} got unexpected key error trying to update its execution time. "
-                        "Worker better be shutting down! keep_running: {}".format(worker_id, keep_running))
-            if keep_running:
+                        "Worker better be shutting down! keep_running: {}".format(worker_id, globals.keep_running))
+            if globals.keep_running:
                 logger.error("worker couldn't update's its execution time but keep_running is still true!")
 
+        # we completed an execution successfully; reset the consecutive_errors counter
+        consecutive_errors = 0
         logger.info("worker time stamps updated.")
 
 def get_container_user(actor):
@@ -394,62 +458,46 @@ def get_container_user(actor):
         user = '{}:{}'.format(uid, gid)
     return user
 
-def main(worker_id, image):
+def main():
     """
     Main function for the worker process.
 
     This function
     """
-    logger.info("Entering main() for worker: {}, image: {}".format(
+    worker_id = os.environ.get('worker_id')
+    image = os.environ.get('image')
+    actor_id = os.environ.get('actor_id')
+
+    client_id = os.environ.get('client_id', None)
+    client_access_token = os.environ.get('client_access_token', None)
+    client_refresh_token = os.environ.get('client_refresh_token', None)
+    tenant = os.environ.get('tenant', None)
+    api_server = os.environ.get('api_server', None)
+    client_secret = os.environ.get('client_secret', None)
+
+    # TODO - add all vars in this log statement
+    logger.info("Top of main() for worker: {}, image: {}".format(
         worker_id, image))
     spawner_worker_ch = SpawnerWorkerChannel(worker_id=worker_id)
 
-    # first, attempt to pull image from docker hub:
-    try:
-        logger.info("Worker pulling image {}...".format(image))
-        pull_image(image)
-    except DockerError as e:
-        # return a message to the spawner that there was an error pulling image and abort
-        # this is not necessarily an error state: the user simply could have provided an
-        # image name that does not exist in the registry. This is the first time we would
-        # find that out.
-        logger.info("worker got a DockerError trying to pull image. Error: {}.".format(e))
-        spawner_worker_ch.put({'status': 'error', 'msg': str(e)})
-        raise e
-    logger.info("Image {} pulled successfully.".format(image))
-
-    # inform spawner that image pulled successfully and, simultaneously,
-    # wait to receive message from spawner that it is time to subscribe to the actor channel
     logger.debug("Worker waiting on message from spawner...")
-    result = spawner_worker_ch.put_sync({'status': 'ok'})
+    result = spawner_worker_ch.get()
+    logger.info(f"LOOK HERE - got result {result}")
     logger.info("Worker received reply from spawner. result: {}.".format(result))
 
     # should be OK to close the spawner_worker_ch on the worker side since spawner was first client
     # to open it.
     spawner_worker_ch.close()
+    logger.info('LOOK HERE - closed channel')
 
-    if result['status'] == 'error':
-        # we do not expect to get an error response at this point. this needs investigation
-        logger.error("Worker received error message from spawner: {}. Quiting...".format(str(result)))
-        raise WorkerException(str(result))
+    logger.info('LOOK HERE - about to update status')
 
-    actor_id = result.get('actor_id')
-    tenant = result.get('tenant')
-    logger.info("Worker received ok from spawner. Message: {}, actor_id:{}".format(result, actor_id))
-    api_server = None
-    client_id = None
-    client_secret = None
-    access_token = None
-    refresh_token = None
-    if result.get('client') == 'yes':
-        logger.info("Got client: yes, result: {}".format(result))
-        api_server = result.get('api_server')
-        client_id = result.get('client_id')
-        client_secret = result.get('client_secret')
-        access_token = result.get('access_token')
-        refresh_token = result.get('refresh_token')
+    if not client_id:
+        logger.info("Did not get client id.")
     else:
-        logger.info("Did not get client:yes, got result:{}".format(result))
+        logger.info("Got a client.")
+        # TODO - list all client vars
+
     try:
         Actor.set_status(actor_id, READY, status_message=" ")
     except KeyError:
@@ -457,16 +505,19 @@ def main(worker_id, image):
         # so, the worker should have a stop message waiting for it. starting subscribe
         # as usual should allow this process to work as expected.
         pass
+    logger.info('LOOK HERE - updated actor status')
+
     logger.info("Actor status set to READY. subscribing to inbox.")
     worker_ch = WorkerChannel(worker_id=worker_id)
     subscribe(tenant,
               actor_id,
+              image,
               worker_id,
               api_server,
               client_id,
               client_secret,
-              access_token,
-              refresh_token,
+              client_access_token,
+              client_refresh_token,
               worker_ch)
 
 
@@ -476,9 +527,5 @@ if __name__ == '__main__':
     # data for the worker through environment variables.
     logger.info("Inital log for new worker.")
 
-    # read channel, worker_id and image from the environment
-    worker_id = os.environ.get('worker_id')
-    image = os.environ.get('image')
-
     # call the main() function:
-    main(worker_id, image)
+    main()

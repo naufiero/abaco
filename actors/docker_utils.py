@@ -14,8 +14,9 @@ logger = get_logger(__name__)
 
 from channels import ExecutionResultsChannel
 from config import Config
-from codes import BUSY
-from models import Worker, get_current_utc_time
+from codes import BUSY, READY
+import globals
+from models import Execution, get_current_utc_time
 
 TAG = os.environ.get('TAG') or Config.get('general', 'TAG') or ''
 if not TAG[0] == ':':
@@ -93,22 +94,20 @@ def list_all_containers():
     cli = docker.APIClient(base_url=dd, version="auto")
     # todo -- finish
 
-def container_running(image=None, name=None):
-    """Check if there is a running container for an image.
-    image should be fully qualified; e.g. image='jstubbs/abaco_core'
-    Can pass wildcards in name using * character; e.g. name='abaco_spawner*'
+def container_running(name=None):
+    """Check if there is a running container whose name contains the string, `name`. Note that this function will
+    return True if any running container has a name which contains the input `name`.
+
     """
     logger.debug("top of container_running().")
     filters = {}
     if name:
         filters['name'] = name
-    if image:
-        filters['image'] = image
     cli = docker.APIClient(base_url=dd, version="auto")
     try:
         containers = cli.containers(filters=filters)
     except Exception as e:
-        msg = "There was an error checking container_running for image: {}. Exception: {}".format(image, e)
+        msg = "There was an error checking container_running for name: {}. Exception: {}".format(name, e)
         logger.error(msg)
         raise DockerError(msg)
     logger.debug("found containers: {}".format(containers))
@@ -119,8 +118,17 @@ def run_container_with_docker(image,
                               name=None,
                               environment={},
                               mounts=[],
-                              log_file='service.log',
-                              auto_remove=False):
+                              log_file=None,
+                              auto_remove=False,
+                              client_id=None,
+                              client_access_token=None,
+                              client_refresh_token=None,
+                              actor_id=None,
+                              tenant=None,
+                              api_server=None,
+                              client_secret=None
+
+):
     """
     Run a container with docker mounted in it.
     Note: this function always mounts the abaco conf file so it should not be used by execute_actor().
@@ -151,6 +159,37 @@ def run_container_with_docker(image,
         msg = "Did not find the abaco_conf_host_path in Config. Exception: {}".format(e)
         logger.error(msg)
         raise DockerError(msg)
+    # also add it to the environment if not already there
+    if 'abaco_conf_host_path' not in environment:
+        environment['abaco_conf_host_path'] = abaco_conf_host_path
+
+    if 'client_id' not in environment:
+        environment['client_id'] = client_id
+
+    if 'client_access_token' not in environment:
+        environment['client_access_token'] = client_access_token
+
+    if 'actor_id' not in environment:
+        environment['actor_id'] = actor_id
+
+    if 'tenant' not in environment:
+        environment['tenant'] = tenant
+
+    if 'api_server' not in environment:
+        environment['api_server'] = api_server
+
+    if 'client_secret' not in environment:
+        environment['client_secret'] = client_secret
+
+    if 'client_refresh_token' not in environment:
+        environment['client_refresh_token'] = client_refresh_token
+
+    # if not passed, determine what log file to use
+    if not log_file:
+        if get_log_file_strategy() == 'split':
+            log_file = 'worker.log'
+        else:
+            log_file = 'abaco.log'
 
     # mount the logs file.
     volumes.append('/var/log/service.log')
@@ -165,14 +204,26 @@ def run_container_with_docker(image,
     host_config = cli.create_host_config(binds=binds, auto_remove=auto_remove)
     logger.debug("binds: {}".format(binds))
 
+    # add the container to a specific docker network, if configured
+    netconf = None
+    try:
+        docker_network = Config.get('spawner', 'docker_network')
+    except Exception:
+        docker_network = None
+    if docker_network:
+        netconf = cli.create_networking_config({docker_network: cli.create_endpoint_config()})
+
     # create and start the container
     try:
         container = cli.create_container(image=image,
                                          environment=environment,
                                          volumes=volumes,
                                          host_config=host_config,
-                                         command=command)
+                                         command=command,
+                                         name=name,
+                                         networking_config=netconf)
         cli.start(container=container.get('Id'))
+        logger.info('LOOK HERE - container successfully created! ')
     except Exception as e:
         msg = "Got exception trying to run container from image: {}. Exception: {}".format(image, e)
         logger.info(msg)
@@ -180,7 +231,16 @@ def run_container_with_docker(image,
     logger.info("container started successfully: {}".format(container))
     return container
 
-def run_worker(image, worker_id):
+
+def run_worker(image,
+               actor_id,
+               worker_id,
+               client_id,
+               client_access_token,
+               client_refresh_token,
+               tenant,
+               api_server,
+               client_secret):
     """
     Run an actor executor worker with a given channel and image.
     :return:
@@ -189,12 +249,6 @@ def run_worker(image, worker_id):
     command = 'python3 -u /actors/worker.py'
     logger.debug("docker_utils running worker. image:{}, command:{}".format(
         image, command))
-
-    # determine what log file to use
-    if get_log_file_strategy() == 'split':
-        log_file = 'worker.log'
-    else:
-        log_file = 'abaco.log'
 
     # mount the directory on the host for creating fifos
     try:
@@ -232,17 +286,29 @@ def run_worker(image, worker_id):
     if hasattr(auto_remove, 'lower'):
         if auto_remove.lower() == 'false':
             auto_remove = False
+        else:
+            auto_remove = True
     elif not auto_remove == True:
         auto_remove = False
-    container = run_container_with_docker(image=AE_IMAGE,
-                                          command=command,
-                                          environment={'image': image,
-                                                       'worker_id': worker_id,
-                                                       '_abaco_secret': os.environ.get('_abaco_secret')},
-                                          mounts=mounts,
-                                          log_file=log_file,
-                                          auto_remove=auto_remove,
-                                          name='worker_{}'.format(worker_id))
+    container = run_container_with_docker(
+        image=AE_IMAGE,
+        command=command,
+        environment={
+            'image': image,
+            'worker_id': worker_id,
+            '_abaco_secret': os.environ.get('_abaco_secret')},
+            mounts=mounts,
+            log_file=None,
+            auto_remove=auto_remove,
+            name='worker_{}_{}'.format(actor_id, worker_id),
+            client_id=client_id,
+            client_access_token=client_access_token,
+            client_refresh_token=client_refresh_token,
+            actor_id=actor_id,
+            tenant=tenant,
+            api_server=api_server,
+            client_secret=client_secret
+    )
     # don't catch errors -- if we get an error trying to run a worker, let it bubble up.
     # TODO - determines worker structure; should be placed in a proper DAO class.
     logger.info("worker container running. worker_id: {}. container: {}".format(worker_id, container))
@@ -251,7 +317,7 @@ def run_worker(image, worker_id):
              'location': dd,
              'id': worker_id,
              'cid': container.get('Id'),
-             'status': BUSY,
+             'status': READY,
              'host_id': host_id,
              'host_ip': host_ip,
              'last_execution_time': 0,
@@ -286,7 +352,9 @@ def execute_actor(actor_id,
                   mounts=[],
                   leave_container=False,
                   fifo_host_path=None,
-                  socket_host_path=None):
+                  socket_host_path=None,
+                  mem_limit=None,
+                  max_cpus=None):
     """
     Creates and runs an actor container and supervises the execution, collecting statistics about resource consumption
     from the Docker daemon.
@@ -304,9 +372,14 @@ def execute_actor(actor_id,
     host_path, container_path and format (which should have value 'ro' or 'rw').
     :param fifo_host_path: If not None, a string representing a path on the host to a FIFO used for passing binary data to the actor.
     :param socket_host_path: If not None, a string representing a path on the host to a socket used for collecting results from the actor.
+    :param mem_limit: The maximum amount of memory the Actor container can use; should be the same format as the --memory Docker flag.
+    :param max_cpus: The maximum number of CPUs each actor will have available to them. Does not guarantee these CPU resources; serves as upper bound.
     :return: result (dict), logs (str) - `result`: statistics about resource consumption; `logs`: output from docker logs.
     """
     logger.debug("top of execute_actor(); (worker {};{})".format(worker_id, execution_id))
+
+    # initially set the global force_quit variable to False
+    globals.force_quit = False
 
     # initial stats object, environment, binds and volumes
     result = {'cpu': 0,
@@ -337,7 +410,22 @@ def execute_actor(actor_id,
         binds[m.get('host_path')] = {'bind': m.get('container_path'),
                                      'ro': m.get('format') == 'ro'}
         volumes.append(m.get('host_path'))
-    host_config = cli.create_host_config(binds=binds, privileged=privileged)
+
+    # mem_limit
+    # -1 => unlimited memory
+    if mem_limit == '-1':
+        mem_limit = None
+
+    # max_cpus
+    try:
+        max_cpus = int(max_cpus)
+    except:
+        max_cpus = None
+    # -1 => unlimited cpus
+    if max_cpus == -1:
+        max_cpus = None
+
+    host_config = cli.create_host_config(binds=binds, privileged=privileged, mem_limit=mem_limit, nano_cpus=max_cpus)
     logger.debug("host_config object created by (worker {};{}).".format(worker_id, execution_id))
 
     # write binary data to FIFO if it exists:
@@ -441,6 +529,7 @@ def execute_actor(actor_id,
     # timeouts
     ct = 0
     stats_obj = None
+    logs = None
     while ct < 3:
         try:
             stats_obj = stats_cli.stats(container=container.get('Id'), decode=True)
@@ -456,8 +545,12 @@ def execute_actor(actor_id,
             # to be sure.
     logger.debug("right after attempting to create stats_obj: {}; (worker {};{})".format(timeit.default_timer(),
                                                                                          worker_id, execution_id))
-
-    while running:
+    # a counter of the number of iterations through the main "running" loop;
+    # this counter is used to determine when less frequent actions, such as log aggregation, need to run.
+    loop_idx = 0
+    while running and not globals.force_quit:
+        loop_idx += 1
+        logger.debug("top of while running loop; loop_idx: {}".format(loop_idx))
         datagram = None
         stats = None
         try:
@@ -512,6 +605,12 @@ def execute_actor(actor_id,
                 logger.info("Got KeyError exception trying to grab the io object. "
                             "running: {}; Exception: {}; (worker {};{})".format(running, e, worker_id, execution_id))
 
+        # grab the logs every 5th iteration --
+        if loop_idx % 5 == 0:
+            logs = cli.logs(container.get('Id'))
+            Execution.set_logs(execution_id, logs)
+            logs = None
+
         # checking the container status to see if it is still running ----
         if running:
             logger.debug("about to check container status: {}; (worker {};{})".format(timeit.default_timer(),
@@ -552,10 +651,16 @@ def execute_actor(actor_id,
                 running = False
                 continue
             else:
-                # container still running; check if we are beyond the max_run_time
+                # container still running; check if a force_quit has been sent OR
+                # we are beyond the max_run_time
                 runtime = timeit.default_timer() - start
-                if max_run_time > 0 and max_run_time < runtime:
-                    logger.info("hit runtime limit: {}; (worker {};{})".format(timeit.default_timer(),
+                if globals.force_quit or (max_run_time > 0 and max_run_time < runtime):
+                    logs = cli.logs(container.get('Id'))
+                    if globals.force_quit:
+                        logger.info("issuing force quit: {}; (worker {};{})".format(timeit.default_timer(),
+                                                                               worker_id, execution_id))
+                    else:
+                        logger.info("hit runtime limit: {}; (worker {};{})".format(timeit.default_timer(),
                                                                                worker_id, execution_id))
                     cli.stop(container.get('Id'))
                     running = False
@@ -563,6 +668,7 @@ def execute_actor(actor_id,
                                                                                            worker_id, execution_id))
     logger.info("container stopped:{}; (worker {};{})".format(timeit.default_timer(), worker_id, execution_id))
     stop = timeit.default_timer()
+    globals.force_quit = False
 
     # get info from container execution, including exit code; Exceptions from any of these commands
     # should not cause the worker to shutdown or prevent starting subsequent actor containers.
@@ -587,7 +693,8 @@ def execute_actor(actor_id,
     logger.debug("right after getting container_info: {}; (worker {};{})".format(timeit.default_timer(),
                                                                                  worker_id, execution_id))
     # get logs from container
-    logs = cli.logs(container.get('Id'))
+    if not logs:
+        logs = cli.logs(container.get('Id'))
     if not logs:
         # there are issues where container do not have logs associated with them when they should.
         logger.info("Container id {} had NO logs associated with it. "
@@ -654,6 +761,8 @@ def execute_actor(actor_id,
     if fifo_host_path:
         os.close(fifo)
         os.remove(fifo_host_path)
+    if results_ch:
+        results_ch.close()
     result['runtime'] = int(stop - start)
     logger.debug("right after removing fifo; about to return: {}; (worker {};{})".format(timeit.default_timer(),
                                                                                          worker_id, execution_id))

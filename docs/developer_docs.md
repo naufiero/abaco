@@ -134,13 +134,13 @@ $ docker build -f Dockerfile-test -t abaco/testsuite$TAG .
 To run the functional tests, execute the following:
 
 ```shell
-$ docker run -e base_url=http://172.17.0.1:8000 -e case=camel -v /:/host -v $(pwd)/local-dev.conf:/etc/service.conf -it --rm abaco/testsuite$TAG
+$ docker run --network=abaco_abaco -e base_url=http://nginx -e case=camel -v /:/host -v $(pwd)/local-dev.conf:/etc/service.conf -it --rm abaco/testsuite$TAG
 ```
 
 Run the unit tests with a command similar to the following, changing the test module as the end as necessary:
 
 ```shell
-$ docker run -e base_url=http://172.17.0.1:8000 -v $(pwd)/local-dev.conf:/etc/service.conf --entrypoint=py.test -it --rm abaco/testsuite$TAG /tests/test_store.py
+$ docker run --network=abaco_abaco -e base_url=http://nginx -v $(pwd)/local-dev.conf:/etc/service.conf --entrypoint=py.test -it --rm abaco/testsuite$TAG /tests/test_store.py
 ```
 
 Dev, Staging and Master Branches and Environments
@@ -193,12 +193,17 @@ module, a Python 3-compatible Agave SDK for managing clients.
 The following algorithm is used to start workers with client generation happening when configured accordingly:
 
 1. Spawner receives a message on the Command channel to start one or more new workers.
-2. Spawner starts the worker containers using the configured docker daemon (for now, the local unix socket). It passes the image to use and waits for a message indicating the workers were able to pull the image and start up successfully.
-3. If the actor already had workers and Spawner was instructed to stop the existing workers, it sends messages to them at this point to shut down.
-4. Spawner checks the `generate_clients` config within the `workers` stanza to see if client generation is enabled.
-5. Spawner sends a message to the clientg agent via the `ClientsChannel` requesting a new client.
-6. Clientg responds to Spawner with a message containing the client key and secret, access token, and refresh token if client generation was successful.
-7. Once all workers have responded healthy and all clients have been generated, Spawner sends a final message to each worker instructing them to subscribe to the actor mailbox channel. This message will contain the client credentials and tokens if those were generated.
+2. Spawner checks the `generate_clients` config within the `workers` stanza to see if client generation is enabled.
+3. Spawner sends a message to the clientg agent via the `ClientsChannel` requesting a new client.
+4. Clientg responds to Spawner with a message containing the client key and secret, access token, and refresh token if client generation was successful.
+5. Spawner pulls the docker image
+6. Spawner starts the worker containers using the configured docker daemon (for now, the local unix socket). It passes the image to use and worker_id as environment variables and waits for a message on the SpawnerWorker channel for that worker indicating the workers were able to pull the image and start up successfully.
+7. Spawner updates worker store with container ID and status of READY
+8. Spawner sends a message on the spawnerworker channel (which only the worker is subscribed to) to let it know that it is ready.
+
+Each worker goes through different states, depending on where it is in the creation process. A finite state machine can be used to describe these states: 
+![Worker State Diagram](https://github.com/TACC/abaco/blob/worker-management/docs/worker-state-diagram.png "Worker State diagram")
+
 
 Dependence on Docker Version
 ----------------------------
@@ -238,7 +243,7 @@ $ docker build -t abaco/dashboard -f Dockerfile-dashboard .
 4. Start the dashboard app with docker-compose by running the following from the project root:
 
 ```shell
-$ docker-compose -f docker-compose-dashboard up -d
+$ docker-compose -f docker-compose-dashboard.yml up -d
 ```
 
 
@@ -315,8 +320,27 @@ Making requests to the local development stack is easy using the requests librar
 
 ```shell
 >>> from util import *
+>>> hs = get_jwt_headers()
 >>> import requests
->>> requests.get('{}/actors'.format(base_url), headers=headers).json()
->>> requests.post('{}/actors'.format(base_url), data={'image': 'abacosamples/py3_func:dev'}, headers=headers).json()
+>>> requests.get('{}/actors'.format(base_url), headers=hs).json()
+>>> requests.post('{}/actors'.format(base_url), data={'image': 'abacosamples/py3_func:dev'}, headers=hs).json()
 
 ```
+Auto-Scaling
+------------
+
+Autoscaling uses [Prometheus](https://prometheus.io), which also provides a convenient dashboard.
+
+Prometheus works by doing a GET request to the `/metrics` endpoint of Abaco, which occurs every 5 seconds. When this GET request happens, the following chain of events occurs:
+1. All current Actors are cycled through, and given a metric for counting the current number of messages in its queue. 
+     * An actor that already has a metric will not receive another one. 
+2. All of the Actor metrics are cycled through, and updated with the Actor's current message count
+3. Each Actor is checked. If an actor has 0 workers, it is given 1 worker. 
+4. Each Actor metric is checked. 
+     * If the message count for the actor is >=1, then that actor is given a new worker. 
+     * If the message count for the actor is 0, then 1 worker is removed from that actor (assuming it has at least 1 worker)
+5. The `/metrics` endpoint is updated with the current values of each metric
+6. Prometheus scrapes the `/metrics` endpoint and saves the metrics data to its time-series database. 
+
+Prometheus has some configuration files, found in the prometheus directory. Here, there is also a Dockerfile. The autoscaling feature uses a separate docker-compose file, `docker-compose-prom`.
+
