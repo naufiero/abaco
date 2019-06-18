@@ -32,11 +32,10 @@ def main():
     # try execpt and catch keyError
     try:
         if stats_store['summary']:
-            print("yeyuh")
             actors_from_stats_store = [db_id for db_id, _ in stats_store.items()]
             new_actor_list = list(set(decoded_ids) - set(actors_from_stats_store))
             print(new_actor_list)
-            print("&&&&&")
+
 
             # if stat_store[dbid] does not exist in stats_store:
             for id in new_actor_list:
@@ -51,14 +50,12 @@ def main():
                 # try: actor not in actor list (it shouldn't be)
                 actors_list.append(actorcache.es)
     except KeyError:
-        print("aw dang")
         tc = create_summary(tc, actor_ids)
         stats_store['summary'] = tc['summary']
         for id in decoded_ids:
 
         # if stat_store[dbid] does not exist in stats_store:
 
-            print("holaaaa")
             actorcache = UpdateCacheActorStats(id)
             # updates each actor in stats store
             actorcache.update_stats_store()
@@ -74,16 +71,15 @@ def main():
 # deal with deleted actors here
 
     # gets and deletes all actors in stats_store but not in actors_store, including summary
-    print("we is here")
     get_delete_list(tc)
 
     stats_store['actors_list'] = actors_list
     # stats_store['summary'] = summary
 
 
-    for key, value in stats_store.items():
-        print(key, value)
-        print("______")
+    # for key, value in stats_store.items():
+    #     print(key, value)
+    #     print("______")
 
 # Returns the list of actor ids currently in actors_store
 def get_actor_ids():
@@ -96,14 +92,11 @@ def delete_actor_from_stats_store(delete_list, tc):
 
     for del_id in delete_list:
         if del_id != "summary" and del_id != "actors_list":
-            print("*******")
             print(del_id)
-            print("*******")
             del stats_store[del_id]
             delete_from_summary(del_id)
     actors_from_stats_store_test = [db_id for db_id, _ in stats_store.items()]
     print(actors_from_stats_store_test)
-    print("######")
 
 # gets a list of actors that need to be deleted from stats_store
 def get_delete_list(tc):
@@ -206,7 +199,6 @@ def update_summary(db_id):
     # get all execution ids for this actor
     for ex_id, execution in executions.items():
         print(ex_id)
-        print("^^^^^^^")
 
         actor_exs += 1
         actor_runtime += execution.get('runtime', 0)
@@ -243,7 +235,6 @@ def delete_from_summary(db_id):
     actor_io = 0
     actor_cpu = 0
 
-    print(db_id + " lolllll")
     actor_id = db_id.split('_')[1]
     executions = executions_store[actor_id]
     for ex_id, execution in executions.items():
