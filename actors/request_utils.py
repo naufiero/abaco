@@ -38,11 +38,13 @@ def handle_error(exc):
         response.status_code = 500
         return response
 
+
 def pretty_print(request):
     """Return whether or not to pretty print based on request"""
     if hasattr(request.args.get('pretty'), 'upper') and request.args.get('pretty').upper() == 'TRUE':
         return True
     return False
+
 
 def ok(result, msg="The request was successful", request=request):
     d = {'result': result,
@@ -50,6 +52,7 @@ def ok(result, msg="The request was successful", request=request):
          'version': TAG,
          'message': msg}
     return jsonify(d)
+
 
 def error(result=None, msg="Error processing the request.", request=request):
     d = {'result': result,

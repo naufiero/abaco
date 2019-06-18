@@ -1074,19 +1074,11 @@ class CacheExecutionsSummary(DbDict):
                       }
         return totalcache
 
-
-
-# empty cache method that takes self, retuns the dict with 0's ^ of this params list above
-# returns data structure with the parmas defined with 0's as the values. called before the for loop in update.py
-#
-#then goes into the for loop, calls actor.es, sends it to the update method, updates running total
-# update takes self, cuurent_total, actor_total), returns current + actor; does this by
-# going through each of the params
-
-# total chache = model.getemptycache
-# actora = get all actors_store
-# for dbid in actors, create actorcache=model(dbid)
-# total cache.update(total_cahce)
-# through the for loop, keep updating that parma dic
-# stats_stor[special key for total] = {total_cache, which is a dictionary with the total variable}
+    def update_with_actorcache(self, actorcache):
+        """
+        Adds the actorcache totals to the (sunnary) instance totals
+        :param actorcache:
+        :return:
+        """
+        # todo - add each individual item to the summary
 

@@ -175,9 +175,10 @@ class AdminActorsResource(Resource):
             ch = ActorMsgChannel(actor_id=actor.db_id)
             actor.messages = len(ch._queue._queue)
             ch.close()
+            #kw:changed
             summary = stats_store['summary']
-            actor.executions = summary.total_executions
-            actor.runtime = summary.total_runtime
+            actor.executions = summary['total_executions']
+            actor.runtime = summary['total_runtime']
             if case == 'camel':
                 actor = dict_to_camel(actor)
             actors.append(actor)
@@ -242,66 +243,70 @@ class AdminWorkersResource(Resource):
 class AdminExecutionsResource(Resource):
 
     def get(self):
-        logger.debug("top of GET /admin/workers")
-        result = {'summary': {'total_actors_all': 0,
-                              'total_executions_all': 0,
-                              'total_execution_runtime_all': 0,
-                              'total_execution_cpu_all': 0,
-                              'total_execution_io_all': 0,
-                              'total_actors_existing': 0,
-                              'total_executions_existing': 0,
-                              'total_execution_runtime_existing': 0,
-                              'total_execution_cpu_existing': 0,
-                              'total_execution_io_existing': 0,
-                              },
-                  'actors': []
-        }
-        case = Config.get('web', 'case')
-        for actor_dbid, executions in executions_store.items():
-            # determine if actor still exists:
-            actor = None
-            try:
-                actor = Actor.from_db(actors_store[actor_dbid])
-            except KeyError:
-                pass
-            # iterate over executions for this actor:
-            actor_exs = 0
-            actor_runtime = 0
-            actor_io = 0
-            actor_cpu = 0
-            for ex_id, execution in executions.items():
-                actor_exs += 1
-                actor_runtime += execution.get('runtime', 0)
-                actor_io += execution.get('io', 0)
-                actor_cpu += execution.get('cpu', 0)
-            # always add these to the totals:
-            result['summary']['total_actors_all'] += 1
-            result['summary']['total_executions_all'] += actor_exs
-            result['summary']['total_execution_runtime_all'] += actor_runtime
-            result['summary']['total_execution_io_all'] += actor_io
-            result['summary']['total_execution_cpu_all'] += actor_cpu
 
-            if actor:
-                result['summary']['total_actors_existing'] += 1
-                result['summary']['total_executions_existing'] += actor_exs
-                result['summary']['total_execution_runtime_existing'] += actor_runtime
-                result['summary']['total_execution_io_existing'] += actor_io
-                result['summary']['total_execution_cpu_existing'] += actor_cpu
-                actor_stats = {'actor_id': actor.get('id'),
-                               'owner': actor.get('owner'),
-                               'image': actor.get('image'),
-                               'total_executions': actor_exs,
-                               'total_execution_cpu': actor_cpu,
-                               'total_execution_io': actor_io,
-                               'total_execution_runtime': actor_runtime,
-                               }
-                if case == 'camel':
-                    actor_stats = dict_to_camel(actor_stats)
-                result['actors'].append(actor_stats)
-
-        if case == 'camel':
-            result['summary'] = dict_to_camel(result['summary'])
+        result = stats_store['summary']
+        result.append(stats_store['actor_stats'])
+        # logger.debug("top of GET /admin/workers")
+        # result = {'summary': {'total_actors_all': 0,
+        #                       'total_executions_all': 0,
+        #                       'total_execution_runtime_all': 0,
+        #                       'total_execution_cpu_all': 0,
+        #                       'total_execution_io_all': 0,
+        #                       'total_actors_existing': 0,
+        #                       'total_executions_existing': 0,
+        #                       'total_execution_runtime_existing': 0,
+        #                       'total_execution_cpu_existing': 0,
+        #                       'total_execution_io_existing': 0,
+        #                       },
+        #           'actors': []
+        # }
+        # case = Config.get('web', 'case')
+        # for actor_dbid, executions in executions_store.items():
+        #     # determine if actor still exists:
+        #     actor = None
+        #     try:
+        #         actor = Actor.from_db(actors_store[actor_dbid])
+        #     except KeyError:
+        #         pass
+        #     # iterate over executions for this actor:
+        #     actor_exs = 0
+        #     actor_runtime = 0
+        #     actor_io = 0
+        #     actor_cpu = 0
+        #     for ex_id, execution in executions.items():
+        #         actor_exs += 1
+        #         actor_runtime += execution.get('runtime', 0)
+        #         actor_io += execution.get('io', 0)
+        #         actor_cpu += execution.get('cpu', 0)
+        #     # always add these to the totals:
+        #     result['summary']['total_actors_all'] += 1
+        #     result['summary']['total_executions_all'] += actor_exs
+        #     result['summary']['total_execution_runtime_all'] += actor_runtime
+        #     result['summary']['total_execution_io_all'] += actor_io
+        #     result['summary']['total_execution_cpu_all'] += actor_cpu
+        #
+        #     if actor:
+        #         result['summary']['total_actors_existing'] += 1
+        #         result['summary']['total_executions_existing'] += actor_exs
+        #         result['summary']['total_execution_runtime_existing'] += actor_runtime
+        #         result['summary']['total_execution_io_existing'] += actor_io
+        #         result['summary']['total_execution_cpu_existing'] += actor_cpu
+        #         actor_stats = {'actor_id': actor.get('id'),
+        #                        'owner': actor.get('owner'),
+        #                        'image': actor.get('image'),
+        #                        'total_executions': actor_exs,
+        #                        'total_execution_cpu': actor_cpu,
+        #                        'total_execution_io': actor_io,
+        #                        'total_execution_runtime': actor_runtime,
+        #                        }
+        #         if case == 'camel':
+        #             actor_stats = dict_to_camel(actor_stats)
+        #         result['actors'].append(actor_stats)
+        #
+        # if case == 'camel':
+        #     result['summary'] = dict_to_camel(result['summary'])
         return ok(result=result, msg="Executions retrieved successfully.")
+
 
 
 class ActorsResource(Resource):
@@ -543,6 +548,7 @@ class ActorExecutionsResource(Resource):
             logger.debug("did not find actor: {}.".format(actor_id))
             raise ResourceError(
                 "No actor found with id: {}.".format(actor_id), 404)
+        #kw:changed
         try:
             summary = stats_store['summary']
         except DAOError as e:

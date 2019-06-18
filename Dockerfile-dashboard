@@ -1,7 +1,7 @@
 # Image: abaco/dashboard
 # Description: Web dashboard application for the Abaco (Actor Based Con(mputing)tainers platform.
 
-FROM ubuntu:xenial
+FROM ubuntu:18.04
 
 MAINTAINER Joe Stubbs <jstubbs@tacc.utexas.edu>
 
@@ -19,7 +19,7 @@ RUN apt-get update \
 RUN apt-get update && \
     apt-get upgrade -y && \
     curl -sL https://deb.nodesource.com/setup_4.x | bash - && \
-    apt-get install -y build-essential python python-dev gettext nodejs xvfb chromium-browser ruby-sass uwsgi && \
+    apt-get install -y git build-essential python python-dev gettext nodejs xvfb chromium-browser ruby-sass uwsgi && \
     curl -SL 'https://bootstrap.pypa.io/get-pip.py' | python
 
 RUN pip3 install --upgrade pip && pip install uwsgi uwsgitop
@@ -40,7 +40,8 @@ COPY requirements-dashboard.txt /tmp/requirements.txt
 
 RUN pip3 install -r /tmp/requirements.txt
 
-COPY actors /actors
+# COPY actors /actors
+# RUN pip3 install -r /actors/requirements.txt
 COPY dashboard /abaco
 
 WORKDIR /abaco
