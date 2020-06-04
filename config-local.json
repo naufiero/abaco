@@ -4,7 +4,8 @@
       "dev-develop"
     ],
     "version": ":dev",
-    "log_level.global": "DEBUG",
+    "log_file": "/var/log/service.log",
+    "log_level": "DEBUG",
     "store_mongo_host": "mongo",
     "store_mongo_port": 27017,
     "rabbit_uri": "amqp://rabbit:5672",
