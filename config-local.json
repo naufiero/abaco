@@ -4,7 +4,7 @@
       "dev-develop"
     ],
     "version": ":dev",
-    "log_file": "/var/log/service.log",
+    "log_file": "/home/tapis/runtime_files/logs/service.log",
     "log_level": "DEBUG",
     "store_mongo_host": "mongo",
     "store_mongo_port": 27017,
@@ -28,12 +28,12 @@
     "worker_sync_max_idle_time": 600,
     "worker_auto_remove": true,
     "worker_privileged_mounts": [
-      "/data1:/_abaco_data1:ro",
-      "/data2:/_abaco_data2:rw"
+      "/data1:/home/tapis/runtime_files/_abaco_data1:ro",
+      "/data2:/home/tapis/runtime_files/_abaco_data2:rw"
     ],
     "worker_leave_containers": false,
-    "worker_socket_host_path_dir": "/_abaco_results_sockets",
-    "worker_fifo_host_path_dir": "/_abaco_fifos",
+    "worker_socket_host_path_dir": "/home/tapis/runtime_files/_abaco_results_sockets",
+    "worker_fifo_host_path_dir": "/home/tapis/runtime_files/_abaco_fifos",
     "web_access_control": "jwt",
     "web_user_role": "Internal/everyone",
     "web_accept_nonce": true,
@@ -53,16 +53,16 @@
       "default_token": false,
       "generate_clients": false,
       "global_mounts": [
-        "/data1:/_abaco_data1:ro",
-        "/data2/{tenant_id}/{username}:/_abaco_data2:rw"
+        "/data1:/home/tapis/runtime_files/_abaco_data1:ro",
+        "/data2/{tenant_id}/{username}:/home/tapis/runtime_files/_abaco_data2:rw"
       ]
     },
     "designsafe_auth_object": {
       "actor_uid": 458981,
       "actor_gid": 816877,
       "global_mounts": [
-        "/data1:/_abaco_data1:ro",
-        "/data2/{tenant_id}/{username}:/_abaco_data2:rw"
+        "/data1:/home/tapis/runtime_files/_abaco_data1:ro",
+        "/data2/{tenant_id}/{username}:/home/tapis/runtime_files/_abaco_data2:rw"
       ]
     },
     "sd2e_auth_object": {
@@ -73,7 +73,7 @@
     },
     "DEV-DEVELOP_auth_object": {
       "global_mounts": [
-        "/data1:/_abaco_data1:ro"
+        "/data1:/home/tapis/runtime_files/_abaco_data1:ro"
       ]
     }
   }
