@@ -1,6 +1,6 @@
 {
   "server": "dev",
-  "service_tenant_base_url": "https://master.staging.tapis.io",
+  "service_tenant_base_url": "https://dev.staging.tapis.io",
   "service_name": "actors-api",
   "tenants": [
     "dev-develop"
