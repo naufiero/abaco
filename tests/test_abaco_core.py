@@ -193,7 +193,24 @@ def test_register_actor(headers):
     assert result['name'] == 'abaco_test_suite'
     assert result['id'] is not None
 
+@pytest.mark.log_exp
+def test_register_with_log_ex(headers):
+    url = '{}/{}'.format(base_url, '/actors')
+    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite', 'logEx': '16000'}
+    rsp = requests.post(url, data=data, headers=headers)
+    result = basic_response_checks(rsp)
+    assert result['logEx'] == 16000
 
+@pytest.mark.log_exp
+def test_update_log_ex(headers):
+    actor_id = get_actor_id(headers)
+    url = '{}/actors/{}'.format(base_url, actor_id)
+    data = {'image': 'abacosamples/test', 'logEx': '20000'}
+    rsp = requests.put(url, headers=headers, data=data)
+    result = basic_response_checks(rsp)
+    assert result['image'] == 'jstubbs/abaco_test'
+    assert result['logEx'] == 20000
+    
 @pytest.mark.aliastest
 def test_register_alias_actor(headers):
     url = '{}/{}'.format(base_url, '/actors')

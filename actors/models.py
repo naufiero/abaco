@@ -762,6 +762,7 @@ class Actor(AbacoDAO):
         ('queue', 'optional', 'queue', str, 'The command channel that this actor uses.', 'default'),
         ('db_id', 'derived', 'db_id', str, 'Primary key in the database for this actor.', None),
         ('id', 'derived', 'id', str, 'Human readable id for this actor.', None),
+        ('log_ex', 'optional', 'log_ex', int, 'Amount of time after which logs will expire', None)
         ]
 
     SYNC_HINT = 'sync'
@@ -879,6 +880,36 @@ class Actor(AbacoDAO):
         else:
             logger.debug("Actor.ensure_one_worker() returning None.")
             return None
+
+    @classmethod
+    def get_actor_log_ttl(cls, actor_id):
+        """Returns the log time to live, looking at both the config file and logEx if passed"""
+        logger.debug("In get_actor_log_ttl")
+        actor = Actor.from_db(actors_store[actor_id])
+        # Find the proper log expiry time, starting with user input, then tenant-specific, then global expiry
+        tenant = actor['tenant']
+        if actor['log_ex'] is not None:
+            log_ex = actor['log_ex']
+            tenant_check = tenant + '_log_ex_limit'
+            try: 
+                tenant_check = int(Config.get('web', tenant_check))
+                if log_ex > tenant_check:
+                    #raise DAOError("{} is larger than max tenant expiration {}, will be set to this expiration".format(log_ex, tenant_check))
+                    log_ex = tenant_check
+            except:
+                check = int(Config.get('web', 'log_ex_limit'))
+                if log_ex > check:
+                    log_ex = check
+                    #raise DAOError("{} is larger than max global expiration {}, will be set to this expiration".format(log_ex, check))
+        else:
+            tenant_check = tenant + '_log_ex'
+            try:
+                tenant_check = int(Config.get('web', tenant_check))
+                log_ex = tenant_check
+            except:
+                log_ex = int(Config.get('web', 'log_ex'))
+        logger.debug(f"log_ex will be set to {log_ex}")
+        return log_ex
 
     @classmethod
     def get_dbid(cls, tenant, id):
@@ -1421,18 +1452,13 @@ class Execution(AbacoDAO):
 
 
     @classmethod
-    def set_logs(cls, exc_id, logs, actor_id, tenant, worker_id):
+    def set_logs(cls, exc_id, logs, actor_id, tenant, worker_id, log_ex):
         """
         Set the logs for an execution.
         :param exc_id: the id of the execution (str)
         :param logs: dict describing the logs
         :return:
         """
-        log_ex = Config.get('web', 'log_ex')
-        try:
-            log_ex = int(log_ex)
-        except ValueError:
-            log_ex = -1
         try:
             max_log_length = int(Config.get('web', 'max_log_length'))
         except:
@@ -1448,12 +1474,8 @@ class Execution(AbacoDAO):
                 logs = ''
             logs = logs[:max_log_length] + " LOG LIMIT EXCEEDED; this execution log was TRUNCATED!"
         start_timer = timeit.default_timer()
-        if log_ex > 0:
-            logger.info("Storing log with expiry. exc_id: {}".format(exc_id))
-            logs_store.set_with_expiry([exc_id, 'logs'], logs)
-        else:
-            logger.info("Storing log without expiry. exc_id: {}".format(exc_id))
-            logs_store[exc_id, logs] = logs
+        logger.info("Storing log with expiry of {} seconds".format(log_ex))
+        logs_store.set_with_expiry([exc_id, 'logs'], logs, log_ex)
         logs_store[exc_id, 'actor_id'] = actor_id
         logs_store[exc_id, 'tenant'] = tenant
         stop_timer = timeit.default_timer()

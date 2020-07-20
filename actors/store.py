@@ -1,6 +1,6 @@
 
 import collections
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import os
 import urllib.parse
@@ -247,7 +247,7 @@ class MongoStore(AbstractStore):
             except KeyError:
                 raise KeyError(f"Subscript of {subscripts} does not exist in document of '_id' {key}")
 
-    def set_with_expiry(self, fields, value):
+    def set_with_expiry(self, fields, value, log_ex):
         """
         Atomically:
         Sets 'self[key] = value' or 'self[key][field1][field2][...] = value'
@@ -255,16 +255,20 @@ class MongoStore(AbstractStore):
         Note: MongoDB TTL checks every 60 secs to delete files
         """
         key, dots, _ = self._process_inputs(fields)
+        log_ex_config = int(Config.get('web','log_ex'))
+        time_change = log_ex_config - log_ex
+        blah = datetime.utcnow()- timedelta(seconds=time_change)
+        logger.debug(f"What time is this being set to: {blah} ")
         if len(fields) == 1 and isinstance(value, dict):
             result = self._db.update_one(
                 filter={'_id': key},
-                update={'$set': {'exp': datetime.utcnow()},
+                update={'$set': {'exp': datetime.utcnow()- timedelta(seconds=time_change)},
                         '$set': value},
                 upsert=True)
         else:
             result = self._db.update_one(
                 filter={'_id': key},
-                update={'$set': {'exp': datetime.utcnow(), dots: self._prepset(value)}},
+                update={'$set': {'exp': datetime.utcnow() - timedelta(seconds=time_change), dots: self._prepset(value)}},
                 upsert=True)
 
     def full_update(self, key, value, upsert=False):
