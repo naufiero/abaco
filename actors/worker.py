@@ -500,8 +500,11 @@ def subscribe(tenant,
 
         # Add the logs to the execution
         try:
-            Execution.set_logs(execution_id, logs, actor_id, tenant, worker_id)
-            logger.debug("Successfully added execution logs.")
+            logger.debug("Checking for get_actor_log_ttl")
+            log_ex = Actor.get_actor_log_ttl(actor_id)
+            logger.debug("log ex is {log_ex}")
+            Execution.set_logs(execution_id, logs, actor_id, tenant, worker_id, log_ex)
+            logger.debug(f"Successfully added execution logs of expiry {log_ex}.")
         except Exception as e:
             msg = "Got exception trying to set logs for exception {}; " \
                   "Exception: {}; worker_id: {}".format(execution_id, e, worker_id)

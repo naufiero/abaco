@@ -769,6 +769,10 @@ class ActorsResource(Resource):
         else:
             token = get_token_default()
         args['token'] = token
+         # adding check for 'log_ex'
+        if 'logEx' in args and args.get('logEx') is not None:
+            log_ex = int(args.get('logEx'))
+            args['log_ex'] = log_ex
         if Config.get('web', 'case') == 'camel':
             max_workers = args.get('maxWorkers')
             args['max_workers'] = max_workers
@@ -891,6 +895,10 @@ class ActorResource(Resource):
         args = self.validate_put(actor)
         logger.debug("PUT args validated successfully.")
         args['tenant'] = g.tenant
+        if 'logEx' in args and args.get('logEx') is not None:
+            log_ex = int(args.get('logEx'))
+            logger.debug(f"log_ex in args; using: {log_ex}")
+            args['log_ex'] = log_ex
         if args['queue']:
             queues_list = Config.get('spawner', 'host_queues').replace(' ', '')
             valid_queues = queues_list.split(',')
@@ -970,6 +978,7 @@ class ActorResource(Resource):
             actor.pop('max_workers')
             actor.pop('mem_limit')
             actor.pop('max_cpus')
+            actor.pop('log_ex')
 
         # this update overrides all required and optional attributes
         try:
