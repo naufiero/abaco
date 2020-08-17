@@ -196,20 +196,28 @@ def test_register_actor(headers):
 @pytest.mark.log_exp
 def test_register_with_log_ex(headers):
     url = '{}/{}'.format(base_url, '/actors')
-    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite', 'logEx': '16000'}
+    if case == 'camel':
+        log_field = 'logEx'
+    else:
+        log_field = 'log_ex'
+    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_log_ex_test', log_field: '16000'}
     rsp = requests.post(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
-    assert result['logEx'] == 16000
+    assert result[log_field] == 16000
 
 @pytest.mark.log_exp
 def test_update_log_ex(headers):
-    actor_id = get_actor_id(headers)
+    actor_id = get_actor_id(headers, 'abaco_log_ex_test')
     url = '{}/actors/{}'.format(base_url, actor_id)
-    data = {'image': 'abacosamples/test', 'logEx': '20000'}
-    rsp = requests.put(url, headers=headers, data=data)
+    if case == 'camel':
+        log_field = 'logEx'
+    else:
+        log_field = 'log_ex'
+    data = {'image': 'jstubbs/abaco_test', log_field: '20000'}
+    rsp = requests.put(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
     assert result['image'] == 'jstubbs/abaco_test'
-    assert result['logEx'] == 20000
+    assert result[log_field] == 20000
     
 @pytest.mark.aliastest
 def test_register_alias_actor(headers):
@@ -1842,16 +1850,16 @@ def test_search_actors_details(headers):
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     if case == 'snake':
-        assert result['_metadata']['count_returned'] == 8
+        assert result['_metadata']['count_returned'] == 9
         assert result['_metadata']['record_limit'] == 100
         assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 8
+        assert result['_metadata']['total_count'] == 9
         assert len(result['search']) == result['_metadata']['count_returned']
     else:
-        assert result['_metadata']['countReturned'] == 8
+        assert result['_metadata']['countReturned'] == 9
         assert result['_metadata']['recordLimit'] == 100
         assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 8
+        assert result['_metadata']['totalCount'] == 9
         assert len(result['search']) == result['_metadata']['countReturned']
     assert '_links' in result['search'][0]
     assert 'description' in result['search'][0]
@@ -1876,16 +1884,16 @@ def test_search_workers_details(headers):
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     if case == 'snake':
-        assert result['_metadata']['count_returned'] == 13
+        assert result['_metadata']['count_returned'] == 14
         assert result['_metadata']['record_limit'] == 100
         assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 13
+        assert result['_metadata']['total_count'] == 14
         assert len(result['search']) == result['_metadata']['count_returned']
     else:
-        assert result['_metadata']['countReturned'] == 13
+        assert result['_metadata']['countReturned'] == 14
         assert result['_metadata']['recordLimit'] == 100
         assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 13
+        assert result['_metadata']['totalCount'] == 14
         assert len(result['search']) == result['_metadata']['countReturned']
     assert 'status' in result['search'][0]
     assert 'id' in result['search'][0]
@@ -2050,7 +2058,7 @@ def test_search_datetime(headers):
     url = '{}/actors/search/actors?create_time.between=2000-01-01,2200-01-01'.format(base_url)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
-    assert len(result['search']) == 8
+    assert len(result['search']) == 9
 
 def test_search_exactsearch_search(headers):
     url = '{}/actors/search/actors?exactsearch=abacosamples/sleep_loop'.format(base_url)
@@ -2088,7 +2096,7 @@ def test_search_eq_neq(headers):
     url = '{}/actors/search/actors?image.neq=abacosamples/py3_func'.format(base_url)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
-    assert len(result['search']) == 7
+    assert len(result['search']) == 8
 
 def test_search_like_nlike(headers):
     url = '{}/actors/search/actors?image.like=py3_func'.format(base_url)
@@ -2099,22 +2107,22 @@ def test_search_like_nlike(headers):
     url = '{}/actors/search/actors?image.nlike=py3_func'.format(base_url)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
-    assert len(result['search']) == 7
+    assert len(result['search']) == 8
 
 def test_search_skip_limit(headers):
     url = '{}/actors/search/actors?skip=4&limit=23'.format(base_url)
     rsp = requests.get(url, headers=headers)
     result = basic_response_checks(rsp)
     if case == 'snake':
-        assert result['_metadata']['count_returned'] == 4
+        assert result['_metadata']['count_returned'] == 5
         assert result['_metadata']['record_limit'] == 23
         assert result['_metadata']['records_skipped'] == 4
-        assert result['_metadata']['total_count'] == 8
+        assert result['_metadata']['total_count'] == 9
     else:
-        assert result['_metadata']['countReturned'] == 4
+        assert result['_metadata']['countReturned'] == 5
         assert result['_metadata']['recordLimit'] == 23
         assert result['_metadata']['recordsSkipped'] == 4
-        assert result['_metadata']['totalCount'] == 8
+        assert result['_metadata']['totalCount'] == 9
 
 
 # ##############################
