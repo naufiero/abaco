@@ -58,7 +58,7 @@ Sending binary JPEG file to actor as message with the ``application/octet-stream
 .. code-block:: python
 
     result = ag.actors.sendMessage(actorId=actor_data['id'],
-                                   body={'binary': binary_image},
+                                   body= binary_image,
                                    headers={'Content-Type': 'application/octet-stream'})
 
 The following returns information pertaining to the execution:
