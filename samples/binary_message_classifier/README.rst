@@ -58,7 +58,7 @@ Sending binary JPEG file to actor as message with the ``application/octet-stream
 .. code-block:: python
 
     result = ag.actors.sendMessage(actorId=actor_data['id'],
-                                   body= binary_image,
+                                   body=binary_image,
                                    headers={'Content-Type': 'application/octet-stream'})
 
 The following returns information pertaining to the execution:
@@ -66,14 +66,14 @@ The following returns information pertaining to the execution:
 .. code-block:: python
 
     execution = ag.actors.getExecution(actorId=actor_data['id'],
-                                       executionId = result['executionId'])
+                                       executionId=result['executionId'])
 
 Once the execution has complete, the logs can be called with the following:
 
 .. code-block:: python
     
     executionLogs = ag.actors.getExecutionLogs(actorId=actor_data['id'],
-                                               executionId = result['executionId'])
+                                               executionId=result['executionId'])
 
 Extra info
 ~~~~~~~~~~
