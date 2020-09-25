@@ -72,8 +72,8 @@ Once the execution has complete, the logs can be called with the following:
 
 .. code-block:: python
     
-    exec_info = requests.get('{}/actors/v2/{}/executions/{}'.format(url, actor_id, exec_id),
-                             headers={'Authorization': 'Bearer {}'.format(token)})
+    executionLogs = ag.actors.getExecutionLogs(actorId=actor_data['id'],
+                                               executionId = result['executionId'])
 
 Extra info
 ~~~~~~~~~~
