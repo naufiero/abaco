@@ -36,7 +36,7 @@ scrape_configs:
           group: 'abaco'
 
   - job_name: 'cron'
-    scrape_interval: 50m
+    scrape_interval: 50s
     metrics_path: '/cron'
     static_configs:
       - targets: ['metrics:5000']

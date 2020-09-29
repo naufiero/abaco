@@ -812,10 +812,11 @@ class Actor(AbacoDAO):
         unit_time = cron_parsed.fixed[2]
         time_length = int(cron_parsed.fixed[1])
         # Parse the first element of cron_parsed into another list of the form [year, month, day, hour]
-        time = parse("{}-{}-{} {}", cron_parsed.fixed[0])
+        cron_next_ex = actor['cron_next_ex']
+        time = parse("{}-{}-{} {}", cron_next_ex)
         # Create a datetime object
         start = datetime.datetime(int(time[0]), int(time[1]), int(time[2]), int(time[3]))
-        logger.debug(f"cron_parsed[1] is {cron_parsed.fixed[1]}")
+        logger.debug(f"cron_parsed[1] is {time_length}")
         # Logic for incrementing the next execution, whether unit of time is months, weeks, days, or hours
         if unit_time == "month" or unit_time == "months":
             end = start + relativedelta(months=+time_length)
@@ -830,6 +831,7 @@ class Actor(AbacoDAO):
             logger.debug("This unit of time is not supported, please choose either hours, days, weeks, or months")
             actors_store[actor_id, 'cron_on'] = False
         time = "{}-{}-{} {}".format(end.year, end.month, end.day, end.hour)
+        logger.debug(f"returning {time}")
         return time  
 
 
