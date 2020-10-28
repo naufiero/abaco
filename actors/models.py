@@ -5,9 +5,13 @@ import timeit
 import uuid
 import re
 import time
+import datetime
 
 from flask_restful import inputs
 from hashids import Hashids
+from parse import parse
+from dateutil.relativedelta import relativedelta
+from werkzeug.exceptions import BadRequest
 
 from agaveflask.utils import RequestParser
 
@@ -762,7 +766,10 @@ class Actor(AbacoDAO):
         ('queue', 'optional', 'queue', str, 'The command channel that this actor uses.', 'default'),
         ('db_id', 'derived', 'db_id', str, 'Primary key in the database for this actor.', None),
         ('id', 'derived', 'id', str, 'Human readable id for this actor.', None),
-        ('log_ex', 'optional', 'log_ex', int, 'Amount of time after which logs will expire', None)
+        ('log_ex', 'optional', 'log_ex', int, 'Amount of time after which logs will expire', None),
+        ('cron_on', 'optional', 'cron_on', inputs.boolean, 'Whether cron is on or off', False),
+        ('cron_schedule', 'optional', 'cron_schedule', str, 'yyyy-mm-dd hh + <number> <unit of time>', None),
+        ('cron_next_ex', 'optional', 'cron_next_ex', str, 'The next cron execution yyyy-mm-dd hh', None)
         ]
 
     SYNC_HINT = 'sync'
@@ -797,6 +804,77 @@ class Actor(AbacoDAO):
             return time_str
         else:
             return db_id
+    
+    @classmethod
+    def set_next_ex(cls, actor, actor_id):
+        # Parse cron into [datetime, number, unit of time]
+        logger.debug("In set_next_ex")
+        cron = actor['cron_schedule']
+        cron_parsed = parse("{} + {} {}", cron)
+        unit_time = cron_parsed.fixed[2]
+        time_length = int(cron_parsed.fixed[1])
+        # Parse the first element of cron_parsed into another list of the form [year, month, day, hour]
+        cron_next_ex = actor['cron_next_ex']
+        time = parse("{}-{}-{} {}", cron_next_ex)
+        # Create a datetime object
+        start = datetime.datetime(int(time[0]), int(time[1]), int(time[2]), int(time[3]))
+        logger.debug(f"cron_parsed[1] is {time_length}")
+        # Logic for incrementing the next execution, whether unit of time is months, weeks, days, or hours
+        if unit_time == "month" or unit_time == "months":
+            end = start + relativedelta(months=+time_length)
+        elif unit_time == "week" or unit_time == "weeks":
+            end = start + datetime.timedelta(weeks=time_length)
+        elif unit_time == "day" or unit_time == "days":
+            end = start + datetime.timedelta(days=time_length)
+        elif unit_time == "hour" or unit_time == "hours":
+            end = start + datetime.timedelta(hours=time_length)
+        else:
+            # The unit of time is not supported, turn off cron or else it will continue to execute
+            logger.debug("This unit of time is not supported, please choose either hours, days, weeks, or months")
+            actors_store[actor_id, 'cron_on'] = False
+        time = "{}-{}-{} {}".format(end.year, end.month, end.day, end.hour)
+        logger.debug(f"returning {time}")
+        return time  
+
+    @classmethod
+    def set_cron(cls, cron):
+        # Method checks for the 'now' alias and also checks that the cron sent in has not passed yet
+        logger.debug("in set_cron()")
+        # raise BadRequest("Test")
+        now = get_current_utc_time()
+        now_datetime = datetime.datetime(now.year, now.month, now.day, now.hour)
+        logger.debug(f"now_datetime is {now_datetime}")
+        # parse r: if r is not in the correct format, parse() will return None
+        r = parse("{} + {} {}", cron)
+        logger.debug(f"r is {r}")
+        if r is None:
+            raise BadRequest(f"The cron is not in the correct format")
+        # Check that the cron schedule hasn't already passed
+        # Check for the 'now' alias and change the cron to now if 'now' is sent in
+        cron_time = r.fixed[0]
+        logger.debug(f"Cron time is {cron_time}")
+        if cron_time == "now" or cron_time == "Now":
+            cron_time_parsed = [now.year, now.month, now.day, now.hour]
+            # Change r to the current UTC datetime
+            logger.debug(f"cron_time_parsed when now is sent in is {cron_time_parsed}")
+            r_temp = "{}-{}-{} {}".format(cron_time_parsed[0], cron_time_parsed[1], cron_time_parsed[2], cron_time_parsed[3])
+            r = "{} + {} {}".format(r_temp, int(r.fixed[1]), r.fixed[2])
+            # parse r so that, when it is returned, it is a parsed object
+            r = parse("{} + {} {}", r)
+            logger.debug(f"User sent now, new r is the current time: {r}")
+        else:
+            cron_time_parsed = parse("{}-{}-{} {}", cron_time)
+            if cron_time_parsed is None:
+                logger.debug(f'{r} is not in the correct format')
+                raise BadRequest(f"The starting date {r.fixed[0]} is not in the correct format")
+            else:
+                # Create a datetime object out of cron_datetime
+                schedule_execution = datetime.datetime(int(cron_time_parsed[0]), int(cron_time_parsed[1]), int(cron_time_parsed[2]), int(cron_time_parsed[3]))
+                if schedule_execution < now_datetime:
+                    logger.debug("User sent in old time, raise exception")
+                    raise BadRequest(f'The starting datetime is old. The current UTC time is {now_datetime}')
+        return r
+
 
     @classmethod
     def get_actor_id(cls, tenant, identifier):
