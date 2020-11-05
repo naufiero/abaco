@@ -93,6 +93,8 @@ class CronResource(Resource):
                         logger.debug("execution has been added, now making message")
                         # Create & add message to the queue 
                         d['Time_msg_queued'] = before_exc_time
+                        d['_abaco_execution_id'] = exc
+                        d['_abaco_Content_Type'] = 'str'
                         ch = ActorMsgChannel(actor_id=actor_id)
                         ch.put_msg(message="This is your cron execution", d=d)
                         ch.close()
@@ -834,6 +836,8 @@ class ActorsResource(Resource):
         if 'logEx' in args and args.get('logEx') is not None:
             log_ex = int(args.get('logEx'))
             args['log_ex'] = log_ex
+        # cron attribute
+        cron = None
         if Config.get('web', 'case') == 'camel':
             logger.debug("Case is camel")
             if 'cronSchedule' in args and args.get('cronSchedule') is not None:
@@ -980,6 +984,7 @@ class ActorResource(Resource):
         args = self.validate_put(actor)
         logger.debug("PUT args validated successfully.")
         args['tenant'] = g.tenant
+        cron = None
         if 'logEx' in args and args.get('logEx') is not None:
             log_ex = int(args.get('logEx'))
             logger.debug(f"log_ex in args; using: {log_ex}")
