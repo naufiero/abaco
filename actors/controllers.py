@@ -836,6 +836,7 @@ class ActorsResource(Resource):
             args['log_ex'] = log_ex
         if Config.get('web', 'case') == 'camel':
             logger.debug("Case is camel")
+            cron = None
             if 'cronSchedule' in args and args.get('cronSchedule') is not None:
                 cron = args.get('cronSchedule')
         else:
