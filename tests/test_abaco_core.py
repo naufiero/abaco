@@ -209,12 +209,19 @@ def test_register_actor_with_cron(headers):
     data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite_cron', cron_field: cron_str}
     rsp = requests.post(url, json=data, headers=headers)
     result = basic_response_checks(rsp)
-    assert result['cronSchedule'] == cron_str
+    if case == 'camel':
+        assert result['cronSchedule'] == cron_str
+    else:
+        assert result['cron_schedule'] == cron_str
 
 @pytest.mark.regapi
 def test_register_actor_with_incorrect_cron(headers):
     url = '{}/{}'.format(base_url, 'actors')
-    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite_cron', 'cronSchedule': '2020-06-21 14 + 6 flimflams'}
+    if case == 'camel':
+        cron_field = 'cronSchedule'
+    else:
+        cron_field = 'cron_schedule'
+    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite_cron', cron_field: '2020-06-21 14 + 6 flimflams'}
     rsp = requests.post(url, data=data, headers=headers)
     #result = basic_response_checks(rsp)
     assert rsp.status_code == 400
@@ -224,20 +231,30 @@ def test_register_actor_with_incorrect_cron(headers):
 def test_update_cron(headers):
     actor_id = get_actor_id(headers, name='abaco_test_suite_cron')
     url = '{}/actors/{}'.format(base_url, actor_id)
-    data = {'image': 'jstubbs/abaco_test', 'stateless': False, 'cronSchedule': '2021-09-6 20 + 3 months'}
+    if case == 'camel':
+        cron_field = 'cronSchedule'
+    else:
+        cron_field = 'cron_schedule'
+    data = {'image': 'jstubbs/abaco_test', 'stateless': False, cron_field: '2021-09-6 20 + 3 months'}
     rsp = requests.put(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
-    assert result['cronSchedule'] == '2021-09-6 20 + 3 months'
+    assert result[cron_field] == '2021-09-6 20 + 3 months'
 
 @pytest.mark.regapi
 def test_update_cron_switch(headers):
     actor_id = get_actor_id(headers, name='abaco_test_suite_cron')
     url = '{}/actors/{}'.format(base_url, actor_id)
-    data = {'image': 'jstubbs/abaco_test', 'stateless': False, 'cronSchedule': '2021-09-6 20 + 3 months', 'cronOn': False}
+    if case == 'camel':
+        cron_field = 'cronSchedule'
+        cron_switch = 'cronOn'
+    else:
+        cron_field = 'cron_schedule'
+        cron_switch = 'cron_on'
+    data = {'image': 'jstubbs/abaco_test', 'stateless': False, cron_field: '2021-09-6 20 + 3 months', cron_switch: False}
     rsp = requests.put(url, data=data, headers=headers)
     result = basic_response_checks(rsp)
     assert result['image'] == 'jstubbs/abaco_test'
-    assert result['cronOn'] == False
+    assert result[cron_switch] == False
 
 @pytest.mark.log_exp
 def test_register_with_log_ex(headers):
