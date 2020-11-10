@@ -5,6 +5,7 @@ import socket
 import time
 import timeit
 import datetime
+import random
 
 import docker
 from requests.packages.urllib3.exceptions import ReadTimeoutError
@@ -17,7 +18,7 @@ from channels import ExecutionResultsChannel
 from config import Config
 from codes import BUSY, READY, RUNNING
 import globals
-from models import Execution, get_current_utc_time, display_time
+from models import Actor, Execution, get_current_utc_time, display_time
 from stores import workers_store
 
 
@@ -52,6 +53,56 @@ class DockerStartContainerError(DockerError):
 class DockerStopContainerError(DockerError):
     pass
 
+def get_docker_credentials():
+    """
+    Get the docker credentials from the config.
+    """
+    # we try to get as many credentials as have been
+    creds = []
+    cnt = 1
+    while True:
+        try:
+            username = Config.get('docker', f'dockerhub_username_{cnt}')
+            password = Config.get('docker', f'dockerhub_password_{cnt}')
+        except:
+            break
+        if not username or not password:
+            break
+        creds.append({'username': username, 'password': password})
+        cnt = cnt + 1
+    return creds
+
+
+dockerhub_creds = get_docker_credentials()
+
+
+def get_random_dockerhub_cred():
+    """
+    Chose a dockerhub credential at random
+    """
+    if len(dockerhub_creds) == 0:
+        return None, None
+    creds = random.choice(dockerhub_creds)
+    try:
+        username = creds['username']
+        password = creds['password']
+    except Exception as e:
+        logger.debug("Got exception trying to get dockerhub credentials")
+        return None, None
+    return username, password
+
+
+def cli_login(cli, username, password):
+    """
+    Try to login a dockerhub cli with a username and password
+    """
+    try:
+        cli.login(username=username, password=password)
+    except Exception as e:
+        logger.error(f"Could not login using dockerhub creds; username: {username}."
+                     f"Exception: {e}")
+
+
 def rm_container(cid):
     """
     Remove a container.
@@ -59,6 +110,9 @@ def rm_container(cid):
     :return:
     """
     cli = docker.APIClient(base_url=dd, version="auto")
+    username, password = get_random_dockerhub_cred()
+    if username and password:
+        cli_login(cli, username, password)
     try:
         rsp = cli.remove_container(cid, force=True)
     except Exception as e:
@@ -74,6 +128,9 @@ def pull_image(image):
     """
     logger.debug("top of pull_image()")
     cli = docker.APIClient(base_url=dd, version="auto")
+    username, password = get_random_dockerhub_cred()
+    if username and password:
+        cli_login(cli, username, password)
     try:
         rsp = cli.pull(repository=image)
     except Exception as e:
@@ -607,6 +664,7 @@ def execute_actor(actor_id,
     # a counter of the number of iterations through the main "running" loop;
     # this counter is used to determine when less frequent actions, such as log aggregation, need to run.
     loop_idx = 0
+    log_ex = Actor.get_actor_log_ttl(actor_id)
     while running and not globals.force_quit:
         loop_idx += 1
         logger.debug("top of while running loop; loop_idx: {}".format(loop_idx))
@@ -667,7 +725,7 @@ def execute_actor(actor_id,
         # grab the logs every 5th iteration --
         if loop_idx % 5 == 0:
             logs = cli.logs(container.get('Id'))
-            Execution.set_logs(execution_id, logs, actor_id, tenant, worker_id)
+            Execution.set_logs(execution_id, logs, actor_id, tenant, worker_id, log_ex)
             logs = None
 
         # checking the container status to see if it is still running ----
