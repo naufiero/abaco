@@ -20,7 +20,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.http import HttpResponse, JsonResponse
 
-import errors
+import abaco.errors
 
 def get_request():
     """Walk up the stack, return the nearest first argument named "request"."""
@@ -128,7 +128,8 @@ def get_roles(access_token, request):
     url = '{}/headers'.format(os.environ.get('AGAVE_BASE_URL', "https://api.tacc.utexas.edu"))
     try:
         rsp = requests.get(url, headers=headers)
-        data = rsp.json()
+        # data = rsp.json()
+        data = json.loads(rsp.content.decode('utf-8'))
         jwt_header_name = os.environ.get('JWT_HEADER')
         if jwt_header_name:
             jwt_header = data['headers'][jwt_header_name]
@@ -171,6 +172,8 @@ def is_abaco_user(request):
   #  return 'Internal/abaco-user' in roles or 'Internal/abaco-limited' in roles or 'Internal/abaco-admin' in roles
     return True
 
+# define
+
 # VIEWS
 
 def actors(request):
@@ -199,7 +202,8 @@ def actors(request):
 
         access_token = request.session.get("access_token")
         headers = {'Authorization': 'Bearer {}'.format(access_token)}
-        url = '{}/actors/v2/admin'.format(os.environ.get('AGAVE_BASE_URL', "https://api.tacc.utexas.edu"))
+        url = '{}/actors/v2/admin'.format(os.environ.get('AGAVE_BASE_URL', "https://dev.tenants.aloedev.tacc.cloud"))
+        print(url)
     context = {"admin": is_admin(request), "active_tab":"actor"}
     actors = []
     error = None

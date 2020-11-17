@@ -4,8 +4,6 @@ import os
 import socket
 import time
 import timeit
-import datetime
-import random
 
 import docker
 from requests.packages.urllib3.exceptions import ReadTimeoutError
@@ -13,18 +11,21 @@ from requests.exceptions import ReadTimeout, ConnectionError
 
 from agaveflask.logs import get_logger, get_log_file_strategy
 logger = get_logger(__name__)
-
+from cryptography.fernet import Fernet
 from channels import ExecutionResultsChannel
 from config import Config
 from codes import BUSY, READY, RUNNING
 import globals
-from models import Actor, Execution, get_current_utc_time, display_time
-from stores import workers_store
+from models import Execution, get_current_utc_time, ActorConfig
+from stores import configs_store, alias_store
+import encrypt_utils
 
+key = Config.get('web', 'encryption_key')
+f = Fernet(key.encode())
 
 TAG = os.environ.get('TAG') or Config.get('general', 'TAG') or ''
 if not TAG[0] == ':':
-    TAG = ':{}'.format(TAG)
+    TAG = ':{}',format(TAG)
 AE_IMAGE = '{}{}'.format(os.environ.get('AE_IMAGE', 'abaco/core'), TAG)
 
 # timeout (in seconds) for the socket server
@@ -53,56 +54,6 @@ class DockerStartContainerError(DockerError):
 class DockerStopContainerError(DockerError):
     pass
 
-def get_docker_credentials():
-    """
-    Get the docker credentials from the config.
-    """
-    # we try to get as many credentials as have been
-    creds = []
-    cnt = 1
-    while True:
-        try:
-            username = Config.get('docker', f'dockerhub_username_{cnt}')
-            password = Config.get('docker', f'dockerhub_password_{cnt}')
-        except:
-            break
-        if not username or not password:
-            break
-        creds.append({'username': username, 'password': password})
-        cnt = cnt + 1
-    return creds
-
-
-dockerhub_creds = get_docker_credentials()
-
-
-def get_random_dockerhub_cred():
-    """
-    Chose a dockerhub credential at random
-    """
-    if len(dockerhub_creds) == 0:
-        return None, None
-    creds = random.choice(dockerhub_creds)
-    try:
-        username = creds['username']
-        password = creds['password']
-    except Exception as e:
-        logger.debug("Got exception trying to get dockerhub credentials")
-        return None, None
-    return username, password
-
-
-def cli_login(cli, username, password):
-    """
-    Try to login a dockerhub cli with a username and password
-    """
-    try:
-        cli.login(username=username, password=password)
-    except Exception as e:
-        logger.error(f"Could not login using dockerhub creds; username: {username}."
-                     f"Exception: {e}")
-
-
 def rm_container(cid):
     """
     Remove a container.
@@ -110,9 +61,6 @@ def rm_container(cid):
     :return:
     """
     cli = docker.APIClient(base_url=dd, version="auto")
-    username, password = get_random_dockerhub_cred()
-    if username and password:
-        cli_login(cli, username, password)
     try:
         rsp = cli.remove_container(cid, force=True)
     except Exception as e:
@@ -128,9 +76,6 @@ def pull_image(image):
     """
     logger.debug("top of pull_image()")
     cli = docker.APIClient(base_url=dd, version="auto")
-    username, password = get_random_dockerhub_cred()
-    if username and password:
-        cli_login(cli, username, password)
     try:
         rsp = cli.pull(repository=image)
     except Exception as e:
@@ -152,50 +97,7 @@ def pull_image(image):
 def list_all_containers():
     """Returns a list of all containers """
     cli = docker.APIClient(base_url=dd, version="auto")
-    return cli.containers()
-
-
-def get_current_worker_containers():
-    worker_containers = []
-    containers = list_all_containers()
-    for c in containers:
-        if 'worker' in c['Names'][0]:
-            container_name = c['Names'][0]
-            # worker container names have format "/worker_<tenant>_<actor-id>_<worker-id>
-            # so split on _ to get parts
-            try:
-                parts = container_name.split('_')
-                tenant_id = parts[1]
-                actor_id = parts[2]
-                worker_id = parts[3]
-                worker_containers.append({'container': c,
-                                          'tenant_id': tenant_id,
-                                          'actor_id': actor_id,
-                                          'worker_id': worker_id
-                                          })
-            except:
-                pass
-    return worker_containers
-
-def check_worker_containers_against_store():
-    """
-    cheks the existing worker containers on a host against the status of the worker in the workers_store.
-    """
-    worker_containers = get_current_worker_containers()
-    for idx, w in enumerate(worker_containers):
-        try:
-            # try to get the worker from the store:
-            store_key = '{}_{}_{}'.format(w['tenant_id'], w['actor_id'], w['worker_id'])
-            worker = workers_store[store_key]
-        except KeyError:
-            worker = {}
-        status = worker.get('status')
-        try:
-            last_execution_time = display_time(worker.get('last_execution_time'))
-        except:
-            last_execution_time = None
-        print(idx, '). ', w['actor_id'], w['worker_id'], status, last_execution_time)
-
+    # todo -- finish
 
 def container_running(name=None):
     """Check if there is a running container whose name contains the string, `name`. Note that this function will
@@ -482,6 +384,42 @@ def execute_actor(actor_id,
     """
     logger.debug("top of execute_actor(); (worker {};{})".format(worker_id, execution_id))
 
+    # get any configs for this actor
+    actor_configs = {}
+    config_list = []
+    aid = actor_id.split('_')[1]
+
+    alias = None
+    for alias in alias_store.items():
+        logger.debug(f"THE ALIAS IS {alias}")
+        if aid == alias['actor_id']:
+            alias = alias['alias']
+            # make it a list
+    # encode tenant in the name
+    for config in configs_store.items():
+        if aid in config['actors'] or alias in config['actors']:
+            config_list.append(config)
+
+    for config in config_list:
+        logger.debug('CHECKING EACH CONFIG')
+        try:
+            if 'is_secret' in config:
+                if config['is_secret']:
+                    value = encrypt_utils.decrypt(config['value'])
+                    actor_configs[config['name']] = value
+            elif 'isSecret' in config:
+                if config['isSecret']:
+                    value = encrypt_utils.decrypt(config['value'])
+                    actor_configs[config['name']] = value
+            else:
+                actor_configs[config['name']] = config['value']
+
+        except:
+            logger.debug(f'something went wrong with config: {config}')
+
+    d['_actor_configs'] = actor_configs
+
+
     # initially set the global force_quit variable to False
     globals.force_quit = False
 
@@ -533,7 +471,6 @@ def execute_actor(actor_id,
     logger.debug("host_config object created by (worker {};{}).".format(worker_id, execution_id))
 
     # write binary data to FIFO if it exists:
-    fifo = None
     if fifo_host_path:
         try:
             fifo = os.open(fifo_host_path, os.O_RDWR)
@@ -597,7 +534,7 @@ def execute_actor(actor_id,
                                                                           worker_id, execution_id))
     if not server:
         msg = "Failed to instantiate results socket. " \
-              "Abaco compute host could be overloaded. (worker {};{})".format(worker_id, execution_id)
+              "Abaco compute host could be overloaded. Exception: {}; (worker {};{})".format(e, worker_id, execution_id)
         logger.error(msg)
         raise DockerStartContainerError(msg)
 
@@ -664,7 +601,6 @@ def execute_actor(actor_id,
     # a counter of the number of iterations through the main "running" loop;
     # this counter is used to determine when less frequent actions, such as log aggregation, need to run.
     loop_idx = 0
-    log_ex = Actor.get_actor_log_ttl(actor_id)
     while running and not globals.force_quit:
         loop_idx += 1
         logger.debug("top of while running loop; loop_idx: {}".format(loop_idx))
@@ -725,7 +661,7 @@ def execute_actor(actor_id,
         # grab the logs every 5th iteration --
         if loop_idx % 5 == 0:
             logs = cli.logs(container.get('Id'))
-            Execution.set_logs(execution_id, logs, actor_id, tenant, worker_id, log_ex)
+            Execution.set_logs(execution_id, logs, actor_id, tenant, worker_id)
             logs = None
 
         # checking the container status to see if it is still running ----
@@ -734,7 +670,6 @@ def execute_actor(actor_id,
                                                                                       worker_id, execution_id))
             # we need to wait for the container id to be available
             i = 0
-            c = None
             while i < 10:
                 try:
                     c = cli.containers(all=True, filters={'id': container.get('Id')})[0]
@@ -790,7 +725,6 @@ def execute_actor(actor_id,
 
     # get info from container execution, including exit code; Exceptions from any of these commands
     # should not cause the worker to shutdown or prevent starting subsequent actor containers.
-    exit_code = 'undetermined'
     try:
         container_info = cli.inspect_container(container.get('Id'))
         try:
@@ -801,25 +735,14 @@ def execute_actor(actor_id,
                 logger.error("Could not determine ExitCode for container {}. "
                              "Exception: {}; (worker {};{})".format(container.get('Id'), e, worker_id, execution_id))
                 exit_code = 'undetermined'
-            # Converting ISO8601 times to unix timestamps
-            try:
-                # Slicing to 23 to account for accuracy up to milliseconds and replace to get rid of ISO 8601 'Z'
-                startedat_ISO = container_state['StartedAt'].replace('Z', '')[:23]
-                finishedat_ISO = container_state['FinishedAt'].replace('Z', '')[:23]
-
-                container_state['StartedAt'] = datetime.datetime.strptime(startedat_ISO, "%Y-%m-%dT%H:%M:%S.%f")
-                container_state['FinishedAt'] = datetime.datetime.strptime(finishedat_ISO, "%Y-%m-%dT%H:%M:%S.%f")
-            except Exception as e:
-                logger.error(f"Datetime conversion failed for container {container.get('Id')}. ",
-                             f"Exception: {e}; (worker {worker_id};{execution_id})")
-                container_state = {'unavailable': True}
         except KeyError as e:
-            logger.error(f"Could not determine final state for container {container.get('Id')}. ",
-                         f"Exception: {e}; (worker {worker_id};{execution_id})")
+            logger.error("Could not determine final state for container {}. "
+                         "Exception: {}; (worker {};{})".format(container.get('Id')), e, worker_id, execution_id)
             container_state = {'unavailable': True}
     except docker.errors.APIError as e:
-        logger.error(f"Could not inspect container {container.get('Id')}. ",
-                     f"Exception: {e}; (worker {worker_id};{execution_id})")
+        logger.error("Could not inspect container {}. "
+                     "Exception: {}; (worker {};{})".format(container.get('Id'), e, worker_id, execution_id))
+
     logger.debug("right after getting container_info: {}; (worker {};{})".format(timeit.default_timer(),
                                                                                  worker_id, execution_id))
     # get logs from container
@@ -889,11 +812,8 @@ def execute_actor(actor_id,
                                                                                    worker_id, execution_id))
 
     if fifo_host_path:
-        try:
-            os.close(fifo)
-            os.remove(fifo_host_path)
-        except Exception as e:
-            logger.debug(f"got Exception trying to clean up fifo_host_path; e: {e}")
+        os.close(fifo)
+        os.remove(fifo_host_path)
     if results_ch:
         results_ch.close()
     result['runtime'] = int(stop - start)

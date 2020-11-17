@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 from agavepy.agave import Agave
 from config import Config
 import codes
-from models import Actor, Alias, get_permissions, is_hashid, Nonce
+from models import Actor, Alias, get_permissions, is_hashid, Nonce, get_config_permissions
 
 from errors import ClientException, ResourceError, PermissionsException
 
@@ -38,6 +38,10 @@ PUB_KEY = get_pub_key()
 TOKEN_RE = re.compile('Bearer (.+)')
 
 WORLD_USER = 'ABACO_WORLD'
+
+def get_pub_key():
+    pub_key = Config.get('web', 'apim_public_key')
+    return RSA.importKey(base64.b64decode(pub_key))
 
 
 def authn_and_authz():
@@ -101,7 +105,7 @@ def check_nonce():
     # the nonce encodes the tenant in its id:
     g.tenant = Nonce.get_tenant_from_nonce_id(nonce_id)
     g.api_server = get_api_server(g.tenant)
-    logger.debug("tenant associated with nonce: {}; api_server assoicated with nonce: {}".format(g.tenant, g.api_server))
+    logger.debug("tenant associated with nonce: {}".format(g.tenant))
     # get the actor_id base on the request path
     actor_id, actor_identifier = get_db_id()
     logger.debug("db_id: {}; actor_identifier: {}".format(actor_id, actor_identifier))
@@ -151,8 +155,8 @@ def authorization():
         or request.url_rule.rule == '/actors/' \
         or '/actors/admin' in request.url_rule.rule \
         or '/actors/aliases' in request.url_rule.rule \
-        or '/actors/utilization' in request.url_rule.rule \
-        or '/actors/search/' in request.url_rule.rule:
+        or '/actors/configs' in request.url_rule.rule \
+        or '/actors/utilization' in request.url_rule.rule:
         db_id = None
         logger.debug("setting db_id to None; rule: {}".format(request.url_rule.rule))
     else:
@@ -203,9 +207,6 @@ def authorization():
     if '/actors/utilization' == request.url_rule.rule or '/actors/utilization/' == request.url_rule.rule:
         return True
 
-    if '/actors/search/<string:search_type>' == request.url_rule.rule:
-        return True
-
     # there are special rules on the actors root collection:
     if '/actors' == request.url_rule.rule or '/actors/' == request.url_rule.rule:
         logger.debug("Checking permissions on root collection.")
@@ -216,12 +217,31 @@ def authorization():
         logger.debug("new actor or GET on root connection. allowing request.")
         return True
 
+    # if actors/configs is in rule at all, return true
+    # aliases root collection has special rules as well -
+    if '/actors/configs' == request.url_rule.rule or '/actors/configs/' == request.url_rule.rule:
+        return True
+
+
     # aliases root collection has special rules as well -
     if '/actors/aliases' == request.url_rule.rule or '/actors/aliases/' == request.url_rule.rule:
         return True
 
+    if '/actors/configs' in request.url_rule.rule:
+        logger.debug('auth.py /actors/configs if statement')
+        config = get_config_id()
+        noun = 'config'
+        if request.method == 'GET':
+            # GET requests require READ access
+            has_pem = check_config_permissions(user=g.user, config=config, level=codes.READ)
+            # all other requests require UPDATE access
+        elif request.method in ['DELETE', 'POST', 'PUT']:
+            has_pem = check_config_permissions(user=g.user, config=config, level=codes.UPDATE)
+        # check for new url here
+
     # request to a specific alias needs to check aliases permissions
-    if '/actors/aliases' in request.url_rule.rule:
+    elif '/actors/aliases' in request.url_rule.rule:
+        logger.debug('auth.py /actors/aliases if statement')
         alias_id = get_alias_id()
         noun = 'alias'
         # we need to compute the db_id since it is not computed in the general case for
@@ -250,7 +270,11 @@ def authorization():
                 # all other requests require UPDATE access
             elif request.method in ['DELETE', 'POST', 'PUT']:
                 has_pem = check_permissions(user=g.user, identifier=alias_id, level=codes.UPDATE)
+        # check for new url here
     else:
+        logger.debug('auth.py else after aliases if statement')
+        # TODO if db_id is none raise error, missing something
+
         # all other checks are based on actor-id:
         noun = 'actor'
         if request.method == 'GET':
@@ -272,6 +296,7 @@ def authorization():
                 # otherwise, we require UPDATE
                 else:
                     has_pem = check_permissions(user=g.user, identifier=db_id, level=codes.UPDATE)
+
     if not has_pem:
         logger.info("NOT allowing request.")
         raise PermissionsException("Not authorized -- you do not have access to this {}.".format(noun))
@@ -356,6 +381,37 @@ def check_permissions(user, identifier, level, roles=None):
     return False
 
 
+def check_config_permissions(user, config, level, roles=None):
+    """Check the permissions store for user and level. Here, `identifier` is a unique id in the
+    permissions_store; e.g., actor db_id or alias_id.
+    """
+    logger.debug("Checking user: {} permissions for config: {}".format(user, config))
+    # first, if roles were passed, check for admin role -
+    if roles:
+        if codes.ADMIN_ROLE in roles:
+            return True
+    # get all permissions for this actor -
+    permissions = get_config_permissions(config)
+    for p_user, p_name in permissions.items():
+        # if the actor has been shared with the WORLD_USER anyone can use it
+        if p_user == WORLD_USER:
+            logger.info("Allowing request - {} has been shared with the WORLD_USER.".format(config))
+            return True
+        # otherwise, check if the permission belongs to this user and has the necessary level
+        if p_user == user:
+            p_pem = codes.PermissionLevel(p_name)
+            if p_pem >= level:
+                logger.info("Allowing request - user has appropriate permission with {}.".format(config))
+                return True
+            else:
+                # we found the permission for the user but it was insufficient; return False right away
+                logger.info("Found permission {} for {}, rejecting request.".format(level, config))
+                return False
+    # didn't find the user or world_user, return False
+    logger.info("user had no permissions for {}. Permissions found: {}".format(config, permissions))
+    return False
+
+
 def get_db_id():
     """Get the db_id and actor_identifier from the request path."""
     # the location of the actor identifier is different for aliases vs actor_id's.
@@ -376,8 +432,6 @@ def get_db_id():
     except IndexError:
         raise ResourceError("Unable to parse actor identifier: is it missing from the URL?", 404)
     logger.debug("actor_identifier: {}; tenant: {}".format(actor_identifier, g.tenant))
-    if actor_identifier == 'search':
-        raise ResourceError("'x-nonce' query parameter on the '/actors/search/{database}' endpoint does not resolve.", 404)
     try:
         actor_id = Actor.get_actor_id(g.tenant, actor_identifier)
     except KeyError:
@@ -400,6 +454,17 @@ def get_alias_id():
     alias = path_split[3]
     logger.debug("alias: {}".format(alias))
     return Alias.generate_alias_id(g.tenant, alias)
+
+#todo
+def get_config_id():
+    """Get the alias from the request path."""
+    path_split = request.path.split("/")
+    if len(path_split) < 4:
+        logger.error("Unrecognized request -- could not find the config. path_split: {}".format(path_split))
+        raise PermissionsException("Not authorized.")
+    config = path_split[3]
+    logger.debug("config: {}".format(config))
+    return config
 
 def get_tenant_verify(tenant):
     """Return whether to turn on SSL verification."""
@@ -443,12 +508,10 @@ def get_tenants():
             'AGAVE-PROD',
             'ARAPORT-ORG',
             'DESIGNSAFE',
-            'DEV',
             'DEV-DEVELOP',
             'DEV-STAGING',
             'IPLANTC-ORG',
             'IREC',
-            'PORTALS',
             'SD2E',
             'SGCI',
             'TACC-PROD',

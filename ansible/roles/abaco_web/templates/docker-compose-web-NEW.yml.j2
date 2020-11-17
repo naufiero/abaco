@@ -1,0 +1,145 @@
+version: "3.3"
+
+networks:
+    abaco:
+        driver: bridge
+
+nginx:
+    image: {{ docker_user }}/nginx:{{ abaco_tag }}
+    ports:
+        - "80:80"
+        - "443:443"
+    networks:
+        - abaco
+
+reg:
+    image: {{ docker_user }}/core:{{ abaco_tag }}
+    ports:
+        - "5000:5000"
+    environment:
+# error handling is currently broken in gunicorn + flask + flask_restufl
+# see https://github.com/flask-restful/flask-restful/issues/542 and https://github.com/flask-restful/flask-restful/pull/544
+#        server: gunicorn
+        server: {{ web_server_type }}
+        api: reg
+{% if tas_role_account is defined %}
+        TAS_ROLE_ACCT: {{ tas_role_account }}
+        TAS_ROLE_PASS: {{ tas_role_password }}
+{% endif %}
+{% if abaco_TACC-PROD_service_token is defined %}
+        _abaco_TACC-PROD_service_token: {{ abaco_TACC-PROD_service_token }}
+{% endif %}
+{% if abaco_TACC-PROD_service_token is defined %}
+        _abaco_TACC-PROD_service_token: {{ abaco_TACC-PROD_service_token }}
+{% endif %}
+{% if abaco_SD2E_service_token is defined %}
+        _abaco_SD2E_service_token: {{ abaco_SD2E_service_token }}
+{% endif %}
+{% if abaco_DESIGNSAFE_service_token is defined %}
+        _abaco_DESIGNSAFE_service_token: {{ abaco_DESIGNSAFE_service_token }}
+{% endif %}
+        mongo_password:
+        redis_password:
+    volumes:
+        - ./abaco.conf:/etc/service.conf
+        - /home/apim/logs/reg.log:/var/log/service.log
+    networks:
+        - abaco
+
+mes:
+    image: {{ docker_user }}/core:{{ abaco_tag }}
+    ports:
+        - "5001:5000"
+    environment:
+#        server: gunicorn
+        server: {{ web_server_type }}
+        api: mes
+{% if tas_role_account is defined %}
+        TAS_ROLE_ACCT: {{ tas_role_account }}
+        TAS_ROLE_PASS: {{ tas_role_password }}
+{% endif %}
+        mongo_password:
+        redis_password:
+    volumes:
+        - ./abaco.conf:/etc/service.conf
+        - /home/apim/logs/mes.log:/var/log/service.log
+    networks:
+        - abaco
+
+admin:
+    image: {{ docker_user }}/core:{{ abaco_tag }}
+    ports:
+        - "5003:5000"
+    environment:
+#        server: gunicorn
+        server: {{ web_server_type }}
+        api: admin
+{% if tas_role_account is defined %}
+        TAS_ROLE_ACCT: {{ tas_role_account }}
+        TAS_ROLE_PASS: {{ tas_role_password }}
+{% endif %}
+        mongo_password:
+        redis_password:
+    volumes:
+        - ./abaco.conf:/etc/service.conf
+        - /home/apim/logs/admin.log:/var/log/service.log
+    networks:
+        - abaco
+
+prometheus:
+    image: {{ docker_user }}/prom:{{ abaco_tag }}
+    volumes:
+        - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+        - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml
+
+    command:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+        - 9090:9090
+
+    networks:
+        - abaco
+
+
+grafana:
+    image: grafana/grafana
+    user: "104"
+    depends_on:
+        - prometheus
+    ports:
+        - 3000:3000
+    volumes:
+        - grafana_data:/var/lib/grafana
+        - ./prometheus/grafana/provisioning/:/etc/grafana/provisioning/
+    env_file:
+        - ./prometheus/grafana/config.monitoring
+    networks:
+        - abaco
+    restart: always
+
+
+metrics:
+    image: {{ docker_user }}/core:{{ abaco_tag }}
+    networks:
+        - abaco
+    volumes:
+        - ./local-dev.conf:/etc/service.conf
+        - ./abaco.log:/var/log/service.log
+    ports:
+        - "5004:5000"
+    environment:
+        server: {{ web_server_type }}
+        api: metrics
+        mongo_password:
+        redis_password:
+{% if tas_role_account is defined %}
+        TAS_ROLE_ACCT: {{ tas_role_account }}
+        TAS_ROLE_PASS: {{ tas_role_password }}
+{% endif %}
+    depends_on:
+        - prometheus
+
+
+
+volumes:
+    grafana_data: {}

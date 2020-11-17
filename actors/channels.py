@@ -87,6 +87,7 @@ class CommandChannel(Channel):
 
     def put_cmd(self, actor_id, worker_id, image, tenant, stop_existing=True):
         """Put a new command on the command channel."""
+        # TODO - simplify to have only one worker
         msg = {'actor_id': actor_id,
                'worker_id': worker_id,
                'image': image,

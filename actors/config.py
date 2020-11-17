@@ -11,7 +11,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def read_config():
-    parser = ConfigParser(interpolation=None)
+    parser = ConfigParser()
     places = ['/service.conf',
               '/etc/service.conf']
     place = places[0]

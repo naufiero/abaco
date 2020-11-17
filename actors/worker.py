@@ -61,10 +61,10 @@ def shutdown_workers(actor_id, delete_actor_ch=True):
         workers = Worker.get_workers(actor_id)
     except Exception as e:
         logger.error("Got exception from get_workers: {}".format(e))
-    if not workers:
-        logger.info("shutdown_workers did not receive any workers from Worker.get_workers for actor: {}".format(actor_id))
+    if workers == {}:
+        logger.info("shutdown_workers did not receive any workers from Worker.get_worker for actor: {}".format(actor_id))
     # @TODO - this code is not thread safe. we need to update the workers state in a transaction:
-    for worker in workers:
+    for _, worker in workers.items():
         shutdown_worker(actor_id, worker['id'], delete_actor_ch)
 
 
@@ -74,12 +74,12 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
     :return:
     """
     global keep_running
-    logger.info("Worker subscribing to worker channel...{}_{}".format(actor_id, worker_id))
+    logger.info("Worker subscribing to worker channel...")
     while keep_running:
         msg, msg_obj = worker_ch.get_one()
         # receiving the message is enough to ack it - resiliency is currently handled in the calling code.
         msg_obj.ack()
-        logger.debug("Received message in worker channel; msg: {}; {}_{}".format(msg, actor_id, worker_id))
+        logger.debug("Received message in worker channel: {}".format(msg))
         logger.debug("Type(msg)={}".format(type(msg)))
         if type(msg) == dict:
             value = msg.get('value', '')
@@ -99,12 +99,10 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
             logger.info("Worker with worker_id: {} (actor_id: {}) received a force_quit message, "
                         "forcing the execution to halt...".format(worker_id, actor_id))
             globals.force_quit = True
-            globals.keep_running = False
 
         elif msg == 'stop' or msg == 'stop-no-delete':
             logger.info("Worker with worker_id: {} (actor_id: {}) received stop message, "
                         "stopping worker...".format(worker_id, actor_id))
-            globals.keep_running = False
             # set the worker status to SHUTTING_DOWN:
             try:
                 Worker.update_worker_status(actor_id, worker_id, SHUTTING_DOWN)
@@ -113,11 +111,13 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
                     f"worker got exception trying to update status to SHUTTING_DOWN. actor_id: {actor_id};"
                     f"worker_id: {worker_id}; exception: {e}")
 
+            globals.keep_running = False
+
             # when an actor's image is updated, old workers are deleted while new workers are
             # created. Deleting the actor msg channel in this case leads to race conditions
             delete_actor_ch = True
             if msg == 'stop-no-delete':
-                logger.info("Got stop-no-delete; will not delete actor_ch. {}_{}".format(actor_id, worker_id))
+                logger.info("Got stop-no-delete; will not delete actor_ch.")
                 delete_actor_ch = False
             # if a `stop` was sent, the actor is being deleted, and so we want to immediately shutdown processing.
             else:
@@ -126,7 +126,7 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
             # its possible this worker was not passed a client,
             # but if so, we need to delete it before shutting down.
             if ag_client:
-                logger.info("worker {}_{} Requesting client {} be deleted.".format(actor_id, worker_id, ag_client.api_key))
+                logger.info("Requesting client {} be deleted.".format(ag_client.api_key))
                 secret = os.environ.get('_abaco_secret')
                 clients_ch = ClientsChannel()
                 msg = clients_ch.request_delete_client(tenant=tenant,
@@ -144,7 +144,7 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
                                                                                     ag_client.api_key))
                 clients_ch.close()
             else:
-                logger.info("Did not receive client. Not issuing delete. Exiting. {}_{}".format(actor_id, worker_id))
+                logger.info("Did not receive client. Not issuing delete. Exiting.")
             try:
                 Worker.delete_worker(actor_id, worker_id)
             except WorkerException as e:
@@ -169,7 +169,7 @@ def process_worker_ch(tenant, worker_ch, actor_id, worker_id, actor_ch, ag_clien
 
             logger.info("Worker with worker_id: {} is now exiting.".format(worker_id))
             _thread.interrupt_main()
-            logger.info("main thread interrupted, worker {}_{} issuing os._exit()...".format(actor_id, worker_id))
+            logger.info("main thread interrupted, issuing os._exit()...")
             os._exit(0)
 
 def subscribe(tenant,
@@ -255,11 +255,6 @@ def subscribe(tenant,
             Worker.update_worker_status(actor_id, worker_id, READY)
             logger.debug("updated worker status to READY in SUBSCRIBE; worker id: {}".format(worker_id))
             update_worker_status = False
-
-        # note: the following get_one() call blocks until a message is returned. this means it could be a long time
-        # (i.e., many seconds, or even minutes) between the check above to globals.keep_running (line 252) and the
-        # get_one() function returning. In this time, the worker channel thread could have received a stop. We need to
-        # check this.
         try:
             msg, msg_obj = actor_ch.get_one()
         except channelpy.ChannelClosedException:
@@ -268,15 +263,6 @@ def subscribe(tenant,
             sys.exit()
         logger.info("worker {} processing new msg.".format(worker_id))
 
-        # worker ch thread has received a stop and is already shutting us down (see note above); we need to nack this
-        # message and exit
-        if not globals.keep_running:
-            logger.info("got msg from get_one() but globals.keep_running was False! "
-                        "Requeing message and worker will exit. {}+{}".format(actor_id, worker_id))
-            msg_obj.nack(requeue=True)
-            logger.info("message requeued; worker exiting:{}_{}".format(actor_id, worker_id))
-            time.sleep(5)
-            raise Exception()
         try:
             Worker.update_worker_status(actor_id, worker_id, BUSY)
         except Exception as e:
@@ -285,7 +271,7 @@ def subscribe(tenant,
                                                                                          worker_id,
                                                                                          BUSY,
                                                                                          e))
-            logger.info("worker exiting. {}_{}".format(actor_id, worker_id))
+            logger.info("worker exiting. worker_id: {}".format(worker_id))
             msg_obj.nack(requeue=True)
             raise e
         update_worker_status = True
@@ -352,7 +338,7 @@ def subscribe(tenant,
 
         # the execution object was created by the controller, but we need to add the worker id to it now that we
         # know which worker will be working on the execution.
-        logger.debug(f"Adding worker_id to execution. worker_id: {worker_id}")
+        logger.debug("Adding worker_id to execution. woker_id: {}".format(worker_id))
         try:
             Execution.add_worker_id(actor_id, execution_id, worker_id)
         except Exception as e:
@@ -394,37 +380,17 @@ def subscribe(tenant,
 
         # if we have an agave client, get a fresh set of tokens:
         if ag:
-            need_to_refresh = True
-            refresh_attempts = 0
-            while need_to_refresh and refresh_attempts < 10:
-                refresh_attempts = refresh_attempts + 1
-                logger.debug("About to try and refreh the token; "
-                             "attempt number: {}; {}_{}".format(refresh_attempts, actor_id, worker_id))
-                try:
-                    ag.token.refresh()
-                    token = ag.token.token_info['access_token']
-                    environment['_abaco_access_token'] = token
-                    logger.info("Refreshed the tokens. Passed {} to the environment.".format(token))
-                    need_to_refresh = False
-                except Exception as e:
-                    logger.error("Got an exception trying to get an access token. Attempt number {} "
-                                 "Exception: {}; actor_id: {}; worker_id: {}; execution_id: {}; client_id: {}; "
-                                 "client_secret: {}".format(refresh_attempts, e, actor_id, worker_id, execution_id, client_id, client_secret))
-                    # try to log the raw response; it is possible the exception object, e, will not have a response object
-                    # on it, for instance if one of the other lines above caused the exception.
-                    try:
-                        logger.error("content from response: {}".format(e.response.content))
-                    except Exception as e2:
-                        logger.error("got exception trying to log response content: {}".format(e2))
-                    # we hit the limit; give up, nack the message and raise an exception (which will put the actor in
-                    # ERROR state).
-                    if refresh_attempts == 10:
-                        msg_obj.nack(requeue=True)
-                        logger.info("worker exiting. worker_id: {}".format(worker_id))
-                        raise e
-                    else:
-                        # otherwise, wait 2 seconds and then try again:
-                        time.sleep(2)
+            try:
+                ag.token.refresh()
+                token = ag.token.token_info['access_token']
+                environment['_abaco_access_token'] = token
+                logger.info("Refreshed the tokens. Passed {} to the environment.".format(token))
+            except Exception as e:
+                logger.error("Got an exception trying to get an access token. Stoping worker and nacking message. "
+                             "Exception: {}".format(e))
+                msg_obj.nack(requeue=True)
+                logger.info("worker exiting. worker_id: {}".format(worker_id))
+                raise e
         else:
             logger.info("Agave client `ag` is None -- not passing access token; worker_id: {}".format(worker_id))
         logger.info("Passing update environment: {}".format(environment))
@@ -500,11 +466,8 @@ def subscribe(tenant,
 
         # Add the logs to the execution
         try:
-            logger.debug("Checking for get_actor_log_ttl")
-            log_ex = Actor.get_actor_log_ttl(actor_id)
-            logger.debug("log ex is {log_ex}")
-            Execution.set_logs(execution_id, logs, actor_id, tenant, worker_id, log_ex)
-            logger.debug(f"Successfully added execution logs of expiry {log_ex}.")
+            Execution.set_logs(execution_id, logs, actor_id, tenant, worker_id)
+            logger.debug("Successfully added execution logs.")
         except Exception as e:
             msg = "Got exception trying to set logs for exception {}; " \
                   "Exception: {}; worker_id: {}".format(execution_id, e, worker_id)
@@ -534,7 +497,7 @@ def get_container_user(actor):
         return None
     uid = actor.get('uid')
     gid = actor.get('gid')
-    logger.debug(f"The uid: {uid} and gid: {gid} from the actor.")
+    logger.debug("The uid: {} and gid:{} from the actor.".format(uid, gid))
     if not uid:
         if Config.get('workers', 'use_tas_uid') and not actor.get('use_container_uid'):
             logger.warn('Warning - legacy actor running as image UID without use_container_uid!')
@@ -597,7 +560,7 @@ if __name__ == '__main__':
     # This is the entry point for the worker container.
     # Worker containers are launched by spawners and spawners pass the initial configuration
     # data for the worker through environment variables.
-    logger.info("Initial log for new worker.")
+    logger.info("Inital log for new worker.")
 
     # call the main() function:
     try:
@@ -608,7 +571,6 @@ if __name__ == '__main__':
         except:
             worker_id = ''
         msg = "worker caught exception from main loop. worker exiting. e" \
-              "Exception: {} worker_id: {}".format(e, worker_id)
+              "xception: {} worker_id: {}".format(e, worker_id)
         logger.info(msg)
-    sys.exit()
 

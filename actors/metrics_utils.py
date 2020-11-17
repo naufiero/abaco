@@ -27,12 +27,11 @@ command_gauge = Gauge(
     ['name'])
 
 def create_gauges(actor_ids):
-    logger.debug("METRICS: Made it to create_gauges; actor_ids: {}".format(actor_ids))
+    # logger.debug("METRICS: Made it to create_gauges; actor_ids: {}".format(actor_ids))
     inbox_lengths = {}
     for actor_id in actor_ids:
-        logger.debug("top of for loop for actor_id: {}".format(actor_id))
-
-        channel_name = None
+        # logger.debug("top of for
+        # loop for actor_id: {}".format(actor_id))
         try:
             actor = actors_store[actor_id]
         except KeyError:
@@ -78,7 +77,7 @@ def create_gauges(actor_ids):
         inbox_lengths[actor_id] = len(ch._queue._queue)
         ch.close()
         g.set(result['messages'])
-        logger.debug("METRICS: {} messages found for actor: {}.".format(result['messages'], actor_id))
+        # logger.debug("METRICS: {} messages found for actor: {}.".format(result['messages'], actor_id))
 
         # add a worker gauge for this actor if one does not exist
         if actor_id not in worker_gaueges.keys():
@@ -99,14 +98,12 @@ def create_gauges(actor_ids):
         workers = Worker.get_workers(actor_id)
         result = {'workers': len(workers)}
         g.set(result['workers'])
-        logger.debug("METRICS: {} workers found for actor: {}.".format(result['workers'], actor_id))
+        # logger.debug("METRICS: {} workers found for actor: {}.".format(result['workers'], actor_id))
 
-    if not channel_name:
-        return
     ch = CommandChannel(name=channel_name)
     cmd_length = len(ch._queue._queue)
     command_gauge.labels(channel_name).set(cmd_length)
-    logger.debug("METRICS COMMAND CHANNEL {} size: {}".format(channel_name, command_gauge))
+    # logger.debug("METRICS COMMAND CHANNEL {} size: {}".format(channel_name, command_gauge))
     ch.close()
 
     # Return actor_ids so we don't have to query for them again later
@@ -139,15 +136,15 @@ def allow_autoscaling(max_workers, num_workers, cmd_length):
     if cmd_length > max_cmd_length:
         return False
     if int(num_workers) >= int(max_workers):
-        logger.debug('METRICS NO AUTOSCALE - criteria not met. {} '.format(num_workers))
+        # logger.debug('METRICS NO AUTOSCALE - criteria not met. {} '.format(num_workers))
         return False
 
-    logger.debug('METRICS AUTOSCALE - criteria met. {} '.format(num_workers))
+    # logger.debug('METRICS AUTOSCALE - criteria met. {} '.format(num_workers))
     return True
 
 def scale_up(actor_id):
     tenant, aid = actor_id.split('_')
-    logger.debug('METRICS Attempting to create a new worker for {}'.format(actor_id))
+    # logger.debug('METRICS Attempting to create a new worker for {}'.format(actor_id))
     try:
         # create a worker & add to this actor
         actor = Actor.from_db(actors_store[actor_id])
@@ -164,20 +161,20 @@ def scale_up(actor_id):
                    tenant=tenant,
                    stop_existing=False)
         ch.close()
-        logger.debug('METRICS Added worker successfully for {}'.format(actor_id))
+        # logger.debug('METRICS Added worker successfully for {}'.format(actor_id))
         return channel_name
     except Exception as e:
-        logger.debug("METRICS - SOMETHING BROKE: {} - {} - {}".format(type(e), e, e.args))
+        # logger.debug("METRICS - SOMETHING BROKE: {} - {} - {}".format(type(e), e, e.args))
         return None
 
 
 def scale_down(actor_id, is_sync_actor=False):
     logger.debug(f"top of scale_down for actor_id: {actor_id}")
     workers = Worker.get_workers(actor_id)
-    logger.debug('METRICS NUMBER OF WORKERS: {}'.format(len(workers)))
+    # logger.debug('METRICS NUMBER OF WORKERS: {}'.format(len(workers)))
     try:
         while len(workers) > 0:
-            logger.debug('METRICS made it STATUS check')
+            # logger.debug('METRICS made it STATUS check')
             check_ttl = False
             sync_max_idle_time = 0
             if len(workers) == 1 and is_sync_actor:
@@ -188,7 +185,7 @@ def scale_down(actor_id, is_sync_actor=False):
                     logger.error(f"Got exception trying to read sync_max_idle_time from config; e:{e}")
                     sync_max_idle_time = DEFAULT_SYNC_MAX_IDLE_TIME
                 check_ttl = True
-            worker = workers.pop()
+            worker = workers.popitem()[1]
             if check_ttl:
                 try:
                     last_execution = int(float(worker.get('last_execution_time', 0)))
@@ -212,7 +209,7 @@ def scale_down(actor_id, is_sync_actor=False):
                     logger.info("Autoscaler not shuting down this worker - still time left.")
                     break
 
-            logger.debug('METRICS SCALE DOWN current worker: {}'.format(worker['status']))
+            # logger.debug('METRICS SCALE DOWN current worker: {}'.format(worker['status']))
             # check status of the worker is ready
             if worker['status'] == 'READY':
                 # scale down

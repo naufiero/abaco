@@ -24,9 +24,8 @@
 # IX) nonce tests
 # X) workers tests
 # XI) roles and authorization tests
-# XII) search and search authorization tests
-# XIII) tenancy tests
-# XV) events tests
+# XII) tenancy tests
+# XIII) events tests
 
 # Design Notes
 # 1. The *headers() functions in the util.py module provides the JWTs used for the tests. The plain headers() returns a
@@ -64,7 +63,7 @@
 #    tenant by not setting the tenant header, while the second one sets tenant: abaco_test_suite_tenant; this enables
 #    the suite to test tenancy bleed-over.
 #
-import datetime
+import ast
 import os
 import sys
 
@@ -193,95 +192,7 @@ def test_register_actor(headers):
     assert result['name'] == 'abaco_test_suite'
     assert result['id'] is not None
 
-@pytest.mark.regapi
-def test_register_actor_with_cron(headers):
-    url = '{}/{}'.format(base_url, 'actors')
-    if case == 'camel':
-        cron_field = 'cronSchedule'
-    else:
-        cron_field = 'cron_schedule'
-    # we need to use "tomorrow" because abaco uses UTC which could be the next day compared to this
-    # machine's "now()"
-    tomorrow_dt = datetime.datetime.now() + datetime.timedelta(days=1)
-    tomorrow_str = tomorrow_dt.strftime("%Y-%m-%d")
-    cron_str = f'{tomorrow_str} 23 + 6 hours'
 
-    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite_cron', cron_field: cron_str}
-    rsp = requests.post(url, json=data, headers=headers)
-    result = basic_response_checks(rsp)
-    if case == 'camel':
-        assert result['cronSchedule'] == cron_str
-    else:
-        assert result['cron_schedule'] == cron_str
-
-@pytest.mark.regapi
-def test_register_actor_with_incorrect_cron(headers):
-    url = '{}/{}'.format(base_url, 'actors')
-    if case == 'camel':
-        cron_field = 'cronSchedule'
-    else:
-        cron_field = 'cron_schedule'
-    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_test_suite_cron', cron_field: '2020-06-21 14 + 6 flimflams'}
-    rsp = requests.post(url, data=data, headers=headers)
-    #result = basic_response_checks(rsp)
-    assert rsp.status_code == 400
-
-
-@pytest.mark.regapi
-def test_update_cron(headers):
-    actor_id = get_actor_id(headers, name='abaco_test_suite_cron')
-    url = '{}/actors/{}'.format(base_url, actor_id)
-    if case == 'camel':
-        cron_field = 'cronSchedule'
-    else:
-        cron_field = 'cron_schedule'
-    data = {'image': 'jstubbs/abaco_test', 'stateless': False, cron_field: '2021-09-6 20 + 3 months'}
-    rsp = requests.put(url, data=data, headers=headers)
-    result = basic_response_checks(rsp)
-    assert result[cron_field] == '2021-09-6 20 + 3 months'
-
-@pytest.mark.regapi
-def test_update_cron_switch(headers):
-    actor_id = get_actor_id(headers, name='abaco_test_suite_cron')
-    url = '{}/actors/{}'.format(base_url, actor_id)
-    if case == 'camel':
-        cron_field = 'cronSchedule'
-        cron_switch = 'cronOn'
-    else:
-        cron_field = 'cron_schedule'
-        cron_switch = 'cron_on'
-    data = {'image': 'jstubbs/abaco_test', 'stateless': False, cron_field: '2021-09-6 20 + 3 months', cron_switch: False}
-    rsp = requests.put(url, data=data, headers=headers)
-    result = basic_response_checks(rsp)
-    assert result['image'] == 'jstubbs/abaco_test'
-    assert result[cron_switch] == False
-
-@pytest.mark.log_exp
-def test_register_with_log_ex(headers):
-    url = '{}/{}'.format(base_url, '/actors')
-    if case == 'camel':
-        log_field = 'logEx'
-    else:
-        log_field = 'log_ex'
-    data = {'image': 'jstubbs/abaco_test', 'name': 'abaco_log_ex_test', log_field: '16000'}
-    rsp = requests.post(url, data=data, headers=headers)
-    result = basic_response_checks(rsp)
-    assert result[log_field] == 16000
-
-@pytest.mark.log_exp
-def test_update_log_ex(headers):
-    actor_id = get_actor_id(headers, 'abaco_log_ex_test')
-    url = '{}/actors/{}'.format(base_url, actor_id)
-    if case == 'camel':
-        log_field = 'logEx'
-    else:
-        log_field = 'log_ex'
-    data = {'image': 'jstubbs/abaco_test', log_field: '20000'}
-    rsp = requests.put(url, data=data, headers=headers)
-    result = basic_response_checks(rsp)
-    assert result['image'] == 'jstubbs/abaco_test'
-    assert result[log_field] == 20000
-    
 @pytest.mark.aliastest
 def test_register_alias_actor(headers):
     url = '{}/{}'.format(base_url, '/actors')
@@ -789,7 +700,7 @@ def test_execute_and_delete_sleep_loop_actor(headers):
             worker_id = rsp.get('workerId')
         idx += 1
         time.sleep(1)
-        if idx > 15:
+        if idx > 10:
             print("worker never got sleep_loop execution. "
                   "actor: {}; execution: {}; idx:{}".format(actor_id, exc_id, idx))
             assert False
@@ -1072,7 +983,6 @@ def test_2_actors_with_different_queues(headers):
 
 ALIAS_1 = 'jane'
 ALIAS_2 = 'doe'
-ALIAS_3 = 'dots.in.my.name.alias' # Testing to make sure dots are okay in aliases.
 
 
 @pytest.mark.aliastest
@@ -1288,7 +1198,7 @@ def test_create_unlimited_alias_nonce(headers):
     check_nonce_fields(result, alias=ALIAS_1, level='EXECUTE', max_uses=-1, current_uses=0, remaining_uses=-1)
 
 @pytest.mark.aliastest
-def test_redeem_unlimited_alias_nonce(headers):
+def test_redeem_unlimted_alias_nonce(headers):
     # first, get the nonce id:
     url = '{}/actors/aliases/{}/nonces'.format(base_url, ALIAS_1)
     rsp = requests.get(url, headers=headers)
@@ -1317,6 +1227,7 @@ def test_owner_can_delete_alias(headers):
     for alias in result:
         assert not alias['alias'] == ALIAS_2
 
+
 @pytest.mark.aliastest
 def test_other_user_can_delete_shared_alias(headers):
     url = '{}/actors/aliases/{}'.format(base_url, ALIAS_1)
@@ -1330,97 +1241,6 @@ def test_other_user_can_delete_shared_alias(headers):
     for alias in result:
         assert not alias['alias'] == ALIAS_1
 
-@pytest.mark.aliastest
-def test_add_alias_with_dots_in_name(headers):
-    actor_id = get_actor_id(headers, name='abaco_test_suite_alias')
-    url = '{}/actors/aliases'.format(base_url)
-    field = 'actor_id'
-    if case == 'camel':
-        field = 'actorId'
-    data = {'alias': ALIAS_3,
-            field: actor_id}
-    rsp = requests.post(url, data=data, headers=headers)
-    result = basic_response_checks(rsp)
-    assert result['alias'] == ALIAS_3
-    assert result[field] == actor_id
-
-@pytest.mark.aliastest
-def test_list_alias_with_dots_in_name(headers):
-    url = '{}/actors/aliases/{}'.format(base_url, ALIAS_3)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    actor_id = get_actor_id(headers, name='abaco_test_suite_alias')
-    field = 'actor_id'
-    if case == 'camel':
-        field = 'actorId'
-    assert field in result
-    assert result[field] == actor_id
-    assert result['alias'] == ALIAS_3
-
-@pytest.mark.aliastest
-def test_get_actor_with_alias_with_dots_in_name(headers):
-    actor_id = get_actor_id(headers, name='abaco_test_suite_alias')
-    url = '{}/actors/{}'.format(base_url, ALIAS_3)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert result['id'] == actor_id
-
-@pytest.mark.aliastest
-def test_get_actor_messages_with_alias_with_dots_in_name(headers):
-    actor_id = get_actor_id(headers, name='abaco_test_suite_alias')
-    url = '{}/actors/{}/messages'.format(base_url, ALIAS_3)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert actor_id in result['_links']['self']
-    assert 'messages' in result
-
-@pytest.mark.aliastest
-def test_get_actor_executions_with_alias_with_dots_in_name(headers):
-    actor_id = get_actor_id(headers, name='abaco_test_suite_alias')
-    url = '{}/actors/{}/executions'.format(base_url, ALIAS_3)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert actor_id in result['_links']['self']
-    assert 'executions' in result
-
-@pytest.mark.aliastest
-def test_create_unlimited_alias_nonce_with_dots_in_name(headers):
-    url = '{}/actors/aliases/{}/nonces'.format(base_url, ALIAS_3)
-    # passing no data to the POST should use the defaults for a nonce:
-    # unlimited uses and EXECUTE level
-    rsp = requests.post(url, headers=headers)
-    result = basic_response_checks(rsp)
-    check_nonce_fields(result, alias=ALIAS_3, level='EXECUTE', max_uses=-1, current_uses=0, remaining_uses=-1)
-
-@pytest.mark.aliastest
-def test_redeem_unlimited_alias_nonce_with_dots_in_name(headers):
-    # first, get the nonce id:
-    url = '{}/actors/aliases/{}/nonces'.format(base_url, ALIAS_3)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    nonce_id = result[0].get('id')
-    # sanity check that alias can be used to get the actor
-    url = '{}/actors/{}'.format(base_url, ALIAS_3)
-    rsp = requests.get(url, headers=headers)
-    basic_response_checks(rsp)
-    # use the nonce-id and the alias to list the actor
-    url = '{}/actors/{}?x-nonce={}'.format(base_url, ALIAS_3, nonce_id)
-    # no JWT header -- we're using the nonce
-    rsp = requests.get(url)
-    basic_response_checks(rsp)
-
-@pytest.mark.aliastest
-def test_owner_can_delete_alias_with_dots_in_name(headers):
-    url = '{}/actors/aliases/{}'.format(base_url, ALIAS_3)
-    rsp = requests.delete(url, headers=headers)
-    result = basic_response_checks(rsp)
-
-    # list aliases and make sure it is gone -
-    url = '{}/actors/aliases'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    for alias in result:
-        assert not alias['alias'] == ALIAS_3
 
 # ################
 # nonce API
@@ -1736,9 +1556,9 @@ def test_delete_worker(headers):
 
     # check the workers store:
     dbid = models.Actor.get_dbid(get_tenant(headers), actor_id)
-    workers = stores.workers_store.items({'actor_id': dbid})
-    for worker in workers:
-        assert not worker['id'] == id
+    workers = stores.workers_store.get(dbid)
+    for k,v in workers.items():
+        assert not k == id
 
 def test_list_permissions(headers):
     actor_id = get_actor_id(headers)
@@ -1848,345 +1668,6 @@ def test_priv_user_can_create_priv_actor():
     url = '{}/{}/{}'.format(base_url, '/actors', actor_id)
     rsp = requests.delete(url, headers=headers)
     basic_response_checks(rsp)
-
-
-# #####################################
-# search and search authorization tests
-# #####################################
-# Checking that search is performing correctly for each database and returning correct projections.
-# Also checking that permissions work correctly; one user can't read anothers information and 
-# admins can read everything. These tests do no work without prior tests.
-
-def test_search_logs_details(headers):
-    url = '{}/actors/search/logs'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    if case == 'snake':
-        assert result['_metadata']['count_returned'] == 7
-        assert result['_metadata']['record_limit'] == 100
-        assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 7
-        assert len(result['search']) == result['_metadata']['count_returned']
-    else:
-        assert result['_metadata']['countReturned'] == 7
-        assert result['_metadata']['recordLimit'] == 100
-        assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 7
-        assert len(result['search']) == result['_metadata']['countReturned']
-    assert '_links' in result['search'][0]
-    assert 'logs' in result['search'][0]
-    assert not '_id' in result['search'][0]
-    assert not 'permissions' in result['search'][0]
-    assert not 'tenant' in result['search'][0]
-    assert not 'exp' in result['search'][0]
-
-def test_search_executions_details(headers):
-    url = '{}/actors/search/executions'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    if case == 'snake':
-        assert result['_metadata']['count_returned'] == 7
-        assert result['_metadata']['record_limit'] == 100
-        assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 7
-        assert len(result['search']) == result['_metadata']['count_returned']
-    else:
-        assert result['_metadata']['countReturned'] == 7
-        assert result['_metadata']['recordLimit'] == 100
-        assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 7
-        assert len(result['search']) == result['_metadata']['countReturned']
-    assert '_links' in result['search'][0]
-    assert 'executor' in result['search'][0]
-    assert 'id' in result['search'][0]
-    assert 'io' in result['search'][0]
-    assert 'runtime' in result['search'][0]
-    assert 'status' in result['search'][0]
-    assert result['search'][0]['status'] == 'COMPLETE'
-    assert not '_id' in result['search'][0]
-    assert not 'permissions' in result['search'][0]
-    assert not 'api_server' in result['search'][0]
-    assert not 'tenant' in result['search'][0]
-
-def test_search_actors_details(headers):
-    url = '{}/actors/search/actors'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    if case == 'snake':
-        assert result['_metadata']['count_returned'] == 10
-        assert result['_metadata']['record_limit'] == 100
-        assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 10
-        assert len(result['search']) == result['_metadata']['count_returned']
-    else:
-        assert result['_metadata']['countReturned'] == 10
-        assert result['_metadata']['recordLimit'] == 100
-        assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 10
-        assert len(result['search']) == result['_metadata']['countReturned']
-    assert '_links' in result['search'][0]
-    assert 'description' in result['search'][0]
-    assert 'gid' in result['search'][0]
-    assert 'hints' in result['search'][0]
-    assert 'link' in result['search'][0]
-    assert 'mounts' in result['search'][0]
-    assert 'name' in result['search'][0]
-    assert 'owner' in result['search'][0]
-    assert 'privileged' in result['search'][0]
-    assert 'status' in result['search'][0]
-    assert result['search'][0]['token'] == 'false'
-    assert not '_id' in result['search'][0]
-    assert not 'permissions' in result['search'][0]
-    assert not 'api_server' in result['search'][0]
-    assert not 'executions' in result['search'][0]
-    assert not 'tenant' in result['search'][0]
-    assert not 'db_id' in result['search'][0]
-
-def test_search_workers_details(headers):
-    url = '{}/actors/search/workers'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    if case == 'snake':
-        assert result['_metadata']['count_returned'] == 15
-        assert result['_metadata']['record_limit'] == 100
-        assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 15
-        assert len(result['search']) == result['_metadata']['count_returned']
-    else:
-        assert result['_metadata']['countReturned'] == 15
-        assert result['_metadata']['recordLimit'] == 100
-        assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 15
-        assert len(result['search']) == result['_metadata']['countReturned']
-    assert 'status' in result['search'][0]
-    assert 'id' in result['search'][0]
-    assert not '_id' in result['search'][0]
-    assert not 'permissions' in result['search'][0]
-    assert not 'tenant' in result['search'][0]
-
-# privileged role
-def test_search_permissions_priv(headers):
-    # Logs
-    url = '{}/actors/search/logs'.format(base_url)
-    rsp = requests.get(url, headers=priv_headers())
-    result = basic_response_checks(rsp)
-    print(result['_metadata'])
-    if case == 'snake':
-        assert result['_metadata']['count_returned'] == 4
-        assert result['_metadata']['record_limit'] == 100
-        assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 4
-    else:
-        assert result['_metadata']['countReturned'] == 4
-        assert result['_metadata']['recordLimit'] == 100
-        assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 4
-    
-    # Executions
-    url = '{}/actors/search/executions'.format(base_url)
-    rsp = requests.get(url, headers=priv_headers())
-    result = basic_response_checks(rsp)
-    print(result['_metadata'])
-    if case == 'snake':
-        assert result['_metadata']['count_returned'] == 4
-        assert result['_metadata']['record_limit'] == 100
-        assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 4
-    else:
-        assert result['_metadata']['countReturned'] == 4
-        assert result['_metadata']['recordLimit'] == 100
-        assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 4
-
-    # Actors
-    url = '{}/actors/search/actors'.format(base_url)
-    rsp = requests.get(url, headers=priv_headers())
-    result = basic_response_checks(rsp)
-    print(result['_metadata'])
-    if case == 'snake':
-        assert result['_metadata']['count_returned'] == 1
-        assert result['_metadata']['record_limit'] == 100
-        assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 1
-    else:
-        assert result['_metadata']['countReturned'] == 1
-        assert result['_metadata']['recordLimit'] == 100
-        assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 1
-
-    # Workers
-    url = '{}/actors/search/workers'.format(base_url)
-    rsp = requests.get(url, headers=priv_headers())
-    result = basic_response_checks(rsp)
-    print(result['_metadata'])
-    if case == 'snake':
-        assert result['_metadata']['count_returned'] == 1
-        assert result['_metadata']['record_limit'] == 100
-        assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 1
-    else:
-        assert result['_metadata']['countReturned'] == 1
-        assert result['_metadata']['recordLimit'] == 100
-        assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 1
-
-# limited role
-def test_search_permissions_limited(headers):
-    # Logs
-    url = '{}/actors/search/logs'.format(base_url)
-    rsp = requests.get(url, headers=limited_headers())
-    result = basic_response_checks(rsp)
-    print(result['_metadata'])
-    if case == 'snake':
-        assert result['_metadata']['count_returned'] == 0
-        assert result['_metadata']['record_limit'] == 100
-        assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 0
-    else:
-        assert result['_metadata']['countReturned'] == 0
-        assert result['_metadata']['recordLimit'] == 100
-        assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 0
-    
-    # Executions
-    url = '{}/actors/search/executions'.format(base_url)
-    rsp = requests.get(url, headers=limited_headers())
-    result = basic_response_checks(rsp)
-    print(result['_metadata'])
-    if case == 'snake':
-        assert result['_metadata']['count_returned'] == 0
-        assert result['_metadata']['record_limit'] == 100
-        assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 0
-    else:
-        assert result['_metadata']['countReturned'] == 0
-        assert result['_metadata']['recordLimit'] == 100
-        assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 0
-
-    # Actors
-    url = '{}/actors/search/actors'.format(base_url)
-    rsp = requests.get(url, headers=limited_headers())
-    result = basic_response_checks(rsp)
-    print(result['_metadata'])
-    if case == 'snake':
-        assert result['_metadata']['count_returned'] == 1
-        assert result['_metadata']['record_limit'] == 100
-        assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 1
-    else:
-        assert result['_metadata']['countReturned'] == 1
-        assert result['_metadata']['recordLimit'] == 100
-        assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 1
-
-    # Workers
-    url = '{}/actors/search/workers'.format(base_url)
-    rsp = requests.get(url, headers=limited_headers())
-    result = basic_response_checks(rsp)
-    print(result['_metadata'])
-    if case == 'snake':
-        assert result['_metadata']['count_returned'] == 1
-        assert result['_metadata']['record_limit'] == 100
-        assert result['_metadata']['records_skipped'] == 0
-        assert result['_metadata']['total_count'] == 1
-    else:
-        assert result['_metadata']['countReturned'] == 1
-        assert result['_metadata']['recordLimit'] == 100
-        assert result['_metadata']['recordsSkipped'] == 0
-        assert result['_metadata']['totalCount'] == 1
-
-def test_search_datetime(headers):
-    url = '{}/actors/search/executions?final_state.StartedAt.gt=2000-05:00'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    print(result)
-    assert len(result['search']) == 7
-
-    url = '{}/actors/search/executions?final_state.StartedAt.gt=2000-01-01T01:00:00.000Z'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert len(result['search']) == 7
-
-    url = '{}/actors/search/executions?final_state.StartedAt.lt=2000-01-01T01:00'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert len(result['search']) == 0
-
-    url = '{}/actors/search/executions?message_received_time.between=2000-01-01T01:00,2200-12-30T23:59:59.999Z'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert len(result['search']) == 7
-
-    url = '{}/actors/search/actors?create_time.between=2000-01-01,2200-01-01'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert len(result['search']) == 10
-
-def test_search_exactsearch_search(headers):
-    url = '{}/actors/search/actors?exactsearch=abacosamples/sleep_loop'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert len(result['search']) == 1
-
-    url = '{}/actors/search/actors?search=sleep_loop'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert result['search'][0]['image'] == 'abacosamples/sleep_loop'
-
-    url = '{}/actors/search/actors?exactsearch=NOTATHINGWORD'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert len(result['search']) == 0
-
-def test_search_in_nin(headers):
-    url = '{}/actors/search/executions?status.in=["COMPLETE", "READY"]'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert len(result['search']) == 7
-
-    url = '{}/actors/search/executions?status.nin=["COMPLETE", "READY"]'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert len(result['search']) == 0
-
-def test_search_eq_neq(headers):
-    url = '{}/actors/search/actors?image=abacosamples/py3_func'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert len(result['search']) == 1
-
-    url = '{}/actors/search/actors?image.neq=abacosamples/py3_func'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert len(result['search']) == 9
-
-def test_search_like_nlike(headers):
-    url = '{}/actors/search/actors?image.like=py3_func'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert len(result['search']) == 1
-    
-    url = '{}/actors/search/actors?image.nlike=py3_func'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    assert len(result['search']) == 9
-
-def test_search_skip_limit(headers):
-    url = '{}/actors/search/actors?skip=4&limit=23'.format(base_url)
-    rsp = requests.get(url, headers=headers)
-    result = basic_response_checks(rsp)
-    if case == 'snake':
-        assert result['_metadata']['count_returned'] == 6
-        assert result['_metadata']['record_limit'] == 23
-        assert result['_metadata']['records_skipped'] == 4
-        assert result['_metadata']['total_count'] == 10
-    else:
-        assert result['_metadata']['countReturned'] == 6
-        assert result['_metadata']['recordLimit'] == 23
-        assert result['_metadata']['recordsSkipped'] == 4
-        assert result['_metadata']['totalCount'] == 10
-
 
 # ##############################
 # tenancy - tests for bleed over
@@ -2380,7 +1861,7 @@ def test_create_actor_with_webhook(headers):
     url = '{}/actors/{}/executions'.format(base_url, aid)
     webhook_ready_ex_id = None
     idx = 0
-    while not webhook_ready_ex_id and idx < 35:
+    while not webhook_ready_ex_id and idx < 25:
         rsp = requests.get(url, headers=headers)
         ex_data = rsp.json().get('result').get('executions')
         if ex_data and len(ex_data) > 0:
@@ -2431,7 +1912,7 @@ def test_execute_event_actor(headers):
     url = '{}/actors/{}/executions'.format(base_url, link_actor_id)
     # the linked actor should get 2 messages - one for the original actor initially being set to READY
     # and a second when the execution sent above completes.
-    while not link_execution_ex_id and idx < 35:
+    while not link_execution_ex_id and idx < 15:
         rsp = requests.get(url, headers=headers)
         ex_data = rsp.json().get('result').get('executions')
         if ex_data and len(ex_data) > 1:
@@ -2482,7 +1963,7 @@ def test_execute_event_actor(headers):
 def test_cant_create_link_with_cycle(headers):
     # this test checks that adding a link to an actor that did not have one that creates a cycle
     # is not allowed.
-    # register a new actor with no linktest_register_actor_with_cron
+    # register a new actor with no link
     url = '{}/{}'.format(base_url, '/actors')
     data = {'image': 'jstubbs/abaco_test',
             'name': 'abaco_test_suite_create_link',}
