@@ -7,6 +7,7 @@ import threading
 import time
 import timeit
 import base64
+import re
 
 from cryptography.fernet import Fernet
 from channelpy.exceptions import ChannelClosedException, ChannelTimeoutException
@@ -20,7 +21,7 @@ from channels import ActorMsgChannel, CommandChannel, ExecutionResultsChannel, W
 from codes import SUBMITTED, COMPLETE, SHUTTING_DOWN, PERMISSION_LEVELS, ALIAS_NONCE_PERMISSION_LEVELS, READ, UPDATE, EXECUTE, PERMISSION_LEVELS, PermissionLevel
 from config import Config
 from errors import DAOError, ResourceError, PermissionsException, WorkerException
-from models import dict_to_camel, display_time, is_hashid, Actor, ActorConfig, Alias, Execution, ExecutionsSummary, Nonce, Worker, get_permissions, \
+from models import dict_to_camel, display_time, is_hashid, Actor, ActorConfig, Alias, Execution, ExecutionsSummary, ActorConfig, Nonce, Worker, get_permissions, \
     set_permission, get_config_permissions, set_config_permission, get_current_utc_time
 
 from mounts import get_all_mounts
@@ -1022,7 +1023,9 @@ class ActorConfigsResource(Resource):
         # permission model
         # permissions endpoint
         configs = []
-        for k, v in configs_store.items():
+        logger.debug(f"CONFIGS: {configs_store.items()}")
+        for v in configs_store.items():
+            logger.debug(f"item is {v}")
             if v['tenant'] == g.tenant:
                 configs.append(ActorConfig.from_db(v).display())
         logger.info("actor configs retrieved.")
@@ -1043,15 +1046,31 @@ class ActorConfigsResource(Resource):
         logger.info("top of POST to register a new config.")
         args = self.validate_post()
         actors = args.get('actors')
-        # make actors string into list
-        # args['actors'] = json.loads(actors)
+        try:
+            #actors = actors[0].split(", ")
+            actors = re.split(", |,",actors[0])
+        except expression as identifier:
+            pass
+        logger.debug(f"actors are {actors}")
+        # Check that the actor id corresponds to a real actor
+        for uid in actors:
+            logger.debug(f"actor is {uid}")
+            try:
+                total_id = f"{g.tenant}_{uid}"
+                actors_store[total_id]
+            except KeyError:
+                logger.debug("did not find actor: {}.".format(uid))
+                raise ResourceError("No actor found with id: {}.".format(uid), 404)
+
+
         args['tenant'] = g.tenant
         if args.get('isSecret') or args.get('is_secret'):
             args['value'] = encrypt_utils.encrypt(args.get('value'))
-        logger.debug("config post args validated: {}.".format(actors))
+        #logger.debug("config post args validated: {}.".format(actors))
+
         actor_config = ActorConfig(**args)
 
-        logger.debug(f"HERE IS THE LOG: {actor_config.is_secret}")
+        #logger.debug(f"HERE IS THE LOG: {actor_config.is_secret}")
         configs_store[actor_config.name] = actor_config.to_db()
         # set permissions for this config
         set_config_permission(g.user, actor_config.name, UPDATE)
@@ -1061,7 +1080,7 @@ class ActorConfigsResource(Resource):
 
 class ActorConfigResource(Resource):
     def get(self, config):
-        logger.debug("top of GET /actors/config/{}".format(config))
+        logger.debug("top of GET /actors/configs/{}".format(config))
         # alias_id = Alias.generate_alias_id(g.tenant, alias)
         try:
             config = ActorConfig.from_db(configs_store[config])
@@ -1110,12 +1129,31 @@ class ActorConfigResource(Resource):
         if not check_config_permissions(user=g.user, config=config, level=codes.UPDATE, roles=g.roles):
             raise PermissionsException(f"Not authorized -- you do not have UPDATE "
                                        f"access to the actor config you want to update.")
+        # Check that the actor ids correspond to real actors
+        actors = args.get('actors')
+        try:
+            actors = re.split(", |,",actors[0])
+        except expression as identifier:
+            pass
+        logger.debug(f"actors are {actors}")
+        # Loop through ids and check
+        for uid in actors:
+            logger.debug(f"actor is {uid}")
+            try:
+                total_id = f"{g.tenant}_{uid}"
+                actors_store[total_id]
+            except KeyError:
+                logger.debug("did not find actor: {}.".format(uid))
+                raise ResourceError("No actor found with id: {}.".format(uid), 404)
         logger.debug(f"config: {config}")
         # supply "provided" fields:
-        # args['tenant'] = config_obj.tenant
+        args['tenant'] = config_obj.tenant
         args['name'] = config_obj.name
         # args['actors'] = config_obj.actors
         # args['is_secret'] = config_obj.is_secret
+        logger.info(f"isSecret is {args.get('isSecret')}")
+        if args.get('isSecret') or args.get('is_secret'):
+            args['value'] = encrypt_utils.encrypt(args.get('value'))
         # args['api_server'] = config_obj.value
         logger.debug("Instantiating actor config object. args: {}".format(args))
         new_config_obj = ActorConfig(**args)
